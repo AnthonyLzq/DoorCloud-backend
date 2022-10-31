@@ -22,6 +22,7 @@ specifiers:
   jest-mock-extended: ^3.0.1
   jest-unit: ^0.0.2
   mqtt: ^4.3.7
+  node-webcam: ^0.8.1
   nodemon: ^2.0.20
   prettier: ^2.7.1
   redis: ^4.3.1
@@ -39,6 +40,7 @@ specifiers:
 dependencies:
   debug: 4.3.4
   mqtt: 4.3.7
+  node-webcam: 0.8.1
   redis: 4.3.1
 
 devDependencies:
@@ -1242,7 +1244,6 @@ packages:
 
   /abbrev/1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
-    dev: true
 
   /acorn-import-assertions/1.8.0_acorn@8.8.1:
     resolution: {integrity: sha512-m7VZ3jwz4eK6A4Vtt8Ew1/mNbP24u0FhdyfA7fSvnJR6LMdfOYnmuIrrJAgrYfYJ10F/otaHTtrtrtmHdMNzEw==}
@@ -3492,6 +3493,14 @@ packages:
     resolution: {integrity: sha512-PiVXnNuFm5+iYkLBNeq5211hvO38y63T0i2KKh2KnUs3RpzJ+JtODFjkD8yjLwnDkTYF1eKXheUwdssR+NRZdg==}
     dev: true
 
+  /node-webcam/0.8.1:
+    resolution: {integrity: sha512-xtI9oF7T6NIpJhou4BfLF224IDPPmH45tNhhixUImgYmD+pJAf9Wuj4LMbyMaIHmePbuj24lUFOCQ/oV7Z/IvQ==}
+    hasBin: true
+    requiresBuild: true
+    dependencies:
+      nopt: 1.0.10
+    dev: false
+
   /nodemon/2.0.20:
     resolution: {integrity: sha512-Km2mWHKKY5GzRg6i1j5OxOHQtuvVsgskLfigG25yTtbyfRGn/GNvIbRyOf1PSCKJ2aT/58TiuUsuOU5UToVViw==}
     engines: {node: '>=8.10.0'}
@@ -3514,7 +3523,6 @@ packages:
     hasBin: true
     dependencies:
       abbrev: 1.1.1
-    dev: true
 
   /normalize-path/3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}

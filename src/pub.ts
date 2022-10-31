@@ -1,23 +1,24 @@
-import debug from 'debug'
+import debug from 'debug';
 
-import { getClient, BASE_TOPIC } from './network'
+import { getClient, BASE_TOPIC } from './network';
+import { CameraService } from './services';
+debug('DoorCloud:Mqtt:pub');
 
-debug('DoorCloud:Mqtt:pub')
-
-const client = getClient()
+const client = getClient();
 
 client.on('connect', () => {
-  debug.log('Connected to mqtt server')
-})
+  debug.log('Connected to mqtt server');
+});
 
-client.on('error', error => {
-  console.log(error)
-})
+client.on('error', (error) => {
+  console.log(error);
+});
 
-const test = {
-  foo: 'bar'
-}
+const cameraService = new CameraService();
 
-client.publish(`${BASE_TOPIC}/test`, Buffer.from(JSON.stringify(test)), () => {
-  debug.log('Message send')
-})
+// [TODO] - Execute this at every button press
+cameraService.takePicture().then((photoBase64) => {
+  client.publish(`${BASE_TOPIC}/test`, Buffer.from(photoBase64), () => {
+    debug.log('Message send');
+  });
+});

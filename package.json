@@ -50,6 +50,7 @@
   "dependencies": {
     "debug": "^4.3.4",
     "mqtt": "^4.3.7",
+    "node-webcam": "^0.8.1",
     "redis": "^4.3.1"
   },
   "nodemonConfig": {
