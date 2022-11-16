@@ -9,8 +9,7 @@
     "start": "node dist/index.js",
     "release": "standard-version",
     "test": "jest",
-    "pub": "ts-node -r dotenv/config src/pub.ts",
-    "sub": "ts-node -r dotenv/config src/sub.ts"
+    "pub": "DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts"
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
   "license": "MIT",

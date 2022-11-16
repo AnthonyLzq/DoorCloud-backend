@@ -1,8 +1,4 @@
-import debug from 'debug'
-// import redis from 'redis'
 import mqtt from 'mqtt'
-
-debug('DoorCloud:Mqtt')
 
 let client: mqtt.MqttClient
 const options: mqtt.IClientOptions = {
@@ -13,8 +9,6 @@ const options: mqtt.IClientOptions = {
   username: process.env.MQTT_USER,
   password: process.env.MQTT_PASS
 }
-const BASE_TOPIC = 'DoorCloud'
-const SUB_TOPIC = `${BASE_TOPIC}/#`
 
 const getClient = () => {
   if (!client) client = mqtt.connect(options)
@@ -22,4 +16,10 @@ const getClient = () => {
   return client
 }
 
-export { getClient, BASE_TOPIC, SUB_TOPIC }
+const start = async () => {
+  const { applyRoutes } = await import('./router')
+
+  applyRoutes(getClient())
+}
+
+export { start, getClient }
