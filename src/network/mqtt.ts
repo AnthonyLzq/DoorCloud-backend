@@ -1,4 +1,5 @@
 import mqtt from 'mqtt'
+import debug from 'debug'
 
 let client: mqtt.MqttClient
 const options: mqtt.IClientOptions = {
@@ -9,9 +10,17 @@ const options: mqtt.IClientOptions = {
   username: process.env.MQTT_USER,
   password: process.env.MQTT_PASS
 }
+const namespace = 'DoorCloud:Mqtt:Server'
+const debugMessage = 'Connected to mqtt server'
+const serverDebug = debug(namespace)
 
 const getClient = () => {
-  if (!client) client = mqtt.connect(options)
+  if (!client) {
+    client = mqtt.connect(options)
+    client.on('connect', () => {
+      serverDebug(debugMessage)
+    })
+  }
 
   return client
 }
@@ -22,4 +31,8 @@ const start = async () => {
   applyRoutes(getClient())
 }
 
-export { start, getClient }
+const stop = async () => {
+  getClient().end()
+}
+
+export { start, getClient, stop, namespace, debugMessage }

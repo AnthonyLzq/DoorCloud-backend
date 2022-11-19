@@ -1,8 +1,10 @@
 import debug from 'debug'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 import { getClient } from './network'
 
-const pubDebug = debug('DoorCloud:Mqtt:pub')
+const pubDebug = debug('DoorCloud:Mqtt:demo:pub')
 
 const client = getClient()
 
@@ -14,10 +16,9 @@ client.on('error', error => {
   pubDebug('Error: ', error)
 })
 
-const test = {
-  foo: 'bar'
-}
+const filePath = join(__dirname, '../basic_pub_sub_test.png')
+const file = readFileSync(filePath)
 
-client.publish('DoorCloud/test', Buffer.from(JSON.stringify(test)), () => {
+client.publish('DoorCloud/image', file, () => {
   pubDebug('Message send')
 })

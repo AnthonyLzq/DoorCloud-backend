@@ -8,8 +8,8 @@
     "service": "nodemon",
     "start": "node dist/index.js",
     "release": "standard-version",
-    "test": "jest",
-    "pub": "DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts"
+    "test:local": "jest --setupFiles dotenv/config --ci -i",
+    "pub": "nodemon --exec \"DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts\""
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
   "license": "MIT",
