@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "release": "standard-version",
     "test:local": "jest --setupFiles dotenv/config --ci -i",
+    "test:ci": "jest --ci -i",
     "pub": "nodemon --exec \"DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts\""
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
