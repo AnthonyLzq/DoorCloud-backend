@@ -1,7 +1,8 @@
 import debug from 'debug'
 import { MqttClient } from 'mqtt'
 
-import { SUB_TOPIC } from './topic'
+const PUB_TOPIC = 'DoorCloud'
+const SUB_TOPIC = `${PUB_TOPIC}/#`
 
 const sub = (client: MqttClient) => {
   const subDebug = debug('DoorCloud:Mqtt:sub')
@@ -23,4 +24,10 @@ const sub = (client: MqttClient) => {
   })
 }
 
-export { sub }
+const demo: Route = {
+  sub,
+  PUB_TOPIC,
+  SUB_TOPIC
+}
+
+export { demo }

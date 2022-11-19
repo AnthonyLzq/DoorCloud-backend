@@ -1,12 +1,9 @@
 import { MqttClient } from 'mqtt'
-import { demo } from './routes'
-
-const routes = [demo]
+import * as Routes from './routes'
 
 const applyRoutes = (client: MqttClient) => {
-  routes.forEach(route => {
-    route.pub(client)
-    route.sub(client)
+  ;(Object.keys(Routes) as (keyof typeof Routes)[]).forEach(route => {
+    Routes[route].sub(client)
   })
 }
 

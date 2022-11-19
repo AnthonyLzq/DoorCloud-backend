@@ -18,17 +18,22 @@ At this point, we only can test receiving and sending messages.
 To subscribe and receive messages in the default topic `DoorCloud` we have to run the following command:
 
 ```bash
-pnpm sub
+pnpm service
 ```
 
-We will get the following out put:
+We will get an output as follows:
 
 ```bash
-> doorcloud-backend@0.1.0 sub /.../DoorCloud/backend
-> ts-node -r dotenv/config src/sub.ts
+> doorcloud-backend@0.1.0 service ~/DoorCloud-backend
+> nodemon
 
-Connected to mqtt server
-Suscribed to DoorCloud/#
+[nodemon] 2.0.20
+[nodemon] to restart at any time, enter `rs`
+[nodemon] watching path(s): .env src/**/*
+[nodemon] watching extensions: ts
+[nodemon] starting `DEBUG=DoorCloud:* npx ts-node -r dotenv/config ./src/index`
+  DoorCloud:Mqtt:sub Connected to mqtt server - Topic: DoorCloud/# +0ms
+  DoorCloud:Mqtt:sub Subscribed to Topic: DoorCloud/# +209ms
 ```
 
 Once we receive a new message it will be displayed immediately after.
@@ -44,11 +49,11 @@ pnpm pub
 We will get the following out put:
 
 ```bash
-> doorcloud-backend@0.1.0 pub /Users/anthonylzq/Development/personal-projects/DoorCloud/backend
-> ts-node -r dotenv/config src/pub.ts
+> doorcloud-backend@0.1.0 pub ~/DoorCloud-backend
+> DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts
 
-Message send
-Connected to mqtt server
+  DoorCloud:Mqtt:pub Message send +0ms
+  DoorCloud:Mqtt:pub Connected to mqtt server +1ms
 ```
 
 Finally, we may have an output as follows:
