@@ -8,10 +8,6 @@ const pubDebug = debug('DoorCloud:Mqtt:demo:pub')
 
 const client = getClient()
 
-client.on('connect', () => {
-  pubDebug('Connected to mqtt server')
-})
-
 client.on('error', error => {
   pubDebug('Error: ', error)
 })
