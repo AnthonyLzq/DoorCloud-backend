@@ -18,11 +18,14 @@ jobs:
         with:
           node-version: 16.x
 
-      - name: Install Node.js dependencies
-        run: yarn install --frozen-lockfile
+      - name: Install pnpm
+        run: corepack enable
 
-      - name: Revert changes into the yarn.lock file
-        run: git checkout -- yarn.lock
+      - name: Install Node.js dependencies
+        run: pnpm i
+
+      - name: Revert changes into the pnpm-lock.yaml file
+        run: git checkout -- pnpm-lock.yaml
 
       - name: Run linters
         uses: wearerequired/lint-action@v1
