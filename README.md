@@ -34,11 +34,12 @@ We will get an output as follows:
 [nodemon] watching path(s): .env src/**/*
 [nodemon] watching extensions: ts
 [nodemon] starting `DEBUG=DoorCloud:* npx ts-node -r dotenv/config ./src/index`
-  DoorCloud:Mqtt:Server Connected to mqtt server +0ms
-  DoorCloud:Mqtt:demo:sub Subscribed to Topic: DoorCloud/# +0ms
-  DoorCloud:Mqtt:demo:sub Topic: DoorCloud/image - Message received +8s
-  DoorCloud:Mqtt:demo:sub Received an image +1ms
-  DoorCloud:Mqtt:demo:sub Topic: DoorCloud/# - Image: /home/anthony/Development/personal-projects/DoorCloud-backend/src/network/routes/test.png created. +2ms
+[04:34:52 UTC] INFO: Server listening at http://127.0.0.1:1996
+[04:34:52 UTC] INFO: Server listening at http://[::1]:1996
+[04:34:53 UTC] INFO: Connected to mqtt server
+[04:34:53 UTC] INFO: DoorCloud:Mqtt:demo:sub
+[04:34:59 UTC] INFO: Received an image
+[04:34:59 UTC] INFO: Topic: DoorCloud/# - Image: /home/anthony/Development/personal-projects/DoorCloud-backend/src/network/mqtt/routes/test.png created.
 ```
 
 Once we receive a new message it will be displayed immediately after.
@@ -70,10 +71,10 @@ Finally, we may have an output as follows:
 
 ![](basic_pub_sub_test.png)
 
-### Unit test
+<!-- ### Unit test
 
 In order to run the unit tests of the project you can run:
 
 ```bash
 pnpm test:local
-```
+``` -->

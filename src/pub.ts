@@ -2,10 +2,9 @@ import debug from 'debug'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-import { getClient } from './network'
+import { getClient } from './network/mqtt'
 
 const pubDebug = debug('DoorCloud:Mqtt:demo:pub')
-
 const client = getClient()
 
 client.on('error', error => {

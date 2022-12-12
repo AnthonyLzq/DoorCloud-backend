@@ -1,3 +1,3 @@
-import { start } from './network'
+import { Server } from './network'
 
-start()
+Server.start()

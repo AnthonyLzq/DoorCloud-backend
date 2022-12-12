@@ -1,4 +1,4 @@
-import debug from 'debug'
+import { FastifyBaseLogger } from 'fastify'
 import { writeFile } from 'fs'
 import { MqttClient } from 'mqtt'
 import { join } from 'path'
@@ -6,37 +6,35 @@ import { join } from 'path'
 const PUB_TOPIC = 'DoorCloud'
 const SUB_TOPIC = `${PUB_TOPIC}/#`
 
-const sub = (client: MqttClient) => {
-  const subDebug = debug('DoorCloud:Mqtt:demo:sub')
+const sub = (client: MqttClient, logger: FastifyBaseLogger) => {
+  const subDebugger = 'DoorCloud:Mqtt:demo:sub'
 
   client.subscribe(SUB_TOPIC, error => {
-    if (!error) subDebug(`Subscribed to Topic: ${SUB_TOPIC}`)
+    if (!error) logger.info({}, subDebugger)
   })
 
   client.on('error', error => {
-    subDebug(`Topic: ${SUB_TOPIC} - Error:`, error)
+    logger.error(error, `Topic: ${SUB_TOPIC} - Error`)
   })
 
   client.on('message', async (topic, message) => {
-    subDebug(`Topic: ${topic} - Message received`)
-
     if (topic.includes('image')) {
-      subDebug('Received an image')
+      logger.info({}, 'Received an image')
 
       const path = join(__dirname, 'test.png')
 
       await new Promise<void>((resolve, reject) => {
         writeFile(path, message, error => {
           if (error) {
-            subDebug(
-              `Topic: ${SUB_TOPIC} - Error while creating the image:`,
-              error
+            logger.error(
+              error,
+              `Topic: ${SUB_TOPIC} - Error while creating the image`
             )
 
             return reject(new Error('Error while creating the image'))
           }
 
-          subDebug(`Topic: ${SUB_TOPIC} - Image: ${path} created.`)
+          logger.info({}, `Topic: ${SUB_TOPIC} - Image: ${path} created.`)
           resolve()
         })
       })
