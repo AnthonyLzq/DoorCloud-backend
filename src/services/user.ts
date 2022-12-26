@@ -1,18 +1,10 @@
-import { BusboyConfig } from '@fastify/busboy'
 import { MultipartFile } from '@fastify/multipart'
-import { FastifyRequest, FastifyReply, FastifyBaseLogger } from 'fastify'
+import { FastifyBaseLogger } from 'fastify'
 import { PostgrestResponse } from '@supabase/postgrest-js/src/types'
 import crypto from 'crypto'
 
 import { supabaseClient } from 'database'
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    files: (
-      options?: Omit<BusboyConfig, 'headers'>
-    ) => AsyncIterableIterator<MultipartFile>
-  }
-}
+import { CustomError } from 'network/http'
 
 class UserServices {
   #log: FastifyBaseLogger
@@ -23,111 +15,59 @@ class UserServices {
 
   async createUser(name: string, phone: string) {
     // getUserByNameAndPhone
-    const { data, error } = await supabaseClient
-      .from('users')
-      .insert({ name, phone })
-      .select('userID')
+    const { data, error }: PostgrestResponse<UserSupabase | null> =
+      await supabaseClient.from('users').insert({ name, phone }).select('*')
 
     if (error) {
       const message = 'Error while creating user'
       this.#log.error(error, message)
 
-      throw new Error(message)
+      throw new CustomError(message)
     }
+
+    this.#log.info(data, 'User created')
 
     return {
       name,
       phone,
-      idFolder: data[0].userID
+      folderID: `${name}-${data[0]?.userID}`
     }
-  }
-
-  static uploadPhotosSupabase = async (
-    request: FastifyRequest<{ Params: { idFolder: string } }>,
-    reply: FastifyReply
-  ) => {
-    const {
-      params: { idFolder }
-    } = request
-
-    if (!idFolder)
-      return reply.code(400).send({ error: 'idFolder is required' })
-
-    const files = await request.files()
-    const [user, ...arrUserID] = idFolder.split('-')
-    const userID: string = arrUserID.join('-')
-    const response: PostgrestResponse<UserSupabase | null> =
-      await supabaseClient
-        .from('users')
-        .select('name')
-        .eq('userID', userID)
-        .select()
-
-    if (!response.data)
-      return reply.code(404).send({ error: ' User not found' })
-
-    if (response.data[0]?.name !== user)
-      return reply.code(409).send({ error: 'wrong user' })
-
-    // any generic error
-    if (response.error) {
-      const { error } = response
-
-      return reply.code(500).send({ error })
-    }
-
-    for await (const file of files) {
-      const bufferFile = await file.toBuffer()
-      const format = file.mimetype.split('/')[1]
-      const response = await supabaseClient.storage
-        .from('photos')
-        .upload(
-          `${idFolder}/${file.fieldname}-${crypto.randomUUID()}.${format}`,
-          bufferFile
-        )
-
-      if (response.error) return reply.code(500).send({ error: response.error })
-    }
-
-    return reply.code(200).send({ message: 'success' })
   }
 
   async uploadPhotos(
-    idFolder: string,
+    folderID: string,
     files: AsyncIterableIterator<MultipartFile>
   ) {
-    const [user, ...arrUserID] = idFolder.split('-')
-    const userID: string = arrUserID.join('-')
-    const response: PostgrestResponse<UserSupabase | null> =
+    const [userName, ...rest] = folderID.split('-')
+    const userID = rest.join('-')
+    const { data, error }: PostgrestResponse<UserSupabase | null> =
       await supabaseClient
         .from('users')
         .select('name')
         .eq('userID', userID)
-        .select()
+        .select('*')
     let errorMessage = ''
 
-    if (!response.data) {
+    if (!data) {
       errorMessage = 'User not found'
       this.#log.error(errorMessage)
 
-      throw new Error(errorMessage)
+      throw new CustomError(errorMessage, 404)
     }
 
-    if (response.data[0]?.name !== user) {
+    if (data[0]?.userID !== userID) {
       errorMessage = 'Wrong user'
       this.#log.error(errorMessage)
 
-      throw new Error(errorMessage)
+      throw new CustomError(errorMessage, 409)
     }
 
     // any generic error
-    if (response.error) {
-      const { error } = response
-
+    if (error) {
       errorMessage = 'Unknown error'
       this.#log.error(error, errorMessage)
 
-      throw new Error(errorMessage)
+      throw new CustomError(errorMessage)
     }
 
     for await (const file of files) {
@@ -136,7 +76,9 @@ class UserServices {
       const response = await supabaseClient.storage
         .from('photos')
         .upload(
-          `${idFolder}/${file.fieldname}-${crypto.randomUUID()}.${format}`,
+          `${userName}-${userID}/${
+            file.fieldname
+          }-${crypto.randomUUID()}.${format}`,
           bufferFile
         )
 
@@ -144,7 +86,7 @@ class UserServices {
         errorMessage = 'Error while uploading file'
         this.#log.error(response.error, errorMessage)
 
-        throw new Error(errorMessage)
+        throw new CustomError(errorMessage)
       }
     }
 

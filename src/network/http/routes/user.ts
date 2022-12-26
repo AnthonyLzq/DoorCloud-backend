@@ -1,11 +1,11 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { BusboyConfig } from '@fastify/busboy'
 import { MultipartFile } from '@fastify/multipart'
-import httpErrors from 'http-errors'
 
-import { UserServices } from 'services'
 import { userRef, UserRequest } from 'schemas'
+import { UserServices } from 'services'
 import { response } from '../response'
+import { handlerErrorInRoute } from '../utils'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -37,44 +37,36 @@ const User = (server: FastifyInstance, prefix = '/api') => {
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
-        const message = error instanceof Error ? error.message : ''
-
-        throw new httpErrors.InternalServerError(
-          `Something went wrong: ${message}`
-        )
+        handlerErrorInRoute(error)
       }
     }
   })
 
   server.route({
     method: 'POST',
-    url: `${prefix}/user/:idFolder/upload`,
+    url: `${prefix}/user/:folderID/upload`,
     handler: async (
-      request: FastifyRequest<{ Params: { idFolder: string } }>,
+      request: FastifyRequest<{ Params: { folderID: string } }>,
       reply: FastifyReply
     ) => {
       const {
-        params: { idFolder }
+        params: { folderID }
       } = request
 
-      if (!idFolder)
+      if (!folderID)
         return response({
           error: true,
-          message: 'idFolder is required',
+          message: 'folderID is required',
           reply,
           status: 400
         })
 
       try {
-        const result = await us.uploadPhotos(idFolder, await request.files())
+        const result = await us.uploadPhotos(folderID, await request.files())
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
-        const message = error instanceof Error ? error.message : ''
-
-        throw new httpErrors.InternalServerError(
-          `Something went wrong: ${message}`
-        )
+        handlerErrorInRoute(error)
       }
     }
   })
