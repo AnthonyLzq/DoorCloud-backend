@@ -4,11 +4,9 @@ import { HttpError } from 'http-errors'
 import { response } from './response'
 import { Home, User } from './routes'
 
-// const routers = [Docs, User]
+const routes = [Home, User]
 const applyRoutes = (app: FastifyInstance): void => {
-  Home(app)
-  User(app)
-  // routers.forEach(router => router(app))
+  routes.forEach(route => route(app))
 
   // Handling 404 error
   app.setNotFoundHandler((request, reply) => {
