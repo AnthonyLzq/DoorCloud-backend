@@ -1,5 +1,8 @@
 import fastify, { FastifyInstance } from 'fastify'
 
+import { supabaseConnection } from 'database'
+import { userSchemas } from 'schemas'
+
 import { applyRoutes, validatorCompiler } from './http'
 import { mqttConnection } from './mqtt'
 
@@ -31,6 +34,13 @@ class Server {
 
   #config() {
     this.#app.register(require('@fastify/cors'), {})
+    this.#app.register(require('@fastify/multipart'), {
+      limits: {
+        fields: 3,
+        files: 3
+      }
+    })
+    for (const schema of userSchemas) this.#app.addSchema(schema)
     this.#app.addHook('preHandler', (req, reply, done) => {
       reply.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE')
       reply.header('Access-Control-Allow-Origin', '*')
@@ -51,6 +61,7 @@ class Server {
 
   public async start(): Promise<void> {
     try {
+      supabaseConnection()
       await this.#startMqtt()
       await this.#mqqtConnection?.start()
       await this.#app.listen({
