@@ -18,8 +18,8 @@ const sub = (client: MqttClient, logger: FastifyBaseLogger) => {
   })
 
   client.on('message', async (topic, message) => {
-    if (topic.includes('image')) {
-      logger.info({}, 'Received an image')
+    if (topic.includes('photo')) {
+      logger.info({}, 'Received an photo')
 
       const path = join(__dirname, 'test.png')
 
