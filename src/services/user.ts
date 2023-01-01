@@ -97,9 +97,34 @@ class UserServices {
       paths.push(response.data.path)
     }
 
-    console.log('paths', paths)
+    const { data: urlsData, error: urlsError } = await supabaseConnection()
+      .storage.from('photos')
+      .createSignedUrls(paths, 200)
 
-    return paths
+    if (urlsError)
+      this.#log.error(
+        urlsError,
+        'Error while trying to get the urls for the uploaded images'
+      )
+
+    return (
+      urlsData?.reduce<string[]>((acc, url, index) => {
+        if (url.error) {
+          this.#log.error(
+            url.error,
+            `Error while trying to get a url for the uploaded image number: ${
+              index + 1
+            }`
+          )
+
+          return acc
+        }
+
+        acc.push(url.signedUrl)
+
+        return acc
+      }, []) ?? []
+    )
   }
 }
 export { UserServices }
