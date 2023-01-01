@@ -1,9 +1,9 @@
+import crypto from 'crypto'
 import { MultipartFile } from '@fastify/multipart'
 import { FastifyBaseLogger } from 'fastify'
 import { PostgrestResponse } from '@supabase/postgrest-js/src/types'
-import crypto from 'crypto'
 
-import { supabaseClient } from 'database'
+import { supabaseConnection } from 'database'
 import { CustomError } from 'network/http'
 
 class UserServices {
@@ -16,7 +16,10 @@ class UserServices {
   async createUser(name: string, phone: string) {
     // getUserByNameAndPhone
     const { data, error }: PostgrestResponse<UserSupabase | null> =
-      await supabaseClient.from('users').insert({ name, phone }).select('*')
+      await supabaseConnection()
+        .from('users')
+        .insert({ name, phone })
+        .select('*')
 
     if (error) {
       const message = 'Error while creating user'
@@ -37,11 +40,11 @@ class UserServices {
   async uploadPhotos(
     folderID: string,
     files: AsyncIterableIterator<MultipartFile>
-  ) {
+  ): Promise<string[]> {
     const [userName, ...rest] = folderID.split('-')
     const userID = rest.join('-')
     const { data, error }: PostgrestResponse<UserSupabase | null> =
-      await supabaseClient
+      await supabaseConnection()
         .from('users')
         .select('name')
         .eq('userID', userID)
@@ -70,11 +73,13 @@ class UserServices {
       throw new CustomError(errorMessage)
     }
 
+    const paths: string[] = []
+
     for await (const file of files) {
       const bufferFile = await file.toBuffer()
       const format = file.mimetype.split('/')[1]
-      const response = await supabaseClient.storage
-        .from('photos')
+      const response = await supabaseConnection()
+        .storage.from('photos')
         .upload(
           `${userName}-${userID}/${
             file.fieldname
@@ -88,9 +93,13 @@ class UserServices {
 
         throw new CustomError(errorMessage)
       }
+
+      paths.push(response.data.path)
     }
 
-    return 'success'
+    console.log('paths', paths)
+
+    return paths
   }
 }
 export { UserServices }

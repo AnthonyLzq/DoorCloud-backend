@@ -66,6 +66,7 @@ const User = (server: FastifyInstance, prefix = '/api') => {
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
+        console.log('error', error)
         handlerErrorInRoute(error)
       }
     }
