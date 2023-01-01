@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { FastifyBaseLogger } from 'fastify'
 
 const supabaseUrl = process.env.SUPABASE_URL as string
 const supabaseKey = process.env.SUPABASE_KEY as string
@@ -8,10 +9,10 @@ declare global {
   var __supabaseClient__: SupabaseClient
 }
 
-const supabaseConnection = () => {
+const supabaseConnection = (log?: FastifyBaseLogger) => {
   if (!global.__supabaseClient__) {
     global.__supabaseClient__ = createClient(supabaseUrl, supabaseKey)
-    console.log('Supabase connection established.')
+    log?.info('Supabase connection established.')
   }
 
   return global.__supabaseClient__

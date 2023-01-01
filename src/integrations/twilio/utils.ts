@@ -1,8 +1,11 @@
+import { FastifyBaseLogger } from 'fastify'
+
 import { twilioConnection } from './connection'
 
 const sendPictureThroughWhatsapp = async (
   imageUrl: string,
-  phoneNumber = '+51936962826'
+  phoneNumber = '+51936962826',
+  log: FastifyBaseLogger
 ) => {
   const client = twilioConnection()
 
@@ -13,7 +16,7 @@ const sendPictureThroughWhatsapp = async (
     mediaUrl: [imageUrl]
   })
 
-  console.log('Image sent')
+  log?.info('Image sent')
 }
 
 export { sendPictureThroughWhatsapp }

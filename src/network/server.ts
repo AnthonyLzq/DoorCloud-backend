@@ -5,6 +5,7 @@ import { userSchemas } from 'schemas'
 
 import { applyRoutes, validatorCompiler } from './http'
 import { mqttConnection } from './mqtt'
+import { twilioConnection } from 'integrations'
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 1996
 const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
@@ -57,14 +58,15 @@ class Server {
     applyRoutes(this.#app)
   }
 
-  async #startMqtt() {
+  #startMqtt() {
     this.#mqqtConnection = mqttConnection(this.#app.log)
   }
 
   public async start(): Promise<void> {
     try {
-      supabaseConnection()
-      await this.#startMqtt()
+      supabaseConnection(this.#app.log)
+      twilioConnection(this.#app.log)
+      this.#startMqtt()
       await this.#mqqtConnection?.start()
       await this.#app.listen({
         port: PORT

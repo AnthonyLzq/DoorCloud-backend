@@ -17,11 +17,11 @@ const options: mqtt.IClientOptions = {
 const namespace = 'DoorCloud:Mqtt:Server'
 const debugMessage = 'Connected to mqtt server'
 
-const getClient = (logger?: FastifyBaseLogger) => {
+const getClient = (log?: FastifyBaseLogger) => {
   if (!global.__mqttClient__) {
     global.__mqttClient__ = mqtt.connect(options)
     global.__mqttClient__.on('connect', () => {
-      if (logger) logger?.info({}, debugMessage)
+      if (log) log?.info({}, debugMessage)
       else
         import('debug').then(debug => {
           const clientDebug = debug.default(namespace)
@@ -34,16 +34,16 @@ const getClient = (logger?: FastifyBaseLogger) => {
   return global.__mqttClient__
 }
 
-const mqttConnection = (logger: FastifyBaseLogger) => ({
+const mqttConnection = (log: FastifyBaseLogger) => ({
   start: async () => {
     const { applyRoutes } = await import('./router')
 
-    applyRoutes(getClient(logger), logger)
+    applyRoutes(getClient(log), log)
 
     return global.__mqttClient__
   },
   stop: async () => {
-    getClient(logger).end()
+    getClient(log).end()
   }
 })
 
