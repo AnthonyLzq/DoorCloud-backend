@@ -66,14 +66,20 @@ const getUserByUserID = async (
   return data
 }
 
-const uploadUserPhoto = async (
-  path: string,
-  bufferFile: Buffer,
+const uploadUserPhoto = async ({
+  path,
+  bufferFile,
+  log,
+  format
+}: {
+  path: string
+  bufferFile: Buffer
   log: FastifyBaseLogger
-) => {
+  format: string
+}) => {
   const response = await supabaseConnection()
     .storage.from('photos')
-    .upload(path, bufferFile)
+    .upload(path, bufferFile, { contentType: `image/${format}` })
 
   if (response.error) {
     const errorMessage = 'Error while uploading file'

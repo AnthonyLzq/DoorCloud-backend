@@ -8,7 +8,7 @@ const Home = (app: FastifyInstance, prefix = '/'): void => {
       error: false,
       message: 'DoorCloud backend!',
       reply,
-      status: 900
+      status: 200
     })
   })
 }

@@ -45,13 +45,14 @@ class UserServices {
 
     for await (const file of files) {
       const format = file.mimetype.split('/')[1]
-      const response = await uploadUserPhoto(
-        `${userName}-${userID}/${
+      const response = await uploadUserPhoto({
+        path: `${userName}-${userID}/${
           file.fieldname
         }-${crypto.randomUUID()}.${format}`,
-        await file.toBuffer(),
-        this.#log
-      )
+        bufferFile: await file.toBuffer(),
+        log: this.#log,
+        format
+      })
 
       paths.push(response.data.path)
     }
@@ -74,11 +75,12 @@ class UserServices {
     }
 
     const { name, phone } = user
-    const response = await uploadUserPhoto(
-      `${name}-${userID}/${getTimestamp()}-${crypto.randomUUID()}.${format}`,
-      bufferPhoto,
-      this.#log
-    )
+    const response = await uploadUserPhoto({
+      path: `${name}-${userID}/${getTimestamp()}-${crypto.randomUUID()}.${format}`,
+      bufferFile: bufferPhoto,
+      log: this.#log,
+      format
+    })
     const [url] = await getPhotosUrls([response.data.path], 900, this.#log)
 
     await sendPhotoThroughWhatsapp(url, phone, this.#log)

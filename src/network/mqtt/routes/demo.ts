@@ -1,10 +1,9 @@
 import { FastifyBaseLogger } from 'fastify'
 import { MqttClient } from 'mqtt'
-import { join } from 'path'
 import { UserServices } from 'services'
 
 const PUB_TOPIC = 'DoorCloud'
-const SUB_TOPIC = `${PUB_TOPIC}/#`
+const SUB_TOPIC = `${PUB_TOPIC}/photo`
 
 const sub = (client: MqttClient, log: FastifyBaseLogger) => {
   const subDebugger = 'DoorCloud:Mqtt:demo:sub'
@@ -18,16 +17,15 @@ const sub = (client: MqttClient, log: FastifyBaseLogger) => {
   })
 
   /**
-   * TODO: change the way the image is received, from buffer to string in the
-   * following format:
+   * The message received will be a string in the following format:
    * userID--format--base64Photo
    */
   client.on('message', async (topic, message) => {
     if (topic.includes('photo')) {
-      log.info({}, 'Received an photo')
+      log.info({}, 'Received a photo')
 
-      const [userID, format, base64Photo] = message.toString().split('--')
-      const path = join(__dirname, 'test.png')
+      const [userID, format, base64] = message.toString().split('----')
+      const [, base64Photo] = base64.split(`data:image/${format};base64,`)
       const us = new UserServices(log)
 
       try {
@@ -36,7 +34,7 @@ const sub = (client: MqttClient, log: FastifyBaseLogger) => {
           format,
           Buffer.from(base64Photo, 'base64')
         )
-        log.info({}, `\tTopic: ${SUB_TOPIC} - Image: ${path} created.`)
+        log.info({}, `Topic: ${SUB_TOPIC} - Photo send.`)
       } catch (error) {
         const errorMessage = 'Error while sending the image to the user'
 
