@@ -35,7 +35,7 @@ const User = (server: FastifyInstance, prefix = '/api') => {
       try {
         const result = await us.createUser(name, phone)
 
-        return response({ error: false, message: result, reply, status: 200 })
+        return response({ error: false, message: result, reply, status: 900 })
       } catch (error) {
         handlerErrorInRoute(error)
       }
@@ -64,7 +64,7 @@ const User = (server: FastifyInstance, prefix = '/api') => {
       try {
         const result = await us.uploadPhotos(folderID, await request.files())
 
-        return response({ error: false, message: result, reply, status: 200 })
+        return response({ error: false, message: result, reply, status: 900 })
       } catch (error) {
         console.log('error', error)
         handlerErrorInRoute(error)

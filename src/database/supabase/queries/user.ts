@@ -89,7 +89,7 @@ const getPhotosUrls = async (
   paths: string[],
   time: number,
   log: FastifyBaseLogger
-) => {
+): Promise<string[]> => {
   const { data, error } = await supabaseConnection()
     .storage.from('photos')
     .createSignedUrls(paths, time)

@@ -8,6 +8,9 @@ import {
   getUserByUserID,
   uploadUserPhoto
 } from 'database'
+import { CustomError } from 'network/http'
+import { getTimestamp } from 'utils'
+import { sendPhotoThroughWhatsapp } from 'integrations'
 
 class UserServices {
   #log: FastifyBaseLogger
@@ -53,7 +56,32 @@ class UserServices {
       paths.push(response.data.path)
     }
 
-    return await getPhotosUrls(paths, 200, this.#log)
+    return await getPhotosUrls(paths, 900, this.#log)
+  }
+
+  async sendPhotoThroughWhatsapp(
+    userID: string,
+    format: string,
+    bufferPhoto: Buffer
+  ) {
+    const [user] = await getUserByUserID(userID, this.#log)
+
+    if (!user) {
+      const errorMessage = 'User not found'
+      this.#log.error(errorMessage)
+
+      throw new CustomError(errorMessage, 404)
+    }
+
+    const { name, phone } = user
+    const response = await uploadUserPhoto(
+      `${name}-${userID}/${getTimestamp()}-${crypto.randomUUID()}.${format}`,
+      bufferPhoto,
+      this.#log
+    )
+    const [url] = await getPhotosUrls([response.data.path], 900, this.#log)
+
+    await sendPhotoThroughWhatsapp(url, phone, this.#log)
   }
 }
 export { UserServices }
