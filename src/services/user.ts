@@ -1,10 +1,13 @@
 import crypto from 'crypto'
 import { MultipartFile } from '@fastify/multipart'
 import { FastifyBaseLogger } from 'fastify'
-import { PostgrestResponse } from '@supabase/postgrest-js/src/types'
 
-import { supabaseConnection } from 'database'
-import { CustomError } from 'network/http'
+import {
+  createUser,
+  getPhotosUrls,
+  getUserByUserID,
+  uploadUserPhoto
+} from 'database'
 
 class UserServices {
   #log: FastifyBaseLogger
@@ -14,23 +17,12 @@ class UserServices {
   }
 
   async createUser(name: string, phone: string) {
-    // getUserByNameAndPhone
-    const { data, error }: PostgrestResponse<UserSupabase | null> =
-      await supabaseConnection()
-        .from('users')
-        .insert({ name, phone })
-        .select('*')
-
-    if (error) {
-      const message = 'Error while creating user'
-      this.#log.error(error, message)
-
-      throw new CustomError(message)
-    }
+    const data = await createUser(name, phone, this.#log)
 
     this.#log.info(data, 'User created')
 
     return {
+      id: data[0]?.userID,
       name,
       phone,
       folderID: `${name}-${data[0]?.userID}`
@@ -43,88 +35,25 @@ class UserServices {
   ): Promise<string[]> {
     const [userName, ...rest] = folderID.split('-')
     const userID = rest.join('-')
-    const { data, error }: PostgrestResponse<UserSupabase | null> =
-      await supabaseConnection()
-        .from('users')
-        .select('name')
-        .eq('userID', userID)
-        .select('*')
-    let errorMessage = ''
 
-    if (!data) {
-      errorMessage = 'User not found'
-      this.#log.error(errorMessage)
-
-      throw new CustomError(errorMessage, 404)
-    }
-
-    if (data[0]?.userID !== userID) {
-      errorMessage = 'Wrong user'
-      this.#log.error(errorMessage)
-
-      throw new CustomError(errorMessage, 409)
-    }
-
-    // any generic error
-    if (error) {
-      errorMessage = 'Unknown error'
-      this.#log.error(error, errorMessage)
-
-      throw new CustomError(errorMessage)
-    }
+    await getUserByUserID(userID, this.#log)
 
     const paths: string[] = []
 
     for await (const file of files) {
-      const bufferFile = await file.toBuffer()
       const format = file.mimetype.split('/')[1]
-      const response = await supabaseConnection()
-        .storage.from('photos')
-        .upload(
-          `${userName}-${userID}/${
-            file.fieldname
-          }-${crypto.randomUUID()}.${format}`,
-          bufferFile
-        )
-
-      if (response.error) {
-        errorMessage = 'Error while uploading file'
-        this.#log.error(response.error, errorMessage)
-
-        throw new CustomError(errorMessage)
-      }
+      const response = await uploadUserPhoto(
+        `${userName}-${userID}/${
+          file.fieldname
+        }-${crypto.randomUUID()}.${format}`,
+        await file.toBuffer(),
+        this.#log
+      )
 
       paths.push(response.data.path)
     }
 
-    const { data: urlsData, error: urlsError } = await supabaseConnection()
-      .storage.from('photos')
-      .createSignedUrls(paths, 200)
-
-    if (urlsError)
-      this.#log.error(
-        urlsError,
-        'Error while trying to get the urls for the uploaded images'
-      )
-
-    return (
-      urlsData?.reduce<string[]>((acc, url, index) => {
-        if (url.error) {
-          this.#log.error(
-            url.error,
-            `Error while trying to get a url for the uploaded image number: ${
-              index + 1
-            }`
-          )
-
-          return acc
-        }
-
-        acc.push(url.signedUrl)
-
-        return acc
-      }, []) ?? []
-    )
+    return await getPhotosUrls(paths, 200, this.#log)
   }
 }
 export { UserServices }
