@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.2.0...v0.3.0) (2023-01-01)
+
+
+### Features
+
+* basic twilio config ([d5f10f7](https://github.com/AnthonyLzq/DoorCloud-backend/commit/d5f10f7d83298143f0ac6eed4547d9f17493e878))
+* completed integration with twilio to send the picture through whatsapp ([19c1914](https://github.com/AnthonyLzq/DoorCloud-backend/commit/19c191429f231ebb1ff179b3062d949ee74fb480))
+* configured everything to send the photo through whatsapp ([c6496b3](https://github.com/AnthonyLzq/DoorCloud-backend/commit/c6496b3adf2e59679e79768e51fd235774cf2159))
+* data layer logic was decoupled from the business logic ([2ea1fb9](https://github.com/AnthonyLzq/DoorCloud-backend/commit/2ea1fb9f8bb8254b025bc25ae60ef10dc92e8a49))
+* implemented photos public url in the return of the uploadPhotos endpoint ([92a9018](https://github.com/AnthonyLzq/DoorCloud-backend/commit/92a90183b2c546f338d4bc4ee2ce2b47f203857c))
+* the login format was standardized ([cab3e09](https://github.com/AnthonyLzq/DoorCloud-backend/commit/cab3e09916a017e24c5707cef7e6f2392fd47c3b))
+
 ## 0.2.0 (2022-12-31)
 
 
