@@ -126,4 +126,27 @@ const getPhotosUrls = async (
   )
 }
 
-export { createUser, getUserByUserID, uploadUserPhoto, getPhotosUrls }
+const updateUserLastMessage = async (id: number, log: FastifyBaseLogger) => {
+  const { error }: PostgrestResponse<UserSupabase | null> =
+    await supabaseConnection()
+      .from('users')
+      .update({ lastMessage: new Date() })
+      .eq('id', id)
+      .select('*')
+
+  const errorMessage = 'Error while updating user last message'
+
+  if (error) {
+    log.error(error, errorMessage)
+
+    throw new CustomError(errorMessage)
+  }
+}
+
+export {
+  createUser,
+  getUserByUserID,
+  uploadUserPhoto,
+  getPhotosUrls,
+  updateUserLastMessage
+}

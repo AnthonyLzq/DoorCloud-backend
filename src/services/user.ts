@@ -6,11 +6,14 @@ import {
   createUser,
   getPhotosUrls,
   getUserByUserID,
+  updateUserLastMessage,
   uploadUserPhoto
 } from 'database'
 import { CustomError } from 'network/http'
 import { getTimestamp } from 'utils'
-import { sendPhotoThroughWhatsapp } from 'integrations'
+import { sayHelloThroughWhatsapp, sendPhotoThroughWhatsapp } from 'integrations'
+
+const MAX_HOUR_DIFFERENCE = 16
 
 class UserServices {
   #log: FastifyBaseLogger
@@ -69,7 +72,25 @@ class UserServices {
       throw new CustomError(errorMessage, 404)
     }
 
-    const { name, phone } = user
+    const { id, name, phone, lastMessage } = user
+
+    if (!lastMessage)
+      await Promise.all([
+        sayHelloThroughWhatsapp(name, phone, this.#log),
+        updateUserLastMessage(id, this.#log)
+      ])
+    else {
+      const currentDate = new Date()
+      const lastMessageDate = new Date(lastMessage)
+      const hDiff = (currentDate.getTime() - lastMessageDate.getTime()) / 36e5
+
+      if (hDiff > MAX_HOUR_DIFFERENCE)
+        await Promise.all([
+          sayHelloThroughWhatsapp(name, phone, this.#log),
+          updateUserLastMessage(id, this.#log)
+        ])
+    }
+
     const response = await uploadUserPhoto({
       path: `${name}-${userID}/${getTimestamp()}-${crypto.randomUUID()}.${format}`,
       bufferFile: bufferPhoto,
