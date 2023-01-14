@@ -16,10 +16,11 @@ class Server {
 
   constructor() {
     this.#app = fastify({
-      logger: !ENVIRONMENTS_WITHOUT_PRETTY_PRINT.includes(
+      logger: ENVIRONMENTS_WITHOUT_PRETTY_PRINT.includes(
         process.env.NODE_ENV as string
       )
-        ? {
+        ? true
+        : {
             transport: {
               target: 'pino-pretty',
               options: {
@@ -28,7 +29,6 @@ class Server {
               }
             }
           }
-        : true
     })
     this.#config()
   }

@@ -1,5 +1,5 @@
 type UserSupabase = {
-  userID: string
+  id: number
   name: string
   phone: string
   created_at: string

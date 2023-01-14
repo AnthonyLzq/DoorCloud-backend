@@ -30,14 +30,14 @@ const createUser = async (
 }
 
 const getUserByUserID = async (
-  userID: string,
+  id: number,
   log: FastifyBaseLogger
 ): Promise<(UserSupabase | null)[]> => {
   const { data, error }: PostgrestResponse<UserSupabase | null> =
     await supabaseConnection()
       .from('users')
       .select('name')
-      .eq('userID', userID)
+      .eq('id', id)
       .select('*')
   let errorMessage = ''
 
@@ -48,7 +48,7 @@ const getUserByUserID = async (
     throw new CustomError(errorMessage, 404)
   }
 
-  if (data[0]?.userID !== userID) {
+  if (data[0]?.id !== id) {
     errorMessage = 'Wrong user'
     log.error(errorMessage)
 

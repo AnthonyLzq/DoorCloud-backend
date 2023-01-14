@@ -24,12 +24,7 @@ class UserServices {
 
     this.#log.info(data, 'User created')
 
-    return {
-      id: data[0]?.userID,
-      name,
-      phone,
-      folderID: `${name}-${data[0]?.userID}`
-    }
+    return data[0]
   }
 
   async uploadPhotos(
@@ -39,7 +34,7 @@ class UserServices {
     const [userName, ...rest] = folderID.split('-')
     const userID = rest.join('-')
 
-    await getUserByUserID(userID, this.#log)
+    await getUserByUserID(parseInt(userID), this.#log)
 
     const paths: string[] = []
 
@@ -65,7 +60,7 @@ class UserServices {
     format: string,
     bufferPhoto: Buffer
   ) {
-    const [user] = await getUserByUserID(userID, this.#log)
+    const [user] = await getUserByUserID(parseInt(userID), this.#log)
 
     if (!user) {
       const errorMessage = 'User not found'
