@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.4.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.3.0...v0.4.0) (2023-01-15)
+
+
+### Features
+
+* implemented lastMessage update and a way to avoid the 24h restriction to send an image ([2687b5b](https://github.com/AnthonyLzq/DoorCloud-backend/commit/2687b5bb9c28bb4a11ec3531190bc5d36afb619a))
+* implemented metrics for receving pictures ([df75ad5](https://github.com/AnthonyLzq/DoorCloud-backend/commit/df75ad5cfa1fcd5668299585147fac945fe75352))
+
+
+### Bug Fixes
+
+* errors in the user API ([ddf77da](https://github.com/AnthonyLzq/DoorCloud-backend/commit/ddf77da7d4ad2f34b244bcab3927d7a09afe9413))
+
 ## [0.3.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.2.0...v0.3.0) (2023-01-01)
 
 
