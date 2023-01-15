@@ -143,10 +143,28 @@ const updateUserLastMessage = async (id: number, log: FastifyBaseLogger) => {
   }
 }
 
+const getAllFilesFromBucket = async (
+  folder: string,
+  log: FastifyBaseLogger
+) => {
+  const { data, error } = await supabaseConnection()
+    .storage.from('photos')
+    .list(folder)
+
+  if (error || !data) {
+    log.error(error, 'Error while getting all files from bucket')
+
+    throw new CustomError('Error while getting all files from bucket')
+  }
+
+  return data
+}
+
 export {
   createUser,
   getUserByUserID,
   uploadUserPhoto,
   getPhotosUrls,
-  updateUserLastMessage
+  updateUserLastMessage,
+  getAllFilesFromBucket
 }

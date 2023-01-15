@@ -5,6 +5,7 @@ import { userSchemas } from 'schemas'
 
 import { applyRoutes, validatorCompiler } from './http'
 import { mqttConnection } from './mqtt'
+import { init } from 'lib'
 import { twilioConnection } from 'integrations'
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 1996
@@ -71,6 +72,7 @@ class Server {
       await this.#app.listen({
         port: PORT
       })
+      await init(this.#app.log)
     } catch (e) {
       console.error(e)
     }

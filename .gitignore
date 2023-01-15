@@ -127,4 +127,7 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/node,yarn
 
+src/**/*.jpeg
 src/**/*.png
+src/tf.ts
+venv
