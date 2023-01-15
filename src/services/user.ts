@@ -10,7 +10,7 @@ import {
   uploadUserPhoto
 } from 'database'
 import { CustomError } from 'network/http'
-import { getTimestamp } from 'utils'
+import { getTimestamp, randomWait } from 'utils'
 import { sayHelloThroughWhatsapp, sendPhotoThroughWhatsapp } from 'integrations'
 
 const MAX_HOUR_DIFFERENCE = 16
@@ -77,7 +77,8 @@ class UserServices {
     if (!lastMessage)
       await Promise.all([
         sayHelloThroughWhatsapp(name, phone, this.#log),
-        updateUserLastMessage(id, this.#log)
+        updateUserLastMessage(id, this.#log),
+        randomWait(3_000, 5_000)
       ])
     else {
       const currentDate = new Date()
@@ -87,7 +88,8 @@ class UserServices {
       if (hDiff > MAX_HOUR_DIFFERENCE)
         await Promise.all([
           sayHelloThroughWhatsapp(name, phone, this.#log),
-          updateUserLastMessage(id, this.#log)
+          updateUserLastMessage(id, this.#log),
+          randomWait(3_000, 5_000)
         ])
     }
 
