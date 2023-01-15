@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.0.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.4.0...v1.0.0) (2023-01-15)
+
+
+### Features
+
+* implemented human to handle face recognition ([6db46b8](https://github.com/AnthonyLzq/DoorCloud-backend/commit/6db46b85bc3a63e996d3f9f98c9cee7430ab7ea7))
+
 ## [0.4.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.3.0...v0.4.0) (2023-01-15)
 
 
