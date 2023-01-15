@@ -4,14 +4,19 @@ import { FastifyBaseLogger } from 'fastify'
 
 import {
   createUser,
+  getAllFilesFromBucket,
   getPhotosUrls,
   getUserByUserID,
   updateUserLastMessage,
   uploadUserPhoto
 } from 'database'
 import { CustomError } from 'network/http'
+import { compareFaces } from 'lib'
+import {
+  sayHelloThroughWhatsapp,
+  sendPhotoDetectionResultThroughWhatsapp
+} from 'integrations'
 import { getTimestamp, randomWait } from 'utils'
-import { sayHelloThroughWhatsapp, sendPhotoThroughWhatsapp } from 'integrations'
 
 const MAX_HOUR_DIFFERENCE = 16
 
@@ -78,7 +83,7 @@ class UserServices {
       await Promise.all([
         sayHelloThroughWhatsapp(name, phone, this.#log),
         updateUserLastMessage(id, this.#log),
-        randomWait(3_000, 5_000)
+        randomWait(5_000, 7_500)
       ])
     else {
       const currentDate = new Date()
@@ -89,19 +94,53 @@ class UserServices {
         await Promise.all([
           sayHelloThroughWhatsapp(name, phone, this.#log),
           updateUserLastMessage(id, this.#log),
-          randomWait(3_000, 5_000)
+          randomWait(5_000, 7_500)
         ])
     }
 
-    const response = await uploadUserPhoto({
-      path: `${name}-${userID}/${getTimestamp()}-${crypto.randomUUID()}.${format}`,
+    const photosFromUser = (
+      await getAllFilesFromBucket(`${name}-${id}`, this.#log)
+    ).map(file => `${name}-${id}/${file.name}`)
+    const urlPhotosFromUser = await getPhotosUrls(
+      photosFromUser,
+      900,
+      this.#log
+    )
+    const foundMatch = (
+      await Promise.all(
+        urlPhotosFromUser.map((url, index) => {
+          return compareFaces(
+            bufferPhoto,
+            url,
+            photosFromUser[index].split('/')[1].split('-')[0],
+            this.#log
+          )
+        })
+      )
+    ).find(result => result.match)
+    const foundName = foundMatch?.name
+    const matchResult = foundMatch?.match ?? false
+    const uploadResponse = await uploadUserPhoto({
+      path: `${name}-${userID}/${
+        foundName ?? getTimestamp()
+      }-${crypto.randomUUID()}.${format}`,
       bufferFile: bufferPhoto,
       log: this.#log,
       format
     })
-    const [url] = await getPhotosUrls([response.data.path], 900, this.#log)
+    const [url] = await getPhotosUrls(
+      [uploadResponse.data.path],
+      900,
+      this.#log
+    )
 
-    await sendPhotoThroughWhatsapp(url, phone, this.#log)
+    await sendPhotoDetectionResultThroughWhatsapp({
+      imageUrl: url,
+      success: matchResult,
+      name: foundName,
+      phoneNumber: phone,
+      log: this.#log
+    })
   }
 }
 export { UserServices }
