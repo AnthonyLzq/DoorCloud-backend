@@ -31,8 +31,6 @@ const detectFromBuffer = async (input: Buffer) => {
   const tensor = global.__human__.tf.node.decodeImage(input, 3)
   const result = await global.__human__.detect(tensor, humanConfig)
 
-  global.__human__.tf.dispose(tensor)
-
   return result
 }
 
@@ -41,12 +39,8 @@ const detectFromUrl = async (input: string) => {
 
   if (res && res.ok) {
     const buffer = Buffer.from(await res.arrayBuffer())
-    const tensor = global.__human__.tf.node.decodeImage(buffer, 3)
-    const result = await global.__human__.detect(tensor, humanConfig)
 
-    global.__human__.tf.dispose(tensor)
-
-    return result
+    return await detectFromBuffer(buffer)
   }
 
   throw new CustomError('Could not fetch image')
@@ -74,8 +68,11 @@ const compareFaces = async (
     !res2.face ||
     res2.face.length === 0 ||
     !res2.face[0].embedding
-  )
-    throw new CustomError('Could not detect face descriptors')
+  ) {
+    log.error({}, 'Could not compare faces')
+
+    return { match: false, name }
+  }
 
   const similarity = global.__human__.match.similarity(
     res1.face[0].embedding,
