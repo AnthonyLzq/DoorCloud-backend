@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { MultipartFile } from '@fastify/multipart'
 import { FastifyBaseLogger } from 'fastify'
+import { appendFileSync } from 'fs'
 
 import {
   createUser,
@@ -16,7 +17,8 @@ import {
   sayHelloThroughWhatsapp,
   sendPhotoDetectionResultThroughWhatsapp
 } from 'integrations'
-import { getTimestamp, randomWait } from 'utils'
+import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
+import { resolve } from 'path'
 
 const MAX_HOUR_DIFFERENCE = 16
 
@@ -106,6 +108,7 @@ class UserServices {
       900,
       this.#log
     )
+    const timeBefore = getTimestamp()
     const foundMatch = (
       await Promise.all(
         urlPhotosFromUser.map((url, index) => {
@@ -118,29 +121,37 @@ class UserServices {
         })
       )
     ).find(result => result.match)
-    const foundName = foundMatch?.name
+    const timeAfter = getTimestamp()
+    // const foundName = foundMatch?.name
     const matchResult = foundMatch?.match ?? false
-    const uploadResponse = await uploadUserPhoto({
-      path: `${name}-${userID}/${
-        foundName ?? getTimestamp()
-      }-${crypto.randomUUID()}.${format}`,
-      bufferFile: bufferPhoto,
-      log: this.#log,
-      format
-    })
-    const [url] = await getPhotosUrls(
-      [uploadResponse.data.path],
-      900,
-      this.#log
+
+    appendFileSync(
+      resolve(__dirname, '..', '..', 'metrics', 'matchPhoto.csv'),
+      `\n${matchResult ? 1 : 0},${diffTimeInSeconds(timeBefore, timeAfter)}`,
+      'utf-8'
     )
 
-    await sendPhotoDetectionResultThroughWhatsapp({
-      imageUrl: url,
-      success: matchResult,
-      name: foundName,
-      phoneNumber: phone,
-      log: this.#log
-    })
+    // const uploadResponse = await uploadUserPhoto({
+    //   path: `${name}-${userID}/${
+    //     foundName ?? getTimestamp()
+    //   }-${crypto.randomUUID()}.${format}`,
+    //   bufferFile: bufferPhoto,
+    //   log: this.#log,
+    //   format
+    // })
+    // const [url] = await getPhotosUrls(
+    //   [uploadResponse.data.path],
+    //   900,
+    //   this.#log
+    // )
+
+    // await sendPhotoDetectionResultThroughWhatsapp({
+    //   imageUrl: url,
+    //   success: matchResult,
+    //   name: foundName,
+    //   phoneNumber: phone,
+    //   log: this.#log
+    // })
   }
 }
 export { UserServices }
