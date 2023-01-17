@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 
 # Obtiene la ruta absoluta del archivo CSV
 script_dir = os.path.dirname(os.path.abspath(__file__))
-data_dir = os.path.join(script_dir, '../metrics/receivePhoto.csv')
+data_dir = os.path.join(script_dir, '../metrics/matchPhoto.csv')
 
 # Lee los datos del archivo CSV
 data = pd.read_csv(data_dir)
 
 # Selecciona la tercera columna de los datos
-data = data.iloc[:,2]
+data = data.iloc[:,1]
 
 # Obtiene el valor mínimo y máximo
 min_val = data.min()
@@ -41,7 +41,7 @@ plt.grid(linestyle = 'dotted')
 plt.xticks(np.round(intervalos[:-1],2))
 
 #Agrega título al gráfico
-plt.title("Latencia MQTT")
+plt.title("Latencia de Detección")
 
 # Agrega una línea vertical para la media
 plt.axvline(
@@ -68,5 +68,5 @@ plt.legend([
 ])
 
 # Guarda el gráfico en un archivo png
-histogram_dir = os.path.join(script_dir, '../metrics/receivePhotoHistogram.png')
+histogram_dir = os.path.join(script_dir, '../metrics/matchPhotoHistogram.png')
 plt.savefig(histogram_dir)
