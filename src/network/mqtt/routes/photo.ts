@@ -4,12 +4,13 @@ import { MqttClient } from 'mqtt'
 import { resolve } from 'path'
 import { UserServices } from 'services'
 import { diffTimeInSeconds, getTimestamp } from 'utils'
+import { getEnv } from 'config/env'
 
 const PUB_TOPIC = 'DoorCloud'
 const SUB_TOPIC = `${PUB_TOPIC}/photo/#`
 
 const sub = (client: MqttClient, log: FastifyBaseLogger) => {
-  client.subscribe(SUB_TOPIC, error => {
+  client.subscribe(SUB_TOPIC, { qos: getEnv().MQTT_QOS }, error => {
     if (!error) log.info({}, `Subscribed to ${SUB_TOPIC}`)
   })
 

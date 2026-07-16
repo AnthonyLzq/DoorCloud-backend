@@ -13,7 +13,9 @@ Required environment variables are validated on startup: `MQTT_USER`,
 `MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `SUPABASE_URL`, `SUPABASE_KEY`,
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and
 `MODELS_CDN_URL`. `PORT` defaults to `1996`, `NODE_ENV` defaults to
-`development`, and `MQTT_PROTOCOL` defaults to `mqtts`.
+`development`, `MQTT_PROTOCOL` defaults to `mqtts`, and MQTT lifecycle settings
+default to clean sessions, 60s keepalive, 1s reconnect period, 30s connect
+timeout, and QoS 0 subscriptions.
 
 ## Setup
 
@@ -49,6 +51,11 @@ MQTT_PASS=doorcloud-backend-local
 MQTT_HOST=localhost
 MQTT_PROTOCOL=mqtt
 MQTT_PORT=1883
+MQTT_CLEAN=true
+MQTT_KEEPALIVE=60
+MQTT_RECONNECT_PERIOD=1000
+MQTT_CONNECT_TIMEOUT=30000
+MQTT_QOS=0
 ```
 
 Use `MOSQUITTO_BACKEND_PASSWORD` and `MOSQUITTO_DEVICE_PASSWORD` to generate

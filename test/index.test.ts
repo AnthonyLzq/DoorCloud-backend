@@ -40,6 +40,7 @@ declare const test: TestGlobals['test']
 type MockMqttClient = {
   end: MockFunction
   on: MockFunction
+  options?: unknown
   subscribe: MockFunction
 }
 
@@ -63,6 +64,13 @@ const mockClient: MockMqttClient = {
   subscribe: jest.fn()
 }
 
+mockClient.end.mockImplementation(
+  (force: boolean, options: unknown, done: (error?: Error) => void) => {
+    done(undefined)
+
+    return mockClient
+  }
+)
 mockClient.on.mockImplementation((event: string, handler: () => void) => {
   if (event === 'connect') handler()
 
@@ -72,7 +80,11 @@ mockClient.on.mockImplementation((event: string, handler: () => void) => {
 jest.mock('mqtt', () => ({
   __esModule: true,
   default: {
-    connect: jest.fn(() => mockClient)
+    connect: jest.fn((options: unknown) => {
+      mockClient.options = options
+
+      return mockClient
+    })
   }
 }))
 
@@ -105,6 +117,7 @@ describe('DoorCloud backend tests', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     Reflect.deleteProperty(global, '__mqttClient__')
+    Reflect.deleteProperty(mockClient, 'options')
     Object.assign(process.env, validEnv)
   })
 
@@ -112,9 +125,14 @@ describe('DoorCloud backend tests', () => {
     test('parses required environment variables and defaults', () => {
       expect(parseEnv(validEnv)).toMatchObject({
         MODELS_CDN_URL: 'https://models.example.com',
+        MQTT_CLEAN: true,
+        MQTT_CONNECT_TIMEOUT: 30_000,
         MQTT_HOST: 'mqtt.example.com',
+        MQTT_KEEPALIVE: 60,
         MQTT_PORT: 8883,
         MQTT_PROTOCOL: 'mqtt',
+        MQTT_QOS: 0,
+        MQTT_RECONNECT_PERIOD: 1_000,
         NODE_ENV: 'development',
         PORT: 1996,
         TWILIO_PHONE_NUMBER: '+10000000000'
@@ -135,16 +153,29 @@ describe('DoorCloud backend tests', () => {
 
       expect(mqtt.connect).toHaveBeenCalledTimes(1)
       expect(mqtt.connect).toHaveBeenCalledWith({
+        clean: true,
+        clientId: `doorcloud-backend-${process.pid}`,
+        connectTimeout: 30_000,
         host: 'mqtt.example.com',
-        keepalive: 0,
+        keepalive: 60,
         password: 'mqtt-password',
         port: 8883,
         protocol: 'mqtt',
+        reconnectPeriod: 1_000,
+        resubscribe: true,
         username: 'mqtt-user'
       })
       expect(firstClient).toBe(mockClient)
       expect(secondClient).toBe(mockClient)
-      expect(log.info).toHaveBeenCalledWith({}, debugMessage)
+      expect(log.info).toHaveBeenCalledWith(
+        {
+          clientId: `doorcloud-backend-${process.pid}`,
+          host: 'mqtt.example.com',
+          port: 8883,
+          protocol: 'mqtt'
+        },
+        debugMessage
+      )
     })
 
     test('applies MQTT routes on start', async () => {
@@ -154,10 +185,19 @@ describe('DoorCloud backend tests', () => {
       expect(applyRoutes).toHaveBeenCalledWith(mockClient, log)
     })
 
-    test('ends the MQTT client on stop', async () => {
+    test('does not create an MQTT client on stop', async () => {
+      await mqttConnection(log).stop()
+
+      expect(mqtt.connect).toHaveBeenCalledTimes(0)
+      expect(mockClient.end).toHaveBeenCalledTimes(0)
+    })
+
+    test('ends and clears the MQTT client on stop', async () => {
+      await mqttConnection(log).start()
       await mqttConnection(log).stop()
 
       expect(mockClient.end).toHaveBeenCalledTimes(1)
+      expect(global.__mqttClient__).toBe(undefined)
     })
   })
 

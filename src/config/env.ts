@@ -16,6 +16,45 @@ const port = (name: string) =>
       .max(65_535, `${name} must be lower than 65536`)
   )
 
+const optionalInteger = (
+  name: string,
+  defaultValue: number,
+  min = 0,
+  max = Number.MAX_SAFE_INTEGER
+) =>
+  z
+    .preprocess(
+      value =>
+        value === '' || value === undefined ? undefined : Number(value),
+      z
+        .number()
+        .int(`${name} must be an integer`)
+        .min(min, `${name} must be greater than or equal to ${min}`)
+        .max(max, `${name} must be lower than or equal to ${max}`)
+        .optional()
+    )
+    .default(defaultValue)
+
+const optionalBoolean = (name: string, defaultValue: boolean) =>
+  z
+    .preprocess(value => {
+      if (value === '' || value === undefined) return undefined
+      if (value === 'true' || value === true) return true
+      if (value === 'false' || value === false) return false
+
+      return value
+    }, z.boolean({ invalid_type_error: `${name} must be true or false` }).optional())
+    .default(defaultValue)
+
+const optionalQos = (name: string, defaultValue: 0 | 1 | 2) =>
+  z
+    .preprocess(
+      value =>
+        value === '' || value === undefined ? undefined : Number(value),
+      z.union([z.literal(0), z.literal(1), z.literal(2)]).optional()
+    )
+    .default(defaultValue)
+
 const optionalPort = (defaultValue: number) =>
   z
     .preprocess(
@@ -38,6 +77,12 @@ const envSchema = z.object({
   MQTT_PORT: port('MQTT_PORT'),
   MQTT_USER: requiredString('MQTT_USER'),
   MQTT_PASS: requiredString('MQTT_PASS'),
+  MQTT_CLIENT_ID: z.string().trim().min(1).optional(),
+  MQTT_CLEAN: optionalBoolean('MQTT_CLEAN', true),
+  MQTT_KEEPALIVE: optionalInteger('MQTT_KEEPALIVE', 60),
+  MQTT_RECONNECT_PERIOD: optionalInteger('MQTT_RECONNECT_PERIOD', 1_000),
+  MQTT_CONNECT_TIMEOUT: optionalInteger('MQTT_CONNECT_TIMEOUT', 30_000, 1),
+  MQTT_QOS: optionalQos('MQTT_QOS', 0),
   SUPABASE_URL: requiredString('SUPABASE_URL').url(
     'SUPABASE_URL must be a URL'
   ),
