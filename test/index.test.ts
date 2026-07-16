@@ -1,57 +1,138 @@
-import mqtt from 'mqtt'
-import debug from 'debug'
+import type { FastifyBaseLogger, FastifyReply } from 'fastify'
 
-import * as mqttServer from '../src/network/mqtt'
-import * as router from '../src/network/router'
+type MockFunction = {
+  (...args: unknown[]): unknown
+  mockImplementation: <Args extends unknown[], Result>(
+    implementation: (...args: Args) => Result
+  ) => MockFunction
+  mockReturnThis: () => MockFunction
+}
 
-beforeAll(async () => {
-  await mqttServer.start()
-})
+type Expectation = {
+  toBe: (expected: unknown) => void
+  toHaveBeenCalledTimes: (times: number) => void
+  toHaveBeenCalledWith: (...expected: unknown[]) => void
+}
 
-afterAll(async () => {
-  await mqttServer.stop()
-})
-
-const mockDebug = jest.fn()
-
-jest.mock('mqtt', () => {
-  return {
-    connect: jest.fn(() => {
-      return {
-        on: jest.fn().mockImplementation(() => {
-          mockDebug(mqttServer.debugMessage)
-        }),
-        end: jest.fn(),
-        subscribe: jest.fn()
-      }
-    })
+type TestGlobals = {
+  beforeEach: (fn: () => void) => void
+  describe: (name: string, fn: () => void) => void
+  expect: (actual: unknown) => Expectation
+  jest: {
+    clearAllMocks: () => void
+    fn: <Args extends unknown[] = unknown[], Result = unknown>(
+      implementation?: (...args: Args) => Result
+    ) => MockFunction
+    mock: (moduleName: string, factory: () => unknown) => void
   }
+  test: (name: string, fn: () => unknown | Promise<unknown>) => void
+}
+
+declare const require: <T>(moduleName: string) => T
+declare const beforeEach: TestGlobals['beforeEach']
+declare const describe: TestGlobals['describe']
+declare const expect: TestGlobals['expect']
+declare const jest: TestGlobals['jest']
+declare const test: TestGlobals['test']
+
+type MockMqttClient = {
+  end: MockFunction
+  on: MockFunction
+  subscribe: MockFunction
+}
+
+const mockClient: MockMqttClient = {
+  end: jest.fn(),
+  on: jest.fn(),
+  subscribe: jest.fn()
+}
+
+mockClient.on.mockImplementation((event: string, handler: () => void) => {
+  if (event === 'connect') handler()
+
+  return mockClient
 })
 
-jest.mock('debug', () => {
-  return jest.fn()
-})
+jest.mock('mqtt', () => ({
+  __esModule: true,
+  default: {
+    connect: jest.fn(() => mockClient)
+  }
+}))
 
-const applyRoutes = jest.spyOn(router, 'applyRoutes')
+jest.mock('../src/network/mqtt/router', () => ({
+  applyRoutes: jest.fn()
+}))
+
+const mqtt = require<{ default: typeof import('mqtt') }>('mqtt').default
+const { response } =
+  require<typeof import('../src/network/http/response')>(
+    '../src/network/http/response'
+  )
+const { debugMessage, getClient, mqttConnection } =
+  require<typeof import('../src/network/mqtt/mqtt')>(
+    '../src/network/mqtt/mqtt'
+  )
+const { applyRoutes } =
+  require<typeof import('../src/network/mqtt/router')>(
+    '../src/network/mqtt/router'
+  )
+
+const log = {
+  error: jest.fn(),
+  info: jest.fn()
+} as Pick<FastifyBaseLogger, 'error' | 'info'> as FastifyBaseLogger
 
 describe('DoorCloud backend tests', () => {
-  describe('Server', () => {
-    test('Client connect should be called once', async () => {
-      expect(mqtt.connect).toHaveBeenCalled()
+  beforeEach(() => {
+    jest.clearAllMocks()
+    Reflect.deleteProperty(global, '__mqttClient__')
+  })
+
+  describe('MQTT connection', () => {
+    test('creates and reuses one MQTT client', () => {
+      const firstClient = getClient(log)
+      const secondClient = getClient(log)
+
+      expect(mqtt.connect).toHaveBeenCalledTimes(1)
+      expect(firstClient).toBe(mockClient)
+      expect(secondClient).toBe(mockClient)
+      expect(log.info).toHaveBeenCalledWith({}, debugMessage)
     })
 
-    test(`Client debug should be called with "${mqttServer.namespace}"`, async () => {
-      expect(debug).toHaveBeenCalled()
-      expect(debug).toHaveBeenCalledWith(mqttServer.namespace)
-    })
+    test('applies MQTT routes on start', async () => {
+      await mqttConnection(log).start()
 
-    test(`Client serverDebug should be called with "${mqttServer.debugMessage}"`, async () => {
-      expect(mockDebug).toHaveBeenCalled()
-      expect(mockDebug).toHaveBeenCalledWith(mqttServer.debugMessage)
-    })
-
-    test('applyRoutes method should be called once', () => {
       expect(applyRoutes).toHaveBeenCalledTimes(1)
+      expect(applyRoutes).toHaveBeenCalledWith(mockClient, log)
+    })
+
+    test('ends the MQTT client on stop', async () => {
+      await mqttConnection(log).stop()
+
+      expect(mockClient.end).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('HTTP response helper', () => {
+    test('sends a normalized response envelope', () => {
+      const reply = {
+        code: jest.fn().mockReturnThis(),
+        send: jest.fn()
+      } as unknown as Pick<FastifyReply, 'code' | 'send'> as FastifyReply
+
+      response({
+        error: false,
+        message: 'DoorCloud backend!',
+        reply,
+        status: 200
+      })
+
+      expect(reply.code).toHaveBeenCalledWith(200)
+      expect(reply.send).toHaveBeenCalledWith({
+        error: false,
+        message: 'DoorCloud backend!'
+      })
     })
   })
 })
