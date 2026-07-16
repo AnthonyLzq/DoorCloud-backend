@@ -1,15 +1,13 @@
 {
   "env": {
-    "node": true,
-    "jest": true
+    "node": true
   },
   "root": true,
   "parser": "@typescript-eslint/parser",
   "plugins": [
     "@typescript-eslint",
     "import",
-    "prettier",
-    "jest"
+    "prettier"
   ],
   "extends": [
     "standard",
@@ -38,8 +36,9 @@
       {
         "devDependencies": [
           "**/*.test.js",
+          "**/*.test.ts",
           "webpack.config.js",
-          "jest.config.ts"
+          "vitest.config.ts"
         ],
         "optionalDependencies": [
           "**/*.test.js"

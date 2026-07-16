@@ -19,6 +19,6 @@ infra/mosquitto/passwordfile
 *.md
 LICENSE
 
-jest.config.ts
+vitest.config.ts
 nodemon.json
 *.log

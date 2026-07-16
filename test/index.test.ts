@@ -1,41 +1,29 @@
 import type { FastifyBaseLogger, FastifyReply } from 'fastify'
+import mqtt from 'mqtt'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-type MockFunction = {
-  (...args: unknown[]): unknown
-  mockImplementation: <Args extends unknown[], Result>(
-    implementation: (...args: Args) => Result
-  ) => MockFunction
-  mockReturnThis: () => MockFunction
-}
+import { parseEnv } from '../src/config/env'
+import { response } from '../src/network/http/response'
+import {
+  debugMessage,
+  getClient,
+  mqttConnection
+} from '../src/network/mqtt/mqtt'
+import {
+  parseLegacyPhotoMetricsPayload,
+  parseLegacyPhotoSendPayload,
+  parsePhotoMetricsPayload,
+  parsePhotoSendPayload
+} from '../src/network/mqtt/photoPayloads'
+import { applyRoutes } from '../src/network/mqtt/router'
+import {
+  getPhotoSubscriptionTopics,
+  isPhotoMetricsTopic,
+  isPhotoSendTopic,
+  MQTT_TOPICS
+} from '../src/network/mqtt/topics'
 
-type Expectation = {
-  toBe: (expected: unknown) => void
-  toHaveBeenCalledTimes: (times: number) => void
-  toHaveBeenCalledWith: (...expected: unknown[]) => void
-  toMatchObject: (expected: unknown) => void
-  toThrow: (expected?: string | RegExp) => void
-}
-
-type TestGlobals = {
-  beforeEach: (fn: () => void) => void
-  describe: (name: string, fn: () => void) => void
-  expect: (actual: unknown) => Expectation
-  jest: {
-    clearAllMocks: () => void
-    fn: <Args extends unknown[] = unknown[], Result = unknown>(
-      implementation?: (...args: Args) => Result
-    ) => MockFunction
-    mock: (moduleName: string, factory: () => unknown) => void
-  }
-  test: (name: string, fn: () => unknown | Promise<unknown>) => void
-}
-
-declare const require: <T>(moduleName: string) => T
-declare const beforeEach: TestGlobals['beforeEach']
-declare const describe: TestGlobals['describe']
-declare const expect: TestGlobals['expect']
-declare const jest: TestGlobals['jest']
-declare const test: TestGlobals['test']
+type MockFunction = ReturnType<typeof vi.fn>
 
 type MockMqttClient = {
   end: MockFunction
@@ -43,6 +31,40 @@ type MockMqttClient = {
   options?: unknown
   subscribe: MockFunction
 }
+
+const mockClient = vi.hoisted(() => {
+  const client = {} as MockMqttClient
+
+  client.end = vi.fn(
+    (force: boolean, options: unknown, done?: (error?: Error) => void) => {
+      done?.(undefined)
+
+      return client
+    }
+  )
+  client.on = vi.fn((event: string, handler: () => void) => {
+    if (event === 'connect') handler()
+
+    return client
+  })
+  client.subscribe = vi.fn()
+
+  return client
+})
+
+vi.mock('mqtt', () => ({
+  default: {
+    connect: vi.fn((options: unknown) => {
+      mockClient.options = options
+
+      return mockClient
+    })
+  }
+}))
+
+vi.mock('../src/network/mqtt/router', () => ({
+  applyRoutes: vi.fn()
+}))
 
 const validEnv = {
   MODELS_CDN_URL: 'https://models.example.com',
@@ -58,80 +80,14 @@ const validEnv = {
   TWILIO_PHONE_NUMBER: '+10000000000'
 }
 
-const mockClient: MockMqttClient = {
-  end: jest.fn(),
-  on: jest.fn(),
-  subscribe: jest.fn()
-}
-
-mockClient.end.mockImplementation(
-  (force: boolean, options: unknown, done: (error?: Error) => void) => {
-    done(undefined)
-
-    return mockClient
-  }
-)
-mockClient.on.mockImplementation((event: string, handler: () => void) => {
-  if (event === 'connect') handler()
-
-  return mockClient
-})
-
-jest.mock('mqtt', () => ({
-  __esModule: true,
-  default: {
-    connect: jest.fn((options: unknown) => {
-      mockClient.options = options
-
-      return mockClient
-    })
-  }
-}))
-
-jest.mock('../src/network/mqtt/router', () => ({
-  applyRoutes: jest.fn()
-}))
-
-const mqtt = require<{ default: typeof import('mqtt') }>('mqtt').default
-const { response } =
-  require<typeof import('../src/network/http/response')>(
-    '../src/network/http/response'
-  )
-const { debugMessage, getClient, mqttConnection } =
-  require<typeof import('../src/network/mqtt/mqtt')>(
-    '../src/network/mqtt/mqtt'
-  )
-const { applyRoutes } =
-  require<typeof import('../src/network/mqtt/router')>(
-    '../src/network/mqtt/router'
-  )
-const { parseEnv } =
-  require<typeof import('../src/config/env')>('../src/config/env')
-const {
-  parseLegacyPhotoMetricsPayload,
-  parseLegacyPhotoSendPayload,
-  parsePhotoMetricsPayload,
-  parsePhotoSendPayload
-} = require<typeof import('../src/network/mqtt/photoPayloads')>(
-  '../src/network/mqtt/photoPayloads'
-)
-const {
-  getPhotoSubscriptionTopics,
-  isPhotoMetricsTopic,
-  isPhotoSendTopic,
-  MQTT_TOPICS
-} = require<typeof import('../src/network/mqtt/topics')>(
-  '../src/network/mqtt/topics'
-)
-
 const log = {
-  error: jest.fn(),
-  info: jest.fn()
+  error: vi.fn(),
+  info: vi.fn()
 } as Pick<FastifyBaseLogger, 'error' | 'info'> as FastifyBaseLogger
 
 describe('DoorCloud backend tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     Reflect.deleteProperty(global, '__mqttClient__')
     Reflect.deleteProperty(mockClient, 'options')
     Object.assign(process.env, validEnv)
@@ -214,7 +170,9 @@ describe('DoorCloud backend tests', () => {
       expect(
         parsePhotoMetricsPayload(Buffer.from('{"timestampSent":1730000000000}'))
       ).toMatchObject({ timestampSent: 1_730_000_000_000 })
-      expect(parseLegacyPhotoMetricsPayload(Buffer.from('1730000000000----x'))).toMatchObject({
+      expect(
+        parseLegacyPhotoMetricsPayload(Buffer.from('1730000000000----x'))
+      ).toMatchObject({
         timestampSent: 1_730_000_000_000
       })
     })
@@ -278,8 +236,8 @@ describe('DoorCloud backend tests', () => {
   describe('HTTP response helper', () => {
     test('sends a normalized response envelope', () => {
       const reply = {
-        code: jest.fn().mockReturnThis(),
-        send: jest.fn()
+        code: vi.fn().mockReturnThis(),
+        send: vi.fn()
       } as unknown as Pick<FastifyReply, 'code' | 'send'> as FastifyReply
 
       response({

@@ -1,16 +1,10 @@
 import mqtt, { IClientOptions, MqttClient } from 'mqtt'
+import { describe, expect, test } from 'vitest'
 
 type AsyncTest = () => Promise<void>
 type TestSuite = ((name: string, fn: () => void) => void) & {
   skip: (name: string, fn: () => void) => void
 }
-type Expectation = {
-  toBe: (expected: unknown) => void
-}
-
-declare const describe: TestSuite
-declare const expect: (actual: unknown) => Expectation
-declare const test: (name: string, fn: AsyncTest, timeout?: number) => void
 
 type Credentials = {
   username?: string

@@ -94,7 +94,7 @@ integration tests, and then removes the Compose volumes.
 
 ## Testing
 
-At this point, we only can test receiving and sending messages manually or using the unit tests.
+At this point, we only can test receiving and sending messages manually or using the Vitest unit tests.
 
 When testing manually, if everything went ok, the image [`basic_pub_sub_testing.png`](basic_pub_sub_test.png) will be copied to the folder `./src/network/routes/` with the name `test.png`.
 
