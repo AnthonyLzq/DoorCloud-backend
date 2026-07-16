@@ -7,8 +7,8 @@ import { applyRoutes, validatorCompiler } from './http'
 import { mqttConnection } from './mqtt'
 import { init } from 'lib'
 import { twilioConnection } from 'integrations'
+import { getEnv } from 'config/env'
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 1996
 const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
 
 class Server {
@@ -16,10 +16,10 @@ class Server {
   #mqqtConnection: Awaited<ReturnType<typeof mqttConnection>> | undefined
 
   constructor() {
+    const { NODE_ENV } = getEnv()
+
     this.#app = fastify({
-      logger: ENVIRONMENTS_WITHOUT_PRETTY_PRINT.includes(
-        process.env.NODE_ENV as string
-      )
+      logger: ENVIRONMENTS_WITHOUT_PRETTY_PRINT.includes(NODE_ENV)
         ? true
         : {
             transport: {
@@ -65,6 +65,8 @@ class Server {
 
   public async start(): Promise<void> {
     try {
+      const { PORT } = getEnv()
+
       supabaseConnection(this.#app.log)
       twilioConnection(this.#app.log)
       this.#startMqtt()

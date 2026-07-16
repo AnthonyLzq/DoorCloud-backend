@@ -1,6 +1,9 @@
 import { FastifyBaseLogger } from 'fastify'
 
+import { getEnv } from 'config/env'
 import { twilioConnection } from './connection'
+
+const getWhatsappSender = () => `whatsapp:${getEnv().TWILIO_PHONE_NUMBER}`
 
 const sayHelloThroughWhatsapp = async (
   name: string,
@@ -10,7 +13,7 @@ const sayHelloThroughWhatsapp = async (
   const client = twilioConnection()
 
   await client.messages.create({
-    from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+    from: getWhatsappSender(),
     to: `whatsapp:${phoneNumber}`,
     body: `Hello ${name}, how is it going?`
   })
@@ -26,7 +29,7 @@ const sendPhotoThroughWhatsappWithTemplate = async (
   const client = twilioConnection()
 
   await client.messages.create({
-    from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+    from: getWhatsappSender(),
     to: `whatsapp:${phoneNumber}`,
     body: 'This may be interesting for you.',
     mediaUrl: [imageUrl]
@@ -44,7 +47,7 @@ const sendPhotoThroughWhatsappWithoutTemplate = async (
   const client = twilioConnection()
 
   await client.messages.create({
-    from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+    from: getWhatsappSender(),
     to: `whatsapp:${phoneNumber}`,
     body: message,
     mediaUrl: [imageUrl]
@@ -69,7 +72,7 @@ const sendPhotoDetectionResultThroughWhatsapp = async ({
   const client = twilioConnection()
 
   await client.messages.create({
-    from: `whatsapp:${process.env.TWILIO_PHONE_NUMBER}`,
+    from: getWhatsappSender(),
     to: `whatsapp:${phoneNumber}`,
     body: success
       ? `The result of the recognition process was successful. ${name} is here.`

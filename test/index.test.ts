@@ -12,6 +12,8 @@ type Expectation = {
   toBe: (expected: unknown) => void
   toHaveBeenCalledTimes: (times: number) => void
   toHaveBeenCalledWith: (...expected: unknown[]) => void
+  toMatchObject: (expected: unknown) => void
+  toThrow: (expected?: string | RegExp) => void
 }
 
 type TestGlobals = {
@@ -39,6 +41,19 @@ type MockMqttClient = {
   end: MockFunction
   on: MockFunction
   subscribe: MockFunction
+}
+
+const validEnv = {
+  MODELS_CDN_URL: 'https://models.example.com',
+  MQTT_HOST: 'mqtt.example.com',
+  MQTT_PASS: 'mqtt-password',
+  MQTT_PORT: '8883',
+  MQTT_USER: 'mqtt-user',
+  SUPABASE_KEY: 'supabase-key',
+  SUPABASE_URL: 'https://supabase.example.com',
+  TWILIO_ACCOUNT_SID: 'twilio-sid',
+  TWILIO_AUTH_TOKEN: 'twilio-token',
+  TWILIO_PHONE_NUMBER: '+10000000000'
 }
 
 const mockClient: MockMqttClient = {
@@ -77,6 +92,8 @@ const { applyRoutes } =
   require<typeof import('../src/network/mqtt/router')>(
     '../src/network/mqtt/router'
   )
+const { parseEnv } =
+  require<typeof import('../src/config/env')>('../src/config/env')
 
 const log = {
   error: jest.fn(),
@@ -87,6 +104,26 @@ describe('DoorCloud backend tests', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     Reflect.deleteProperty(global, '__mqttClient__')
+    Object.assign(process.env, validEnv)
+  })
+
+  describe('environment validation', () => {
+    test('parses required environment variables and defaults', () => {
+      expect(parseEnv(validEnv)).toMatchObject({
+        MODELS_CDN_URL: 'https://models.example.com',
+        MQTT_HOST: 'mqtt.example.com',
+        MQTT_PORT: 8883,
+        NODE_ENV: 'development',
+        PORT: 1996,
+        TWILIO_PHONE_NUMBER: '+10000000000'
+      })
+    })
+
+    test('reports invalid environment variables by name', () => {
+      expect(() => parseEnv({ ...validEnv, MQTT_HOST: '' })).toThrow(
+        'MQTT_HOST'
+      )
+    })
   })
 
   describe('MQTT connection', () => {
@@ -95,6 +132,14 @@ describe('DoorCloud backend tests', () => {
       const secondClient = getClient(log)
 
       expect(mqtt.connect).toHaveBeenCalledTimes(1)
+      expect(mqtt.connect).toHaveBeenCalledWith({
+        host: 'mqtt.example.com',
+        keepalive: 0,
+        password: 'mqtt-password',
+        port: 8883,
+        protocol: 'mqtts',
+        username: 'mqtt-user'
+      })
       expect(firstClient).toBe(mockClient)
       expect(secondClient).toBe(mockClient)
       expect(log.info).toHaveBeenCalledWith({}, debugMessage)

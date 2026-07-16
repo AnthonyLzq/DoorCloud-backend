@@ -9,6 +9,12 @@ To have installed the following:
 
 A `.env` file with the correct variables specified in the `.env.example` file.
 
+Required environment variables are validated on startup: `MQTT_USER`,
+`MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `SUPABASE_URL`, `SUPABASE_KEY`,
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and
+`MODELS_CDN_URL`. `PORT` defaults to `1996` and `NODE_ENV` defaults to
+`development`.
+
 ## Setup
 
 Use the pinned runtime and package manager before installing dependencies:

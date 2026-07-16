@@ -1,25 +1,31 @@
 import mqtt from 'mqtt'
 import { FastifyBaseLogger } from 'fastify'
 
+import { getEnv } from 'config/env'
+
 declare global {
   // eslint-disable-next-line no-var
   var __mqttClient__: mqtt.MqttClient
 }
 
-const options: mqtt.IClientOptions = {
-  port: process.env.MQTT_PORT ? parseInt(process.env.MQTT_PORT) : 0,
-  host: process.env.MQTT_HOST,
-  protocol: 'mqtts',
-  keepalive: 0,
-  username: process.env.MQTT_USER,
-  password: process.env.MQTT_PASS
+const getMqttOptions = (): mqtt.IClientOptions => {
+  const { MQTT_HOST, MQTT_PASS, MQTT_PORT, MQTT_USER } = getEnv()
+
+  return {
+    port: MQTT_PORT,
+    host: MQTT_HOST,
+    protocol: 'mqtts',
+    keepalive: 0,
+    username: MQTT_USER,
+    password: MQTT_PASS
+  }
 }
 const namespace = 'DoorCloud:Mqtt:Server'
 const debugMessage = 'Connected to mqtt server'
 
 const getClient = (log?: FastifyBaseLogger) => {
   if (!global.__mqttClient__) {
-    global.__mqttClient__ = mqtt.connect(options)
+    global.__mqttClient__ = mqtt.connect(getMqttOptions())
     global.__mqttClient__.on('connect', () => {
       if (log) log?.info({}, debugMessage)
       else
@@ -47,4 +53,4 @@ const mqttConnection = (log: FastifyBaseLogger) => ({
   }
 })
 
-export { getClient, mqttConnection, namespace, debugMessage }
+export { getClient, getMqttOptions, mqttConnection, namespace, debugMessage }

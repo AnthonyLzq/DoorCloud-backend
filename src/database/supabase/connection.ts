@@ -1,8 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { FastifyBaseLogger } from 'fastify'
 
-const supabaseUrl = process.env.SUPABASE_URL as string
-const supabaseKey = process.env.SUPABASE_KEY as string
+import { getEnv } from 'config/env'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -11,7 +10,9 @@ declare global {
 
 const supabaseConnection = (log?: FastifyBaseLogger) => {
   if (!global.__supabaseClient__) {
-    global.__supabaseClient__ = createClient(supabaseUrl, supabaseKey)
+    const { SUPABASE_URL, SUPABASE_KEY } = getEnv()
+
+    global.__supabaseClient__ = createClient(SUPABASE_URL, SUPABASE_KEY)
     log?.info('Supabase connection established.')
   }
 

@@ -1,6 +1,7 @@
 import { Human, Config } from '@vladmandic/human'
 import { FastifyBaseLogger } from 'fastify'
 
+import { getEnv } from 'config/env'
 import { CustomError } from 'network/http'
 
 declare global {
@@ -8,18 +9,20 @@ declare global {
   var __human__: Human
 }
 
-const humanConfig: Partial<Config> = {
+const getHumanConfig = (): Partial<Config> => ({
   debug: false,
   face: { emotion: { enabled: false } },
   body: { enabled: false },
   hand: { enabled: false },
   gesture: { enabled: false },
-  modelBasePath: process.env.MODELS_CDN_URL
-}
+  modelBasePath: getEnv().MODELS_CDN_URL
+})
 
 const init = async (log: FastifyBaseLogger) => {
   if (!global.__human__) {
     log.info({}, 'Initializing human')
+    const humanConfig = getHumanConfig()
+
     global.__human__ = new Human(humanConfig)
     await global.__human__.tf.ready()
     await global.__human__.load()
@@ -28,6 +31,7 @@ const init = async (log: FastifyBaseLogger) => {
 }
 
 const detectFromBuffer = async (input: Buffer) => {
+  const humanConfig = getHumanConfig()
   const tensor = global.__human__.tf.node.decodeImage(input, 3)
   const result = await global.__human__.detect(tensor, humanConfig)
 

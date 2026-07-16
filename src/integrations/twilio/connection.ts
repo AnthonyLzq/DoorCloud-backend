@@ -1,6 +1,8 @@
 import twilio from 'twilio'
 import { FastifyBaseLogger } from 'fastify'
 
+import { getEnv } from 'config/env'
+
 declare global {
   // eslint-disable-next-line no-var
   var __twilioClient__: twilio.Twilio
@@ -8,10 +10,9 @@ declare global {
 
 const twilioConnection = (log?: FastifyBaseLogger) => {
   if (!global.__twilioClient__) {
-    global.__twilioClient__ = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    )
+    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = getEnv()
+
+    global.__twilioClient__ = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
     log?.info('Twilio connection established.')
   }
 
