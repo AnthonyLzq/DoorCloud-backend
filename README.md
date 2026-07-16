@@ -34,6 +34,16 @@ The repository enforces this baseline through `.nvmrc`, `package.json`, and
 `pnpm-workspace.yaml`. Use `nvm use` before pnpm commands so `engineStrict`
 does not reject the install.
 
+## Docker
+
+The image uses the current Node 22 Alpine 3.23 line, upgrades Alpine packages at
+build time, and keeps pnpm pinned to the project baseline:
+
+```bash
+docker build -t doorcloud-backend .
+docker run --env-file .env -p 1996:1996 doorcloud-backend
+```
+
 ## Local Mosquitto broker
 
 The local broker runs with authentication and ACLs. Generate the password file

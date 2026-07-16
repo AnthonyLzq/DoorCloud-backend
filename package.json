@@ -5,9 +5,10 @@
   "main": "src/index.ts",
   "description": "Backend for DoorCloud",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "lint": "eslint src/* --ext .ts --no-error-on-unmatched-pattern",
     "service": "nodemon",
-    "start": "node dist/index.js",
+    "start": "NODE_PATH=dist node dist/index.js",
     "release": "standard-version",
     "test:local": "jest --setupFiles dotenv/config --ci -i",
     "test:ci": "jest --ci -i",

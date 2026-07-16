@@ -1,17 +1,36 @@
-FROM node:16-alpine
+FROM node:22-alpine3.23 AS base
 
 WORKDIR /app
 
-COPY . ./
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
-RUN yarn install --prod
+RUN apk upgrade --no-cache \
+  && corepack enable \
+  && corepack prepare pnpm@10.30.1 --activate
 
-RUN yarn add webpack webpack-node-externals tsconfig-paths-webpack-plugin -D
+FROM base AS deps
 
-RUN yarn build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-RUN yarn remove webpack webpack-node-externals tsconfig-paths-webpack-plugin
+RUN pnpm install --frozen-lockfile
 
-COPY dist ./dist
+FROM deps AS build
 
-CMD [ "yarn", "start" ]
+COPY tsconfig.base.json tsconfig.json ./
+COPY src ./src
+
+RUN pnpm build
+
+FROM base AS production
+
+ENV NODE_ENV=production
+ENV NODE_PATH=/app/dist
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=build /app/dist ./dist
+
+CMD ["pnpm", "start"]

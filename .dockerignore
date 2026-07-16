@@ -6,6 +6,15 @@
 .github
 
 node_modules
+dist
+coverage
+.nyc_output
+.goals
+.env
+.env.*
+metrics
+venv
+infra/mosquitto/passwordfile
 
 *.md
 LICENSE
