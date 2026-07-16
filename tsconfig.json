@@ -8,7 +8,8 @@
     "test",
     "tests",
     "__test__",
-    "dist"
+    "dist",
+    "src/tf.ts"
   ],
   "include": [
     "src"

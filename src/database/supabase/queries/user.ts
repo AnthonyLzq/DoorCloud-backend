@@ -41,6 +41,14 @@ const getUserByUserID = async (
       .select('*')
   let errorMessage = ''
 
+  // any generic error
+  if (error) {
+    errorMessage = 'Unknown error'
+    log.error({ error }, errorMessage)
+
+    throw new CustomError(errorMessage)
+  }
+
   if (!data) {
     errorMessage = 'User not found'
     log.error(errorMessage)
@@ -53,14 +61,6 @@ const getUserByUserID = async (
     log.error(errorMessage)
 
     throw new CustomError(errorMessage, 409)
-  }
-
-  // any generic error
-  if (error) {
-    errorMessage = 'Unknown error'
-    log.error(error, errorMessage)
-
-    throw new CustomError(errorMessage)
   }
 
   return data
@@ -110,10 +110,19 @@ const getPhotosUrls = async (
     data?.reduce<string[]>((acc, url, index) => {
       if (url.error) {
         log.error(
-          url.error,
+          { error: url.error },
           `Error while trying to get a url for the uploaded image number: ${
             index + 1
           }`
+        )
+
+        return acc
+      }
+
+      if (!url.signedUrl) {
+        log.error(
+          { url },
+          `Missing signed url for the uploaded image number: ${index + 1}`
         )
 
         return acc

@@ -11,6 +11,7 @@
     "release": "standard-version",
     "test:local": "jest --setupFiles dotenv/config --ci -i",
     "test:ci": "jest --ci -i",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "pub": "nodemon --exec \"DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts\""
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
@@ -45,7 +46,7 @@
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.1.1",
     "tsconfig-paths-webpack-plugin": "^4.0.0",
-    "typescript": "^4.9.4"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@fastify/busboy": "^1.1.0",
