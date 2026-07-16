@@ -8,7 +8,7 @@ const config: Config.InitialOptions = {
   modulePaths: ['<rootDir>/src', '<rootDir>/node_modules'],
   roots: ['.'],
   moduleFileExtensions: ['js', 'json', 'ts'],
-  testRegex: '.test.ts$',
+  testRegex: '^(?!.*\\.integration\\.test\\.ts$).*\\.test\\.ts$',
   transform: {
     '^.+\\.(t|j)s$': [
       'ts-jest',

@@ -55,6 +55,15 @@ Use `MOSQUITTO_BACKEND_PASSWORD` and `MOSQUITTO_DEVICE_PASSWORD` to generate
 different local passwords. The generated `infra/mosquitto/passwordfile` is
 ignored and must not be committed.
 
+Run the Mosquitto-backed integration suite with Docker:
+
+```bash
+pnpm test:mqtt
+```
+
+`test:mqtt` starts Mosquitto, waits for the broker healthcheck, runs the MQTT
+integration tests, and then removes the Compose volumes.
+
 ## Testing
 
 At this point, we only can test receiving and sending messages manually or using the unit tests.

@@ -11,6 +11,8 @@
     "release": "standard-version",
     "test:local": "jest --setupFiles dotenv/config --ci -i",
     "test:ci": "jest --ci -i",
+    "test:mqtt": "scripts/mosquitto/run-integration-tests.sh",
+    "test:mqtt:integration": "jest --setupFiles dotenv/config --ci -i --testRegex mqtt\\\\.integration\\\\.test\\\\.ts$",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "pub": "nodemon --exec \"DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts\""
   },
