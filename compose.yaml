@@ -1,0 +1,31 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - '${MOSQUITTO_PORT:-1883}:1883'
+    environment:
+      MOSQUITTO_BACKEND_PASSWORD: ${MOSQUITTO_BACKEND_PASSWORD:-doorcloud-backend-local}
+      MOSQUITTO_BACKEND_USER: doorcloud-backend
+    volumes:
+      - ./infra/mosquitto/aclfile:/mosquitto/config/aclfile:ro
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./infra/mosquitto/passwordfile:/mosquitto/config/passwordfile:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          mosquitto_sub -h 127.0.0.1 -p 1883
+          -u "$$MOSQUITTO_BACKEND_USER"
+          -P "$$MOSQUITTO_BACKEND_PASSWORD"
+          -t '$$SYS/broker/version' -C 1 -W 5 >/dev/null
+      interval: 10s
+      timeout: 6s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

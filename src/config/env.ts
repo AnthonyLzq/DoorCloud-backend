@@ -34,6 +34,7 @@ const envSchema = z.object({
   NODE_ENV: z.string().trim().min(1).default('development'),
   PORT: optionalPort(1996),
   MQTT_HOST: requiredString('MQTT_HOST'),
+  MQTT_PROTOCOL: z.enum(['mqtt', 'mqtts']).default('mqtts'),
   MQTT_PORT: port('MQTT_PORT'),
   MQTT_USER: requiredString('MQTT_USER'),
   MQTT_PASS: requiredString('MQTT_PASS'),

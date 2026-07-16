@@ -9,12 +9,12 @@ declare global {
 }
 
 const getMqttOptions = (): mqtt.IClientOptions => {
-  const { MQTT_HOST, MQTT_PASS, MQTT_PORT, MQTT_USER } = getEnv()
+  const { MQTT_HOST, MQTT_PASS, MQTT_PORT, MQTT_PROTOCOL, MQTT_USER } = getEnv()
 
   return {
     port: MQTT_PORT,
     host: MQTT_HOST,
-    protocol: 'mqtts',
+    protocol: MQTT_PROTOCOL,
     keepalive: 0,
     username: MQTT_USER,
     password: MQTT_PASS

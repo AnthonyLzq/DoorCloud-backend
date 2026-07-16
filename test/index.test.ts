@@ -48,6 +48,7 @@ const validEnv = {
   MQTT_HOST: 'mqtt.example.com',
   MQTT_PASS: 'mqtt-password',
   MQTT_PORT: '8883',
+  MQTT_PROTOCOL: 'mqtt',
   MQTT_USER: 'mqtt-user',
   SUPABASE_KEY: 'supabase-key',
   SUPABASE_URL: 'https://supabase.example.com',
@@ -113,6 +114,7 @@ describe('DoorCloud backend tests', () => {
         MODELS_CDN_URL: 'https://models.example.com',
         MQTT_HOST: 'mqtt.example.com',
         MQTT_PORT: 8883,
+        MQTT_PROTOCOL: 'mqtt',
         NODE_ENV: 'development',
         PORT: 1996,
         TWILIO_PHONE_NUMBER: '+10000000000'
@@ -137,7 +139,7 @@ describe('DoorCloud backend tests', () => {
         keepalive: 0,
         password: 'mqtt-password',
         port: 8883,
-        protocol: 'mqtts',
+        protocol: 'mqtt',
         username: 'mqtt-user'
       })
       expect(firstClient).toBe(mockClient)
