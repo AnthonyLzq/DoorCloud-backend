@@ -1,12 +1,17 @@
 import fastify, { FastifyInstance } from 'fastify'
+import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
+import {
+  serializerCompiler,
+  validatorCompiler,
+  ZodTypeProvider
+} from 'fastify-type-provider-zod'
 
 import { supabaseConnection } from 'database'
-import { userSchemas } from 'schemas'
 
-import { applyRoutes, validatorCompiler } from './http'
+import { applyRoutes } from './http'
 import { mqttConnection } from './mqtt'
 import { init } from 'lib'
-import { twilioConnection } from 'integrations'
 import { getEnv } from 'config/env'
 
 const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
@@ -35,15 +40,13 @@ class Server {
   }
 
   #config() {
-    this.#app.register(require('@fastify/cors'), {})
-    this.#app.register(require('@fastify/multipart'), {
+    this.#app.register(cors, {})
+    this.#app.register(multipart, {
       limits: {
         fields: 3,
         files: 3
       }
     })
-
-    for (const schema of userSchemas) this.#app.addSchema(schema)
 
     this.#app.addHook('preHandler', (req, reply, done) => {
       reply.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE')
@@ -56,7 +59,8 @@ class Server {
       done()
     })
     this.#app.setValidatorCompiler(validatorCompiler)
-    applyRoutes(this.#app)
+    this.#app.setSerializerCompiler(serializerCompiler)
+    applyRoutes(this.#app.withTypeProvider<ZodTypeProvider>())
   }
 
   #startMqtt() {
@@ -64,20 +68,15 @@ class Server {
   }
 
   public async start(): Promise<void> {
-    try {
-      const { PORT } = getEnv()
+    const { PORT } = getEnv()
 
-      supabaseConnection(this.#app.log)
-      twilioConnection(this.#app.log)
-      this.#startMqtt()
-      await this.#mqqtConnection?.start()
-      await this.#app.listen({
-        port: PORT
-      })
-      await init(this.#app.log)
-    } catch (e) {
-      console.error(e)
-    }
+    supabaseConnection(this.#app.log)
+    this.#startMqtt()
+    await this.#mqqtConnection?.start()
+    await this.#app.listen({
+      port: PORT
+    })
+    await init(this.#app.log)
   }
 
   public async stop(): Promise<void> {

@@ -1,8 +1,20 @@
 import type { FastifyBaseLogger, FastifyReply } from 'fastify'
+import { mkdtempSync, readFileSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import mqtt from 'mqtt'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { parseEnv } from '../src/config/env'
+import {
+  getOpenWaSetupQr,
+  getOpenWaSetupStatus,
+  saveOpenWaSetupConfig,
+  sendOpenWaSetupTest,
+  startOpenWaSetupSession,
+  sendWhatsappImage,
+  sendWhatsappText
+} from '../src/integrations/whatsapp'
 import { response } from '../src/network/http/response'
 import {
   debugMessage,
@@ -26,15 +38,19 @@ import {
 type MockFunction = ReturnType<typeof vi.fn>
 
 type MockMqttClient = {
+  connected: boolean
   end: MockFunction
   on: MockFunction
   options?: unknown
+  once: MockFunction
+  removeListener: MockFunction
   subscribe: MockFunction
 }
 
 const mockClient = vi.hoisted(() => {
   const client = {} as MockMqttClient
 
+  client.connected = false
   client.end = vi.fn(
     (force: boolean, options: unknown, done?: (error?: Error) => void) => {
       done?.(undefined)
@@ -43,10 +59,22 @@ const mockClient = vi.hoisted(() => {
     }
   )
   client.on = vi.fn((event: string, handler: () => void) => {
-    if (event === 'connect') handler()
+    if (event === 'connect') {
+      client.connected = true
+      handler()
+    }
 
     return client
   })
+  client.once = vi.fn((event: string, handler: () => void) => {
+    if (event === 'connect') {
+      client.connected = true
+      handler()
+    }
+
+    return client
+  })
+  client.removeListener = vi.fn().mockReturnValue(client)
   client.subscribe = vi.fn()
 
   return client
@@ -73,11 +101,12 @@ const validEnv = {
   MQTT_PORT: '8883',
   MQTT_PROTOCOL: 'mqtt',
   MQTT_USER: 'mqtt-user',
+  OPENWA_API_KEY: 'openwa-api-key',
+  OPENWA_BASE_URL: 'http://localhost:2785',
+  OPENWA_CHAT_ID: '51999999999@c.us',
+  OPENWA_SESSION_ID: 'main',
   SUPABASE_KEY: 'supabase-key',
-  SUPABASE_URL: 'https://supabase.example.com',
-  TWILIO_ACCOUNT_SID: 'twilio-sid',
-  TWILIO_AUTH_TOKEN: 'twilio-token',
-  TWILIO_PHONE_NUMBER: '+10000000000'
+  SUPABASE_URL: 'https://supabase.example.com'
 }
 
 const log = {
@@ -88,8 +117,11 @@ const log = {
 describe('DoorCloud backend tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(process.env, 'SETUP_TOKEN')
     Reflect.deleteProperty(global, '__mqttClient__')
     Reflect.deleteProperty(mockClient, 'options')
+    mockClient.connected = false
     Object.assign(process.env, validEnv)
   })
 
@@ -107,8 +139,10 @@ describe('DoorCloud backend tests', () => {
         MQTT_QOS: 0,
         MQTT_RECONNECT_PERIOD: 1_000,
         NODE_ENV: 'development',
-        PORT: 1996,
-        TWILIO_PHONE_NUMBER: '+10000000000'
+        OPENWA_BASE_URL: 'http://localhost:2785',
+        OPENWA_CHAT_ID: '51999999999@c.us',
+        OPENWA_SESSION_ID: 'main',
+        PORT: 1996
       })
     })
 
@@ -230,6 +264,217 @@ describe('DoorCloud backend tests', () => {
 
       expect(mockClient.end).toHaveBeenCalledTimes(1)
       expect(global.__mqttClient__).toBe(undefined)
+    })
+  })
+
+  describe('OpenWA WhatsApp provider', () => {
+    test('sends text messages to the configured chat id', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ messageId: 'text-1', timestamp: 1 }), {
+          status: 201
+        })
+      )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(sendWhatsappText('hello', log)).resolves.toMatchObject({
+        messageId: 'text-1'
+      })
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:2785/api/sessions/main/messages/send-text',
+        expect.objectContaining({
+          body: JSON.stringify({
+            chatId: '51999999999@c.us',
+            text: 'hello'
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': 'openwa-api-key'
+          },
+          method: 'POST'
+        })
+      )
+    })
+
+    test('sends image messages through OpenWA send-image', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ messageId: 'image-1', timestamp: 2 }), {
+          status: 201
+        })
+      )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        sendWhatsappImage({
+          imageUrl: 'https://example.com/photo.jpg',
+          caption: 'result',
+          log
+        })
+      ).resolves.toMatchObject({ messageId: 'image-1' })
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:2785/api/sessions/main/messages/send-image',
+        expect.objectContaining({
+          body: JSON.stringify({
+            caption: 'result',
+            chatId: '51999999999@c.us',
+            url: 'https://example.com/photo.jpg'
+          }),
+          method: 'POST'
+        })
+      )
+    })
+
+    test('surfaces OpenWA send errors', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('bad api key', { status: 401 }))
+      )
+
+      await expect(sendWhatsappText('hello', log)).rejects.toThrow(
+        'OpenWA message request failed with 401'
+      )
+      expect(log.error).toHaveBeenCalledWith(
+        { responseBody: 'bad api key', status: 401 },
+        'OpenWA message request failed'
+      )
+    })
+
+    test('reports missing OpenWA session during setup status', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('not found', { status: 404 }))
+      )
+
+      await expect(getOpenWaSetupStatus(log)).resolves.toMatchObject({
+        configuredChatId: '51999999999@c.us',
+        configuredSessionId: 'main',
+        session: null
+      })
+    })
+
+    test('creates and starts an OpenWA session for setup', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response('not found', { status: 404 }))
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ id: 'main', status: 'created' }), {
+            status: 201
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ status: 'qr_ready' }), { status: 201 })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ id: 'main', status: 'qr_ready' }), {
+            status: 200
+          })
+        )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(startOpenWaSetupSession(log)).resolves.toMatchObject({
+        session: { id: 'main', status: 'qr_ready' }
+      })
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        'http://localhost:2785/api/sessions',
+        expect.objectContaining({
+          body: JSON.stringify({ name: 'main' }),
+          method: 'POST'
+        })
+      )
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        'http://localhost:2785/api/sessions/main/start',
+        expect.objectContaining({ method: 'POST' })
+      )
+    })
+
+    test('loads the OpenWA setup QR', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ id: 'main', status: 'qr_ready' }), {
+            status: 200
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              qrCode: 'data:image/png;base64,ZmFrZQ==',
+              status: 'qr_ready'
+            }),
+            { status: 200 }
+          )
+        )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(getOpenWaSetupQr(log)).resolves.toMatchObject({
+        qrCode: 'data:image/png;base64,ZmFrZQ==',
+        status: 'qr_ready'
+      })
+    })
+
+    test('sends OpenWA setup test text and image', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ messageId: 'text-1', timestamp: 1 }), {
+            status: 201
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ messageId: 'image-1', timestamp: 2 }), {
+            status: 201
+          })
+        )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        sendOpenWaSetupTest({
+          imageUrl: 'https://example.com/test.jpg',
+          log,
+          text: 'setup test'
+        })
+      ).resolves.toMatchObject({
+        imageMessage: { messageId: 'image-1' },
+        textMessage: { messageId: 'text-1' }
+      })
+    })
+
+    test('saves OpenWA setup config to .env and process env', () => {
+      const cwd = process.cwd()
+      const dir = mkdtempSync(join(tmpdir(), 'doorcloud-openwa-'))
+
+      try {
+        process.chdir(dir)
+
+        expect(
+          saveOpenWaSetupConfig({
+            OPENWA_API_KEY: 'saved-key',
+            OPENWA_BASE_URL: 'http://localhost:2785',
+            OPENWA_CHAT_ID: '51999999999@c.us',
+            OPENWA_SESSION_ID: 'main'
+          })
+        ).toMatchObject({
+          saved: [
+            'OPENWA_API_KEY',
+            'OPENWA_BASE_URL',
+            'OPENWA_CHAT_ID',
+            'OPENWA_SESSION_ID'
+          ]
+        })
+        expect(readFileSync('.env', 'utf8')).toContain(
+          'OPENWA_API_KEY=saved-key'
+        )
+        expect(process.env.OPENWA_API_KEY).toBe('saved-key')
+      } finally {
+        process.chdir(cwd)
+        rmSync(dir, { force: true, recursive: true })
+      }
     })
   })
 

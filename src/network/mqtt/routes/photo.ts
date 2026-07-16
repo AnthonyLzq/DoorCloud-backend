@@ -20,6 +20,7 @@ import {
   isPhotoSendTopic,
   MQTT_TOPICS
 } from '../topics'
+import type { MqttRoute } from '../types'
 
 const PUB_TOPIC = 'doorcloud/v1/photo'
 const SUB_TOPIC = MQTT_TOPICS.photo.send
@@ -79,18 +80,25 @@ const recordMetrics = (
   log.info({ topic }, 'Photo received and measured.')
 }
 
-const sub = (client: MqttClient, log: FastifyBaseLogger) => {
+const sub = async (
+  client: MqttClient,
+  log: FastifyBaseLogger
+): Promise<void> => {
   const { MQTT_LEGACY_TOPICS_ENABLED, MQTT_QOS } = getEnv()
   const topics = getPhotoSubscriptionTopics(MQTT_LEGACY_TOPICS_ENABLED)
 
-  client.subscribe(topics, { qos: MQTT_QOS }, error => {
-    if (error) {
-      log.error({ error, topics }, 'Error subscribing to MQTT photo topics')
+  await new Promise<void>((resolve, reject) => {
+    client.subscribe(topics, { qos: MQTT_QOS }, error => {
+      if (error) {
+        log.error({ error, topics }, 'Error subscribing to MQTT photo topics')
+        reject(error)
 
-      return
-    }
+        return
+      }
 
-    log.info({ topics }, 'Subscribed to MQTT photo topics')
+      log.info({ topics }, 'Subscribed to MQTT photo topics')
+      resolve()
+    })
   })
 
   client.on('error', error => {
@@ -113,7 +121,7 @@ const sub = (client: MqttClient, log: FastifyBaseLogger) => {
   })
 }
 
-const demo: Route = {
+const demo: MqttRoute = {
   sub,
   PUB_TOPIC,
   SUB_TOPIC

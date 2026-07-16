@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src/* --ext .ts --no-error-on-unmatched-pattern",
-    "service": "nodemon",
+    "preservice": "node scripts/openwa/sync-api-key.mjs --optional",
+    "service": "nodemon --exitcrash",
     "start": "NODE_PATH=dist node dist/index.js",
     "release": "standard-version",
     "test:local": "vitest run --exclude \"**/*.integration.test.ts\"",
@@ -15,16 +16,19 @@
     "test:mqtt": "scripts/mosquitto/run-integration-tests.sh",
     "test:mqtt:integration": "vitest run test/mqtt.integration.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-    "pub": "nodemon --exec \"DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts\""
+    "openwa:qr": "node scripts/openwa/qr-sign-in.mjs",
+    "openwa:sync-api-key": "node scripts/openwa/sync-api-key.mjs",
+    "pub": "nodemon --exec \"DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts\""
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
   "license": "MIT",
   "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/eslint-parser": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
     "@types/debug": "^4.1.7",
     "@types/http-errors": "^2.0.1",
     "@types/node": "^22.20.1",
-    "@typescript-eslint/eslint-plugin": "^5.47.1",
-    "@typescript-eslint/parser": "^5.47.1",
     "dotenv": "^16.0.3",
     "eslint": "^8.31.0",
     "eslint-config-prettier": "^8.5.0",
@@ -36,28 +40,25 @@
     "nodemon": "^2.0.20",
     "prettier": "^2.8.1",
     "standard-version": "^9.5.0",
-    "ts-node": "^10.9.1",
-    "tsconfig-paths": "^4.1.1",
-    "typescript": "^5.9.3",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@fastify/busboy": "^1.1.0",
-    "@fastify/cors": "^8.2.0",
-    "@fastify/multipart": "^7.3.0",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "^10.1.0",
+    "@fastify/swagger": "^9.8.1",
     "@supabase/postgrest-js": "^1.1.1",
     "@supabase/supabase-js": "^2.2.3",
     "@tensorflow/tfjs-node": "^4.2.0",
     "@vladmandic/human": "^3.0.3",
-    "ajv": "^8.11.2",
     "debug": "^4.3.4",
-    "fastify": "^4.10.2",
-    "fastify-zod": "^1.2.0",
+    "fastify": "^5.10.0",
+    "fastify-type-provider-zod": "7.0.0",
     "http-errors": "^2.0.0",
-    "mqtt": "^4.3.7",
+    "mqtt": "^5.15.2",
     "pino-pretty": "^9.1.1",
-    "twilio": "^3.84.0",
-    "zod": "^3.20.2"
+    "zod": "^4.4.3"
   },
   "nodemonConfig": {
     "watch": [
@@ -68,7 +69,7 @@
     "ignore": [
       "src/**/*.test.ts"
     ],
-    "exec": "DEBUG=DoorCloud:* npx ts-node -r dotenv/config ./src/index"
+    "exec": "DEBUG=DoorCloud:* tsx -r dotenv/config ./src/index.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",

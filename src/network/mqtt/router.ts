@@ -5,16 +5,19 @@ import * as Routes from './routes'
 
 const routedClients = new WeakSet<MqttClient>()
 
-const applyRoutes = (client: MqttClient, logger: FastifyBaseLogger) => {
+const applyRoutes = async (
+  client: MqttClient,
+  logger: FastifyBaseLogger
+): Promise<void> => {
   if (routedClients.has(client)) {
     logger.info({}, 'MQTT routes already registered')
 
     return
   }
 
-  ;(Object.keys(Routes) as (keyof typeof Routes)[]).forEach(route => {
-    Routes[route].sub(client, logger)
-  })
+  for (const route of Object.keys(Routes) as (keyof typeof Routes)[])
+    await Routes[route].sub(client, logger)
+
   routedClients.add(client)
 }
 

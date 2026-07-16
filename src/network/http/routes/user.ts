@@ -1,33 +1,35 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { BusboyConfig } from '@fastify/busboy'
-import { MultipartFile } from '@fastify/multipart'
+import type {
+  FastifyBaseLogger,
+  FastifyInstance,
+  RawReplyDefaultExpression,
+  RawRequestDefaultExpression,
+  RawServerDefault
+} from 'fastify'
+import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 
-import { userRef, UserRequest } from 'schemas'
+import { uploadUserPhotoParamsSchema, userSchema } from 'schemas'
 import { UserServices } from 'services'
 import { response } from '../response'
 import { handlerErrorInRoute } from '../utils'
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    files: (
-      options?: Omit<BusboyConfig, 'headers'>
-    ) => AsyncIterableIterator<MultipartFile>
-  }
-}
+type ZodFastifyInstance = FastifyInstance<
+  RawServerDefault,
+  RawRequestDefaultExpression<RawServerDefault>,
+  RawReplyDefaultExpression<RawServerDefault>,
+  FastifyBaseLogger,
+  ZodTypeProvider
+>
 
-const User = (server: FastifyInstance, prefix = '/api') => {
+const User = (server: ZodFastifyInstance, prefix = '/api') => {
   const us = new UserServices(server.log)
 
   server.route({
     method: 'POST',
     url: `${prefix}/user`,
     schema: {
-      body: userRef('userSchema')
+      body: userSchema
     },
-    handler: async (
-      request: FastifyRequest<{ Body: UserRequest }>,
-      reply: FastifyReply
-    ) => {
+    handler: async (request, reply) => {
       const {
         body: { name, phone }
       } = request
@@ -45,10 +47,10 @@ const User = (server: FastifyInstance, prefix = '/api') => {
   server.route({
     method: 'POST',
     url: `${prefix}/user/:folderID/upload`,
-    handler: async (
-      request: FastifyRequest<{ Params: { folderID: string } }>,
-      reply: FastifyReply
-    ) => {
+    schema: {
+      params: uploadUserPhotoParamsSchema
+    },
+    handler: async (request, reply) => {
       const {
         params: { folderID }
       } = request

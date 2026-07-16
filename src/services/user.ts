@@ -122,7 +122,7 @@ class UserServices {
       )
     ).find(result => result.match)
     const timeAfter = getTimestamp()
-    // const foundName = foundMatch?.name
+    const foundName = foundMatch?.name
     const matchResult = foundMatch?.match ?? false
 
     appendFileSync(
@@ -131,27 +131,27 @@ class UserServices {
       'utf-8'
     )
 
-    // const uploadResponse = await uploadUserPhoto({
-    //   path: `${name}-${userID}/${
-    //     foundName ?? getTimestamp()
-    //   }-${crypto.randomUUID()}.${format}`,
-    //   bufferFile: bufferPhoto,
-    //   log: this.#log,
-    //   format
-    // })
-    // const [url] = await getPhotosUrls(
-    //   [uploadResponse.data.path],
-    //   900,
-    //   this.#log
-    // )
+    const uploadResponse = await uploadUserPhoto({
+      path: `${name}-${userID}/${
+        foundName ?? getTimestamp()
+      }-${crypto.randomUUID()}.${format}`,
+      bufferFile: bufferPhoto,
+      log: this.#log,
+      format
+    })
+    const [url] = await getPhotosUrls(
+      [uploadResponse.data.path],
+      900,
+      this.#log
+    )
 
-    // await sendPhotoDetectionResultThroughWhatsapp({
-    //   imageUrl: url,
-    //   success: matchResult,
-    //   name: foundName,
-    //   phoneNumber: phone,
-    //   log: this.#log
-    // })
+    await sendPhotoDetectionResultThroughWhatsapp({
+      imageUrl: url,
+      success: matchResult,
+      name: foundName,
+      phoneNumber: phone,
+      log: this.#log
+    })
   }
 }
 export { UserServices }

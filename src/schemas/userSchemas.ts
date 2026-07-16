@@ -1,27 +1,22 @@
-import zod from 'zod'
-import { buildJsonSchemas } from 'fastify-zod'
+import { z } from 'zod'
 
-const userSchema = zod.object({
-  name: zod.string({
-    required_error: 'name is required'
-  }),
-  phone: zod.string({
-    required_error: 'phone is required'
-  })
+const userSchema = z.object({
+  name: z.string().min(1, 'name is required'),
+  phone: z.string().min(1, 'phone is required')
 })
 
-const userResponseSchema = zod.object({
-  name: zod.string(),
-  phone: zod.string(),
-  idFolder: zod.string() // id of the folder in the storage
+const userResponseSchema = z.object({
+  name: z.string(),
+  phone: z.string(),
+  idFolder: z.string()
 })
 
-export type UserRequest = zod.infer<typeof userSchema>
-export type UserResponse = zod.infer<typeof userResponseSchema>
-
-const { schemas: userSchemas, $ref: userRef } = buildJsonSchemas({
-  userSchema,
-  userResponseSchema
+const uploadUserPhotoParamsSchema = z.object({
+  folderID: z.string().min(1, 'folderID is required')
 })
 
-export { userSchemas, userRef }
+type UserRequest = z.infer<typeof userSchema>
+type UserResponse = z.infer<typeof userResponseSchema>
+
+export { uploadUserPhotoParamsSchema, userSchema, userResponseSchema }
+export type { UserRequest, UserResponse }

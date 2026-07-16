@@ -3,22 +3,27 @@
     "node": true
   },
   "root": true,
-  "parser": "@typescript-eslint/parser",
+  "parser": "@babel/eslint-parser",
+  "parserOptions": {
+    "requireConfigFile": false,
+    "babelOptions": {
+      "presets": [
+        "@babel/preset-typescript"
+      ]
+    }
+  },
   "plugins": [
-    "@typescript-eslint",
     "import",
     "prettier"
   ],
   "extends": [
     "standard",
     "eslint:recommended",
-    "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended",
     "prettier"
   ],
   "rules": {
-    "@typescript-eslint/no-var-requires": "off",
-    "@typescript-eslint/no-empty-interface": "off",
+    "no-undef": "off",
+    "no-unused-vars": "off",
     "arrow-parens": [
       "error",
       "as-needed"
@@ -38,7 +43,7 @@
           "**/*.test.js",
           "**/*.test.ts",
           "webpack.config.js",
-          "vitest.config.ts"
+          "vitest.config.mts"
         ],
         "optionalDependencies": [
           "**/*.test.js"

@@ -10,6 +10,7 @@ dist
 coverage
 .nyc_output
 .goals
+.openwa
 .env
 .env.*
 metrics
@@ -19,6 +20,6 @@ infra/mosquitto/passwordfile
 *.md
 LICENSE
 
-vitest.config.ts
+vitest.config.mts
 nodemon.json
 *.log

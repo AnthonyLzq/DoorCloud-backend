@@ -1,4 +1,6 @@
-import { FastifyReply } from 'fastify'
+import type { FastifyReply } from 'fastify'
+
+type ResponseReply = Pick<FastifyReply, 'code' | 'send'>
 
 const response = ({
   error,
@@ -8,7 +10,7 @@ const response = ({
 }: {
   error: boolean
   message: unknown
-  reply: FastifyReply
+  reply: ResponseReply
   status: number
 }): void => {
   reply.code(status).send({ error, message })

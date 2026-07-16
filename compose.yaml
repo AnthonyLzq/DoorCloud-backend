@@ -1,12 +1,33 @@
 services:
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:latest
+    restart: unless-stopped
+    ports:
+      - '${OPENWA_PORT:-2785}:2785'
+    environment:
+      NODE_ENV: production
+      PORT: 2785
+    volumes:
+      - openwa-data:/app/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          wget -qO- http://127.0.0.1:2785/api/health >/dev/null
+          || wget -qO- http://127.0.0.1:2785/ >/dev/null
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 20s
+
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
       - '${MOSQUITTO_PORT:-1883}:1883'
     environment:
-      MOSQUITTO_BACKEND_PASSWORD: ${MOSQUITTO_BACKEND_PASSWORD:-doorcloud-backend-local}
-      MOSQUITTO_BACKEND_USER: doorcloud-backend
+      MOSQUITTO_BACKEND_PASSWORD: ${MQTT_PASS:-doorcloud-backend-local}
+      MOSQUITTO_BACKEND_USER: ${MQTT_USER:-doorcloud-backend}
     volumes:
       - ./infra/mosquitto/aclfile:/mosquitto/config/aclfile:ro
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
@@ -27,5 +48,6 @@ services:
       start_period: 5s
 
 volumes:
+  openwa-data:
   mosquitto-data:
   mosquitto-log:

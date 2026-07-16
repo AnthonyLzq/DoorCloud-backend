@@ -5,3 +5,5 @@ type UserSupabase = {
   createdAt: string
   lastMessage: string
 }
+
+export type { UserSupabase }

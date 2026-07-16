@@ -2,6 +2,7 @@ import mqtt from 'mqtt'
 import { FastifyBaseLogger } from 'fastify'
 
 import { getEnv } from 'config/env'
+import { applyRoutes } from './router'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -65,6 +66,12 @@ const logError = (
   else writeDebug(`${message}: ${error.message}`)
 }
 
+const isAuthenticationError = (error: Error): boolean => {
+  const errorCode = (error as Error & { code?: unknown }).code
+
+  return errorCode === 4 || errorCode === 5 || errorCode === 'Not authorized'
+}
+
 const attachLifecycleLogging = (
   client: mqtt.MqttClient,
   log?: FastifyBaseLogger
@@ -88,6 +95,11 @@ const attachLifecycleLogging = (
   })
   client.on('error', error => {
     logError(log, 'MQTT connection error', error)
+
+    if (isAuthenticationError(error)) {
+      logError(log, 'Stopping MQTT reconnect after authentication error', error)
+      client.end(true)
+    }
   })
 }
 
@@ -113,11 +125,72 @@ const stopClient = async (client: mqtt.MqttClient): Promise<void> =>
     })
   })
 
+const removeStartupListeners = (
+  client: mqtt.MqttClient,
+  onConnect: () => void,
+  onClose: () => void,
+  onError: (error: Error) => void
+) => {
+  client.removeListener('connect', onConnect)
+  client.removeListener('close', onClose)
+  client.removeListener('error', onError)
+}
+
+const rejectStartup = async (
+  client: mqtt.MqttClient,
+  error: Error
+): Promise<never> => {
+  client.end(true)
+  Reflect.deleteProperty(global, '__mqttClient__')
+
+  throw error
+}
+
+const waitForClientConnect = async (client: mqtt.MqttClient): Promise<void> => {
+  const { MQTT_CONNECT_TIMEOUT } = getEnv()
+
+  if ((client as mqtt.MqttClient & { connected?: boolean }).connected) return
+
+  await new Promise<void>((resolve, reject) => {
+    const onConnect = () => {
+      clearTimeout(timeout)
+      removeStartupListeners(client, onConnect, onClose, onError)
+      resolve()
+    }
+    const onClose = () => {
+      clearTimeout(timeout)
+      removeStartupListeners(client, onConnect, onClose, onError)
+      reject(new Error('MQTT connection closed before startup completed'))
+    }
+    const onError = (error: Error) => {
+      clearTimeout(timeout)
+      removeStartupListeners(client, onConnect, onClose, onError)
+      reject(error)
+    }
+    const timeout = setTimeout(() => {
+      removeStartupListeners(client, onConnect, onClose, onError)
+      reject(
+        new Error(`MQTT connection timed out after ${MQTT_CONNECT_TIMEOUT}ms`)
+      )
+    }, MQTT_CONNECT_TIMEOUT)
+
+    client.once('connect', onConnect)
+    client.once('close', onClose)
+    client.once('error', onError)
+  }).catch(error => rejectStartup(client, error as Error))
+}
+
 const mqttConnection = (log: FastifyBaseLogger) => ({
   start: async () => {
-    const { applyRoutes } = await import('./router')
+    const client = getClient(log)
 
-    applyRoutes(getClient(log), log)
+    await waitForClientConnect(client)
+
+    try {
+      await applyRoutes(client, log)
+    } catch (error) {
+      await rejectStartup(client, error as Error)
+    }
 
     return global.__mqttClient__
   },

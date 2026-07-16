@@ -1,1 +1,1 @@
-export * from './twilio'
+export * from './whatsapp'

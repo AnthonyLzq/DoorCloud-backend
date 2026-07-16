@@ -1,7 +1,9 @@
-import { resolve } from 'path'
+import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'url'
 import { defineConfig } from 'vitest/config'
 
-const src = (path: string) => resolve(__dirname, 'src', path)
+const configDir = dirname(fileURLToPath(import.meta.url))
+const src = (path: string) => resolve(configDir, 'src', path)
 
 export default defineConfig({
   resolve: {

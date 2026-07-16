@@ -10,13 +10,17 @@ To have installed the following:
 A `.env` file with the correct variables specified in the `.env.example` file.
 
 Required environment variables are validated on startup: `MQTT_USER`,
-`MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `SUPABASE_URL`, `SUPABASE_KEY`,
-`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and
-`MODELS_CDN_URL`. `PORT` defaults to `1996`, `NODE_ENV` defaults to
-`development`, `MQTT_PROTOCOL` defaults to `mqtts`, and MQTT lifecycle settings
-default to clean sessions, 60s keepalive, 1s reconnect period, 30s connect
-timeout, QoS 0 subscriptions, and legacy `DoorCloud/photo/#` compatibility
-enabled.
+`MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `SUPABASE_URL`, `SUPABASE_KEY`, and
+`MODELS_CDN_URL`. MQTT is required: broker connection or subscription failures
+are treated as fatal startup errors. `OPENWA_BASE_URL` defaults to
+`http://localhost:2785` and `OPENWA_SESSION_ID` defaults to `main`;
+`OPENWA_API_KEY` and `OPENWA_CHAT_ID` are required only when using OpenWA setup
+or WhatsApp sends. `OPENWA_CHAT_ID` should be the WhatsApp chat ID for the
+destination number, e.g. `51999999999@c.us`. `PORT` defaults to `1996`,
+`NODE_ENV` defaults to `development`, `MQTT_PROTOCOL` defaults to `mqtts`, and
+MQTT lifecycle settings default to clean sessions, 60s keepalive, 1s reconnect
+period, 30s connect timeout, QoS 0 subscriptions, and legacy
+`DoorCloud/photo/#` compatibility enabled.
 
 ## Setup
 
@@ -90,7 +94,51 @@ pnpm test:mqtt
 ```
 
 `test:mqtt` starts Mosquitto, waits for the broker healthcheck, runs the MQTT
-integration tests, and then removes the Compose volumes.
+integration tests, and then removes the Compose volumes. The integration script
+uses host port `1884` by default to avoid conflicts with an already-running
+local broker; override it with `MOSQUITTO_PORT=<port> pnpm test:mqtt`.
+
+## OpenWA WhatsApp sign-in
+
+DoorCloud sends WhatsApp text and image messages through an OpenWA gateway. To
+sign in the configured OpenWA session from a terminal, set `OPENWA_BASE_URL`,
+`OPENWA_API_KEY`, and `OPENWA_SESSION_ID` in `.env`, then run:
+
+```bash
+pnpm openwa:qr
+```
+
+The script creates the session if it does not exist, starts it, waits for the QR
+code, and saves it to `.openwa/qr.png` by default. Scan that QR with the
+WhatsApp account that should send DoorCloud notifications. Use
+`OPENWA_QR_PATH=path/to/qr.png pnpm openwa:qr` to choose another output path.
+
+The API key must be able to create/start sessions and read QR codes. If OpenWA
+creates a different session ID, the script prints it; copy that value back into
+`OPENWA_SESSION_ID` before running DoorCloud.
+
+For a local browser setup flow, start DoorCloud and open:
+
+```text
+http://localhost:1996/setup
+```
+
+The setup page can save OpenWA config into `.env`, refresh OpenWA status, start
+the session, render the sign-in QR, and send a text/image test to
+`OPENWA_CHAT_ID`.
+
+Before `pnpm service` starts the backend, the `preservice` script tries to fill an empty
+`OPENWA_API_KEY` by reading `/app/data/.api-key` from a running Docker Compose
+OpenWA service. It tries `OPENWA_COMPOSE_SERVICE`, then `openwa`, then
+`openwa-api`. To run the sync manually:
+
+```bash
+pnpm openwa:sync-api-key
+```
+
+If OpenWA is managed by a separate Compose project, set
+`OPENWA_COMPOSE_SERVICE` to the service name that exposes `/app/data/.api-key`,
+or paste the key in `/setup`.
 
 ## Testing
 
@@ -116,7 +164,7 @@ We will get an output as follows:
 [nodemon] to restart at any time, enter `rs`
 [nodemon] watching path(s): .env src/**/*
 [nodemon] watching extensions: ts
-[nodemon] starting `DEBUG=DoorCloud:* npx ts-node -r dotenv/config ./src/index`
+[nodemon] starting `DEBUG=DoorCloud:* tsx -r dotenv/config ./src/index.ts`
 [04:34:52 UTC] INFO: Server listening at http://127.0.0.1:1996
 [04:34:52 UTC] INFO: Server listening at http://[::1]:1996
 [04:34:53 UTC] INFO: Connected to mqtt server
@@ -139,13 +187,13 @@ We will get the following out put:
 
 ```bash
 > doorcloud-backend@0.1.0 pub /home/anthony/Development/personal-projects/DoorCloud-backend
-> nodemon --exec "DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts"
+> nodemon --exec "DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts"
 
 [nodemon] 2.0.20
 [nodemon] to restart at any time, enter `rs`
 [nodemon] watching path(s): .env src/**/*
 [nodemon] watching extensions: ts
-[nodemon] starting `DEBUG=DoorCloud:* ts-node -r dotenv/config src/pub.ts`
+[nodemon] starting `DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts`
   DoorCloud:Mqtt:Server Connected to mqtt server +0ms
   DoorCloud:Mqtt:demo:pub Message send +0ms
 ```

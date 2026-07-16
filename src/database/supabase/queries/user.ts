@@ -1,8 +1,9 @@
-import { PostgrestResponse } from '@supabase/postgrest-js'
-import { FastifyBaseLogger } from 'fastify'
+import type { PostgrestResponse } from '@supabase/postgrest-js'
+import type { FastifyBaseLogger } from 'fastify'
 import { CustomError } from 'network/http'
 
 import { supabaseConnection } from '../connection'
+import type { UserSupabase } from '../types'
 
 const createUser = async (
   name: string,

@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 const requiredString = (name: string) =>
   z
-    .string({ required_error: `${name} is required` })
+    .string({ error: `${name} is required` })
     .trim()
     .min(1, `${name} cannot be empty`)
 
@@ -10,7 +10,7 @@ const port = (name: string) =>
   z.preprocess(
     value => (value === '' || value === undefined ? value : Number(value)),
     z
-      .number({ required_error: `${name} is required` })
+      .number({ error: `${name} is required` })
       .int(`${name} must be an integer`)
       .min(1, `${name} must be greater than 0`)
       .max(65_535, `${name} must be lower than 65536`)
@@ -43,7 +43,7 @@ const optionalBoolean = (name: string, defaultValue: boolean) =>
       if (value === 'false' || value === false) return false
 
       return value
-    }, z.boolean({ invalid_type_error: `${name} must be true or false` }).optional())
+    }, z.boolean({ error: `${name} must be true or false` }).optional())
     .default(defaultValue)
 
 const optionalQos = (name: string, defaultValue: 0 | 1 | 2) =>
@@ -69,6 +69,16 @@ const optionalPort = (defaultValue: number) =>
     )
     .default(defaultValue)
 
+const optionalString = (name: string) =>
+  z.preprocess(
+    value => (value === '' || value === undefined ? undefined : value),
+    z
+      .string({ error: `${name} is required` })
+      .trim()
+      .min(1)
+      .optional()
+  )
+
 const envSchema = z.object({
   NODE_ENV: z.string().trim().min(1).default('development'),
   PORT: optionalPort(1996),
@@ -77,7 +87,7 @@ const envSchema = z.object({
   MQTT_PORT: port('MQTT_PORT'),
   MQTT_USER: requiredString('MQTT_USER'),
   MQTT_PASS: requiredString('MQTT_PASS'),
-  MQTT_CLIENT_ID: z.string().trim().min(1).optional(),
+  MQTT_CLIENT_ID: optionalString('MQTT_CLIENT_ID'),
   MQTT_CLEAN: optionalBoolean('MQTT_CLEAN', true),
   MQTT_KEEPALIVE: optionalInteger('MQTT_KEEPALIVE', 60),
   MQTT_RECONNECT_PERIOD: optionalInteger('MQTT_RECONNECT_PERIOD', 1_000),
@@ -91,12 +101,16 @@ const envSchema = z.object({
     'SUPABASE_URL must be a URL'
   ),
   SUPABASE_KEY: requiredString('SUPABASE_KEY'),
-  TWILIO_ACCOUNT_SID: requiredString('TWILIO_ACCOUNT_SID'),
-  TWILIO_AUTH_TOKEN: requiredString('TWILIO_AUTH_TOKEN'),
-  TWILIO_PHONE_NUMBER: requiredString('TWILIO_PHONE_NUMBER').regex(
-    /^\+[1-9]\d{1,14}$/,
-    'TWILIO_PHONE_NUMBER must be an E.164 phone number'
-  ),
+  OPENWA_BASE_URL: z
+    .preprocess(
+      value => (value === '' || value === undefined ? undefined : value),
+      z.string().trim().url('OPENWA_BASE_URL must be a URL').optional()
+    )
+    .default('http://localhost:2785'),
+  OPENWA_API_KEY: optionalString('OPENWA_API_KEY'),
+  OPENWA_SESSION_ID: optionalString('OPENWA_SESSION_ID').default('main'),
+  OPENWA_CHAT_ID: optionalString('OPENWA_CHAT_ID'),
+  SETUP_TOKEN: optionalString('SETUP_TOKEN'),
   MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
     'MODELS_CDN_URL must be a URL'
   )

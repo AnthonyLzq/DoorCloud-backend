@@ -12,6 +12,9 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+mosquitto_port="${MOSQUITTO_PORT:-1884}"
+export MOSQUITTO_PORT="$mosquitto_port"
+
 ./scripts/mosquitto/create-password-file.sh
 docker compose up -d mosquitto
 
@@ -48,7 +51,7 @@ fi
 RUN_MQTT_INTEGRATION=true \
 MQTT_HOST=127.0.0.1 \
 MQTT_PROTOCOL=mqtt \
-MQTT_PORT=1883 \
+MQTT_PORT="$mosquitto_port" \
 MQTT_USER=doorcloud-backend \
 MQTT_PASS="${MOSQUITTO_BACKEND_PASSWORD:-doorcloud-backend-local}" \
 pnpm test:mqtt:integration

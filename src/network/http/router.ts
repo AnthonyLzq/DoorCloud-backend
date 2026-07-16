@@ -1,11 +1,26 @@
-import { FastifyInstance } from 'fastify'
-import { HttpError } from 'http-errors'
+import type {
+  FastifyBaseLogger,
+  FastifyError,
+  FastifyInstance,
+  RawReplyDefaultExpression,
+  RawRequestDefaultExpression,
+  RawServerDefault
+} from 'fastify'
+import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 
 import { response } from './response'
-import { Home, User } from './routes'
+import { Home, Setup, User } from './routes'
 
-const routes = [Home, User]
-const applyRoutes = (app: FastifyInstance): void => {
+const routes = [Home, Setup, User]
+type ZodFastifyInstance = FastifyInstance<
+  RawServerDefault,
+  RawRequestDefaultExpression<RawServerDefault>,
+  RawReplyDefaultExpression<RawServerDefault>,
+  FastifyBaseLogger,
+  ZodTypeProvider
+>
+
+const applyRoutes = (app: ZodFastifyInstance): void => {
   routes.forEach(route => route(app))
 
   // Handling 404 error
@@ -17,14 +32,18 @@ const applyRoutes = (app: FastifyInstance): void => {
       status: 404
     })
   })
-  app.setErrorHandler<HttpError>((error, request, reply) => {
-    response({
-      error: true,
-      message: error.message,
-      reply,
-      status: error.status ?? 500
-    })
-  })
+  app.setErrorHandler(
+    (error: FastifyError & { status?: number }, request, reply) => {
+      const status = error.statusCode ?? error.status ?? 500
+
+      response({
+        error: true,
+        message: error.message,
+        reply,
+        status
+      })
+    }
+  )
 }
 
 export { applyRoutes }
