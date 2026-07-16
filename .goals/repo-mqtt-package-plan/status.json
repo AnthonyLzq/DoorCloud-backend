@@ -1,0 +1,10 @@
+{
+  "goal_id": "repo-mqtt-package-plan",
+  "status": "building",
+  "iteration": 1,
+  "builder_model": "OpenAI:GPT-5.5",
+  "inspector_model": "OpenAI:GPT-5.5",
+  "initial_sha": "bc0eb47caeed6d6d650513a2c5dcf280985c9404",
+  "created_at": "2026-07-15T19:51:52.312-05:00",
+  "history": []
+}
