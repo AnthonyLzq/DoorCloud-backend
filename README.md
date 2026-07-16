@@ -15,7 +15,8 @@ Required environment variables are validated on startup: `MQTT_USER`,
 `MODELS_CDN_URL`. `PORT` defaults to `1996`, `NODE_ENV` defaults to
 `development`, `MQTT_PROTOCOL` defaults to `mqtts`, and MQTT lifecycle settings
 default to clean sessions, 60s keepalive, 1s reconnect period, 30s connect
-timeout, and QoS 0 subscriptions.
+timeout, QoS 0 subscriptions, and legacy `DoorCloud/photo/#` compatibility
+enabled.
 
 ## Setup
 
@@ -56,7 +57,17 @@ MQTT_KEEPALIVE=60
 MQTT_RECONNECT_PERIOD=1000
 MQTT_CONNECT_TIMEOUT=30000
 MQTT_QOS=0
+MQTT_LEGACY_TOPICS_ENABLED=true
 ```
+
+Preferred MQTT topics are versioned:
+
+- `doorcloud/v1/photo/send` receives JSON photo payloads:
+  `{"userId":"123","format":"jpeg","photo":"data:image/jpeg;base64,..."}`
+- `doorcloud/v1/photo/metrics` receives JSON metrics payloads:
+  `{"timestampSent": 1730000000000}`
+- Deprecated `DoorCloud/photo/#` remains available while
+  `MQTT_LEGACY_TOPICS_ENABLED=true` for existing delimiter-based messages.
 
 Use `MOSQUITTO_BACKEND_PASSWORD` and `MOSQUITTO_DEVICE_PASSWORD` to generate
 different local passwords. The generated `infra/mosquitto/passwordfile` is

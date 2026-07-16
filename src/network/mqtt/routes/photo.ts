@@ -5,74 +5,110 @@ import { resolve } from 'path'
 import { UserServices } from 'services'
 import { diffTimeInSeconds, getTimestamp } from 'utils'
 import { getEnv } from 'config/env'
+import {
+  parseLegacyPhotoMetricsPayload,
+  parseLegacyPhotoSendPayload,
+  parsePhotoMetricsPayload,
+  parsePhotoSendPayload,
+  PhotoMetricsPayload,
+  PhotoSendPayload
+} from '../photoPayloads'
+import {
+  getPhotoSubscriptionTopics,
+  isLegacyPhotoTopic,
+  isPhotoMetricsTopic,
+  isPhotoSendTopic,
+  MQTT_TOPICS
+} from '../topics'
 
-const PUB_TOPIC = 'DoorCloud'
-const SUB_TOPIC = `${PUB_TOPIC}/photo/#`
+const PUB_TOPIC = 'doorcloud/v1/photo'
+const SUB_TOPIC = MQTT_TOPICS.photo.send
+
+const getPhotoSendPayload = (
+  topic: string,
+  message: Buffer
+): PhotoSendPayload =>
+  isLegacyPhotoTopic(topic)
+    ? parseLegacyPhotoSendPayload(message)
+    : parsePhotoSendPayload(message)
+
+const getPhotoMetricsPayload = (
+  topic: string,
+  message: Buffer
+): PhotoMetricsPayload =>
+  isLegacyPhotoTopic(topic)
+    ? parseLegacyPhotoMetricsPayload(message)
+    : parsePhotoMetricsPayload(message)
+
+const handlePhotoSend = async (
+  topic: string,
+  message: Buffer,
+  log: FastifyBaseLogger
+) => {
+  log.info({ topic }, 'Received a photo')
+
+  const { base64Photo, format, userID } = getPhotoSendPayload(topic, message)
+  const us = new UserServices(log)
+
+  await us.sendPhotoThroughWhatsapp(
+    userID,
+    format,
+    Buffer.from(base64Photo, 'base64')
+  )
+
+  log.info({ topic }, 'Photo sent.')
+}
+
+const recordMetrics = (
+  { timestampSent }: PhotoMetricsPayload,
+  log: FastifyBaseLogger,
+  topic: string
+) => {
+  log.info({ topic }, 'Received photo metrics')
+
+  const timeReceived = getTimestamp()
+  const diffInSeconds = diffTimeInSeconds(timeReceived, timestampSent)
+
+  appendFileSync(
+    resolve(__dirname, '..', '..', '..', '..', 'metrics', 'receivePhoto.csv'),
+    `\n${new Date(timestampSent).toISOString()},${new Date(
+      timeReceived
+    ).toISOString()},${diffInSeconds}`,
+    'utf-8'
+  )
+  log.info({ topic }, 'Photo received and measured.')
+}
 
 const sub = (client: MqttClient, log: FastifyBaseLogger) => {
-  client.subscribe(SUB_TOPIC, { qos: getEnv().MQTT_QOS }, error => {
-    if (!error) log.info({}, `Subscribed to ${SUB_TOPIC}`)
+  const { MQTT_LEGACY_TOPICS_ENABLED, MQTT_QOS } = getEnv()
+  const topics = getPhotoSubscriptionTopics(MQTT_LEGACY_TOPICS_ENABLED)
+
+  client.subscribe(topics, { qos: MQTT_QOS }, error => {
+    if (error) {
+      log.error({ error, topics }, 'Error subscribing to MQTT photo topics')
+
+      return
+    }
+
+    log.info({ topics }, 'Subscribed to MQTT photo topics')
   })
 
   client.on('error', error => {
-    log.error(error, `Topic: ${SUB_TOPIC} - Error`)
+    log.error({ error, topics }, 'MQTT photo route error')
   })
 
   client.on('message', async (topic, message) => {
-    if (topic.includes('send')) {
-      /**
-       * The message received will be a string in the following format:
-       * userID--format--base64Photo
-       */
-      log.info({}, 'Received a photo')
+    try {
+      if (isPhotoSendTopic(topic, MQTT_LEGACY_TOPICS_ENABLED)) {
+        await handlePhotoSend(topic, message, log)
 
-      const [userID, format, base64] = message.toString().split('----')
-      const [, base64Photo] = base64.split(`data:image/${format};base64,`)
-      const us = new UserServices(log)
-
-      try {
-        await us.sendPhotoThroughWhatsapp(
-          userID,
-          format,
-          Buffer.from(base64Photo, 'base64')
-        )
-
-        log.info({}, `Topic: ${topic} - Photo send.`)
-      } catch (error) {
-        const errorMessage = 'Error while sending the image to the user'
-
-        log.error(error, `${errorMessage}`)
-
-        throw new Error(errorMessage)
+        return
       }
-    } else if (topic.includes('metrics')) {
-      /**
-       * The message received will be a string in the following format:
-       * timestampSent----base64phot
-       */
-      log.info({}, 'Received a photo')
 
-      const [timestampSent] = message.toString().split('----')
-      const timeReceived = getTimestamp()
-      const timeSent = parseInt(timestampSent)
-      const diffInSeconds = diffTimeInSeconds(timeReceived, timeSent)
-
-      appendFileSync(
-        resolve(
-          __dirname,
-          '..',
-          '..',
-          '..',
-          '..',
-          'metrics',
-          'receivePhoto.csv'
-        ),
-        `\n${new Date(timeSent).toISOString()},${new Date(
-          timeReceived
-        ).toISOString()},${diffInSeconds}`,
-        'utf-8'
-      )
-      log.info({}, `Topic: ${topic} - Photo received and measured.`)
+      if (isPhotoMetricsTopic(topic, MQTT_LEGACY_TOPICS_ENABLED))
+        recordMetrics(getPhotoMetricsPayload(topic, message), log, topic)
+    } catch (error) {
+      log.error({ error, topic }, 'Error processing MQTT photo message')
     }
   })
 }

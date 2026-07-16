@@ -107,6 +107,22 @@ const { applyRoutes } =
   )
 const { parseEnv } =
   require<typeof import('../src/config/env')>('../src/config/env')
+const {
+  parseLegacyPhotoMetricsPayload,
+  parseLegacyPhotoSendPayload,
+  parsePhotoMetricsPayload,
+  parsePhotoSendPayload
+} = require<typeof import('../src/network/mqtt/photoPayloads')>(
+  '../src/network/mqtt/photoPayloads'
+)
+const {
+  getPhotoSubscriptionTopics,
+  isPhotoMetricsTopic,
+  isPhotoSendTopic,
+  MQTT_TOPICS
+} = require<typeof import('../src/network/mqtt/topics')>(
+  '../src/network/mqtt/topics'
+)
 
 const log = {
   error: jest.fn(),
@@ -129,6 +145,7 @@ describe('DoorCloud backend tests', () => {
         MQTT_CONNECT_TIMEOUT: 30_000,
         MQTT_HOST: 'mqtt.example.com',
         MQTT_KEEPALIVE: 60,
+        MQTT_LEGACY_TOPICS_ENABLED: true,
         MQTT_PORT: 8883,
         MQTT_PROTOCOL: 'mqtt',
         MQTT_QOS: 0,
@@ -143,6 +160,63 @@ describe('DoorCloud backend tests', () => {
       expect(() => parseEnv({ ...validEnv, MQTT_HOST: '' })).toThrow(
         'MQTT_HOST'
       )
+    })
+  })
+
+  describe('MQTT photo topics and payloads', () => {
+    test('builds subscriptions with legacy topics enabled', () => {
+      expect(getPhotoSubscriptionTopics(true)).toMatchObject([
+        MQTT_TOPICS.photo.send,
+        MQTT_TOPICS.photo.metrics,
+        MQTT_TOPICS.photo.legacy
+      ])
+    })
+
+    test('identifies versioned and legacy photo topics', () => {
+      expect(isPhotoSendTopic('doorcloud/v1/photo/send', false)).toBe(true)
+      expect(isPhotoSendTopic('DoorCloud/photo/send', true)).toBe(true)
+      expect(isPhotoSendTopic('DoorCloud/photo/send', false)).toBe(false)
+      expect(isPhotoMetricsTopic('doorcloud/v1/photo/metrics', false)).toBe(
+        true
+      )
+      expect(isPhotoMetricsTopic('DoorCloud/photo/metrics', true)).toBe(true)
+    })
+
+    test('parses versioned photo send payloads', () => {
+      const payload = Buffer.from(
+        JSON.stringify({
+          userId: '42',
+          format: 'jpeg',
+          photo: 'data:image/jpeg;base64,aGVsbG8='
+        })
+      )
+
+      expect(parsePhotoSendPayload(payload)).toMatchObject({
+        userID: '42',
+        format: 'jpeg',
+        base64Photo: 'aGVsbG8='
+      })
+    })
+
+    test('parses legacy photo send payloads', () => {
+      expect(
+        parseLegacyPhotoSendPayload(
+          Buffer.from('42----png----data:image/png;base64,aGVsbG8=')
+        )
+      ).toMatchObject({
+        userID: '42',
+        format: 'png',
+        base64Photo: 'aGVsbG8='
+      })
+    })
+
+    test('parses versioned and legacy metrics payloads', () => {
+      expect(
+        parsePhotoMetricsPayload(Buffer.from('{"timestampSent":1730000000000}'))
+      ).toMatchObject({ timestampSent: 1_730_000_000_000 })
+      expect(parseLegacyPhotoMetricsPayload(Buffer.from('1730000000000----x'))).toMatchObject({
+        timestampSent: 1_730_000_000_000
+      })
     })
   })
 
