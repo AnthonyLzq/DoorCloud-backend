@@ -4,10 +4,26 @@
 
 To have installed the following:
 
-- [Node.js](https://nodejs.org/) (>= 16)
-- [pnpm](https://pnpm.io/) (>= 7)
+- [Node.js](https://nodejs.org/) `22.20.0` (see `.nvmrc`)
+- [pnpm](https://pnpm.io/) `10.30.1` via Corepack
 
 A `.env` file with the correct variables specified in the `.env.example` file.
+
+## Setup
+
+Use the pinned runtime and package manager before installing dependencies:
+
+```bash
+nvm use
+corepack enable
+corepack prepare pnpm@10.30.1 --activate
+pnpm install --frozen-lockfile
+pnpm test:local
+```
+
+The repository enforces this baseline through `.nvmrc`, `package.json`, and
+`pnpm-workspace.yaml`. Use `nvm use` before pnpm commands so `engineStrict`
+does not reject the install.
 
 ## Testing
 

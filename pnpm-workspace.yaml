@@ -1,0 +1,9 @@
+packages:
+  - .
+
+nodeVersion: 22.20.0
+engineStrict: true
+
+allowBuilds:
+  '@tensorflow/tfjs-node': true
+  core-js: false
