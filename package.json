@@ -42,7 +42,6 @@
     "@fastify/swagger": "^9.8.1",
     "@supabase/postgrest-js": "^1.1.1",
     "@supabase/supabase-js": "^2.2.3",
-    "@tensorflow/tfjs-node": "^4.2.0",
     "@vladmandic/human": "^3.0.3",
     "debug": "^4.3.4",
     "fastify": "^5.10.0",
