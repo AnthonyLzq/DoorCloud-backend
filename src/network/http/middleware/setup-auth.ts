@@ -1,5 +1,5 @@
-import type { FastifyRequest, FastifyReply } from 'fastify'
 import { getEnv } from 'config/env'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 
 /**
  * Middleware para autenticar endpoints de setup
@@ -19,7 +19,7 @@ export const setupAuthMiddleware = async (
 
   const authHeader = request.headers.authorization
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     reply.code(401).send({
       error: true,
       message: 'Authorization header with Bearer token required'

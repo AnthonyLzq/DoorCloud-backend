@@ -14,8 +14,8 @@ import {
   startOpenWaSetupSession
 } from 'integrations'
 import { z } from 'zod'
-import { response } from '../response'
 import { setupAuthMiddleware } from '../middleware/setup-auth'
+import { response } from '../response'
 
 type ZodFastifyInstance = FastifyInstance<
   RawServerDefault,

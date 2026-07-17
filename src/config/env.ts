@@ -88,51 +88,53 @@ const commaSeparatedOrigins = (_name: string) =>
     return value
   }, z.array(z.string().trim().min(1)).optional())
 
-const envSchema = z.object({
-  NODE_ENV: z.string().trim().min(1).default('development'),
-  PORT: optionalPort(1996),
-  CORS_ORIGINS: commaSeparatedOrigins('CORS_ORIGINS'),
-  MQTT_HOST: requiredString('MQTT_HOST'),
-  MQTT_PROTOCOL: z.enum(['mqtt', 'mqtts']).default('mqtts'),
-  MQTT_PORT: port('MQTT_PORT'),
-  MQTT_USER: requiredString('MQTT_USER'),
-  MQTT_PASS: requiredString('MQTT_PASS'),
-  MQTT_CLIENT_ID: optionalString('MQTT_CLIENT_ID'),
-  MQTT_CLEAN: optionalBoolean('MQTT_CLEAN', true),
-  MQTT_KEEPALIVE: optionalInteger('MQTT_KEEPALIVE', 60),
-  MQTT_RECONNECT_PERIOD: optionalInteger('MQTT_RECONNECT_PERIOD', 1_000),
-  MQTT_CONNECT_TIMEOUT: optionalInteger('MQTT_CONNECT_TIMEOUT', 30_000, 1),
-  MQTT_QOS: optionalQos('MQTT_QOS', 0),
-  SUPABASE_URL: requiredString('SUPABASE_URL').url(
-    'SUPABASE_URL must be a URL'
-  ),
-  SUPABASE_KEY: requiredString('SUPABASE_KEY'),
-  OPENWA_BASE_URL: z
-    .preprocess(
-      value => (value === '' || value === undefined ? undefined : value),
-      z.string().trim().url('OPENWA_BASE_URL must be a URL').optional()
+const envSchema = z
+  .object({
+    NODE_ENV: z.string().trim().min(1).default('development'),
+    PORT: optionalPort(1996),
+    CORS_ORIGINS: commaSeparatedOrigins('CORS_ORIGINS'),
+    MQTT_HOST: requiredString('MQTT_HOST'),
+    MQTT_PROTOCOL: z.enum(['mqtt', 'mqtts']).default('mqtts'),
+    MQTT_PORT: port('MQTT_PORT'),
+    MQTT_USER: requiredString('MQTT_USER'),
+    MQTT_PASS: requiredString('MQTT_PASS'),
+    MQTT_CLIENT_ID: optionalString('MQTT_CLIENT_ID'),
+    MQTT_CLEAN: optionalBoolean('MQTT_CLEAN', true),
+    MQTT_KEEPALIVE: optionalInteger('MQTT_KEEPALIVE', 60),
+    MQTT_RECONNECT_PERIOD: optionalInteger('MQTT_RECONNECT_PERIOD', 1_000),
+    MQTT_CONNECT_TIMEOUT: optionalInteger('MQTT_CONNECT_TIMEOUT', 30_000, 1),
+    MQTT_QOS: optionalQos('MQTT_QOS', 0),
+    SUPABASE_URL: requiredString('SUPABASE_URL').url(
+      'SUPABASE_URL must be a URL'
+    ),
+    SUPABASE_KEY: requiredString('SUPABASE_KEY'),
+    OPENWA_BASE_URL: z
+      .preprocess(
+        value => (value === '' || value === undefined ? undefined : value),
+        z.string().trim().url('OPENWA_BASE_URL must be a URL').optional()
+      )
+      .default('http://localhost:2785'),
+    OPENWA_API_KEY: optionalString('OPENWA_API_KEY'),
+    OPENWA_SESSION_ID: optionalString('OPENWA_SESSION_ID').default('main'),
+    OPENWA_CHAT_ID: optionalString('OPENWA_CHAT_ID'),
+    SETUP_TOKEN: optionalString('SETUP_TOKEN'),
+    MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
+      'MODELS_CDN_URL must be a URL'
     )
-    .default('http://localhost:2785'),
-  OPENWA_API_KEY: optionalString('OPENWA_API_KEY'),
-  OPENWA_SESSION_ID: optionalString('OPENWA_SESSION_ID').default('main'),
-  OPENWA_CHAT_ID: optionalString('OPENWA_CHAT_ID'),
-  SETUP_TOKEN: optionalString('SETUP_TOKEN'),
-  MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
-    'MODELS_CDN_URL must be a URL'
-  )
-}).refine(
-  data => {
-    // In production, CORS_ORIGINS must be configured
-    if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS) {
-      return false
+  })
+  .refine(
+    data => {
+      // In production, CORS_ORIGINS must be configured
+      if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS) {
+        return false
+      }
+      return true
+    },
+    {
+      message: 'CORS_ORIGINS is required in production environment',
+      path: ['CORS_ORIGINS']
     }
-    return true
-  },
-  {
-    message: 'CORS_ORIGINS is required in production environment',
-    path: ['CORS_ORIGINS']
-  }
-)
+  )
 
 type Env = z.infer<typeof envSchema>
 
