@@ -143,18 +143,14 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Script corre y responde a requests básicos
 - **Commit**: `feat: create Python face recognition server with IPC protocol`
 
-### Task 2.2: Install Python Dependencies
+### Task 2.2: Install Python Dependencies ✅
 - **Time**: 1 hora
 - **Files**: `requirements.txt`, `scripts/install-python-deps.sh`
 - **Actions**:
   - Crear requirements.txt con:
-    - adaface
-    - magface
-    - opencv-python
+    - dlib
     - Pillow
     - numpy
-    - torch
-    - torchvision
   - Crear script de instalación
   - Testear instalación
 - **Acceptance**: Python dependencies instaladas
