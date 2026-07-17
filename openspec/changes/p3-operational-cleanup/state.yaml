@@ -1,0 +1,14 @@
+schema: spec-driven
+change: p3-operational-cleanup
+created: 2026-07-16
+status: proposing
+current_phase: propose
+phases:
+  explore: completed
+  propose: in_progress
+  spec: pending
+  design: pending
+  tasks: pending
+  apply: pending
+  verify: pending
+  archive: pending

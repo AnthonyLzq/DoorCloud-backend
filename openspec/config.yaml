@@ -1,0 +1,79 @@
+schema: spec-driven
+
+context: |
+  Tech stack: TypeScript 7.0.2, Fastify 5.10.0, Node.js 22.20.0, pnpm 10.30.1
+  Architecture: Layered (network/http, network/mqtt, services, database/supabase, integrations/whatsapp, lib/human)
+  Testing: Vitest 4.1.10 (unit + MQTT integration), ESLint 8, Prettier (via eslint-plugin-prettier)
+  Style: No semicolons, single quotes, 80 char line width, absolute imports from src
+
+strict_tdd: true
+
+testing:
+  runner: vitest
+  runner_version: 4.1.10
+  runner_command: pnpm test:local
+  layers:
+    unit:
+      available: true
+      tool: vitest
+      command: pnpm test:local
+      notes: "test/index.test.ts with vi.mock for MQTT, fetch, etc."
+    integration:
+      available: true
+      tool: vitest + Docker Mosquitto
+      command: pnpm test:mqtt
+      notes: "test/mqtt.integration.test.ts requires RUN_MQTT_INTEGRATION=true and Docker"
+    e2e:
+      available: false
+      tool: null
+      command: null
+  coverage:
+    available: false
+    command: null
+    notes: "No coverage config or --coverage flag in scripts"
+  quality:
+    linter:
+      available: true
+      command: pnpm lint
+      tool: "ESLint 8 with @babel/eslint-parser (TS7 compatibility)"
+    type_checker:
+      available: true
+      command: pnpm typecheck
+      tool: "TypeScript 7.0.2 (tsconfig.json + tsconfig.test.json)"
+    formatter:
+      available: true
+      command: "pnpm lint (prettier/prettier rule)"
+      tool: "Prettier 2.8.1 via eslint-plugin-prettier"
+      notes: "No standalone prettier config; rules in .eslintrc"
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Consider MQTT topic versioning (doorcloud/v1/* vs DoorCloud/*)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Consider TensorFlow.js native bindings constraints
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns (no semicolons, single quotes, absolute imports)
+      - Use Zod for validation (zod@4.4.3)
+      - Use Fastify type providers (fastify-type-provider-zod)
+    tdd: false
+    test_command: pnpm test:local
+  verify:
+    test_command: pnpm test:local
+    build_command: pnpm build
+    lint_command: pnpm lint
+    typecheck_command: pnpm typecheck
+    mqtt_integration_command: pnpm test:mqtt
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+    - Update main specs in openspec/specs/
