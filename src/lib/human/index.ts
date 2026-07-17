@@ -1,7 +1,6 @@
-import { Human, Config } from '@vladmandic/human'
-import { FastifyBaseLogger } from 'fastify'
-
+import { type Config, Human } from '@vladmandic/human'
 import { getEnv } from 'config/env'
+import type { FastifyBaseLogger } from 'fastify'
 import { CustomError } from 'network/http'
 
 declare global {
@@ -41,7 +40,7 @@ const detectFromBuffer = async (input: Buffer) => {
 const detectFromUrl = async (input: string) => {
   const res = await fetch(input)
 
-  if (res && res.ok) {
+  if (res?.ok) {
     const buffer = Buffer.from(await res.arrayBuffer())
 
     return await detectFromBuffer(buffer)
@@ -64,8 +63,7 @@ const compareFaces = async (
   ])
 
   if (
-    !res1 ||
-    !res1.face ||
+    !res1?.face ||
     res1.face.length === 0 ||
     !res1.face[0].embedding ||
     !res2 ||
@@ -93,4 +91,4 @@ const compareFaces = async (
   return result
 }
 
-export { init, compareFaces }
+export { compareFaces, init }

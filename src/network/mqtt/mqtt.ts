@@ -1,7 +1,6 @@
-import mqtt from 'mqtt'
-import { FastifyBaseLogger } from 'fastify'
-
 import { getEnv } from 'config/env'
+import type { FastifyBaseLogger } from 'fastify'
+import mqtt from 'mqtt'
 import { applyRoutes } from './router'
 
 declare global {
@@ -202,4 +201,4 @@ const mqttConnection = (log: FastifyBaseLogger) => ({
   }
 })
 
-export { getClient, getMqttOptions, mqttConnection, namespace, debugMessage }
+export { debugMessage, getClient, getMqttOptions, mqttConnection, namespace }

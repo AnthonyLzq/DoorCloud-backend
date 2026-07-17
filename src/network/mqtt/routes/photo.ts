@@ -1,15 +1,14 @@
-import { FastifyBaseLogger } from 'fastify'
-import { appendFileSync } from 'fs'
-import { MqttClient } from 'mqtt'
-import { resolve } from 'path'
+import { appendFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { getEnv } from 'config/env'
+import type { FastifyBaseLogger } from 'fastify'
+import type { MqttClient } from 'mqtt'
 import { UserServices } from 'services'
 import { diffTimeInSeconds, getTimestamp } from 'utils'
-import { getEnv } from 'config/env'
 import {
+  type PhotoMetricsPayload,
   parsePhotoMetricsPayload,
-  parsePhotoSendPayload,
-  PhotoMetricsPayload,
-  PhotoSendPayload
+  parsePhotoSendPayload
 } from '../photoPayloads'
 import {
   getPhotoSubscriptionTopics,

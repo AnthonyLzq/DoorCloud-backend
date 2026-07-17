@@ -18,7 +18,7 @@ type ZodFastifyInstance = FastifyInstance<
 >
 
 const Home = (app: ZodFastifyInstance, prefix = '/'): void => {
-  app.get(`${prefix}`, (request, reply) => {
+  app.get(`${prefix}`, (_request, reply) => {
     response({
       error: false,
       message: 'DoorCloud backend!',

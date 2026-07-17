@@ -1,6 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import debug from 'debug'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 import { getClient } from './network/mqtt'
 

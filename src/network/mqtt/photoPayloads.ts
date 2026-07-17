@@ -59,5 +59,5 @@ const parsePhotoMetricsPayload = (message: Buffer): PhotoMetricsPayload => {
   return { timestampSent }
 }
 
-export { parsePhotoMetricsPayload, parsePhotoSendPayload }
 export type { PhotoMetricsPayload, PhotoSendPayload }
+export { parsePhotoMetricsPayload, parsePhotoSendPayload }

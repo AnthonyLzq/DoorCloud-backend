@@ -18,5 +18,5 @@ const uploadUserPhotoParamsSchema = z.object({
 type UserRequest = z.infer<typeof userSchema>
 type UserResponse = z.infer<typeof userResponseSchema>
 
-export { uploadUserPhotoParamsSchema, userSchema, userResponseSchema }
 export type { UserRequest, UserResponse }
+export { uploadUserPhotoParamsSchema, userResponseSchema, userSchema }

@@ -114,19 +114,19 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Lint Tooling Migration (Biome)
 
-- [ ] 5.1 Install `@biomejs/biome`; create `biome.json` preserving current rules: `lineWidth: 80`, `quoteStyle: single`, `semicolons: asNeeded`, `indentStyle: space`, `indentWidth: 2`, `trailingCommas: none`, `arrowParentheses: asNeeded`, `bracketSpacing: true`, `objectShorthand: always`, `preferConst: error`, `curly: multi`. Remove ESLint/Prettier deps from `package.json`: `eslint`, `@babel/eslint-parser`, `@babel/preset-typescript`, `eslint-config-*`, `eslint-plugin-*`, `prettier`, `eslint-plugin-prettier`. Update scripts: `lint` → `biome check src/`, `lint:fix` → `biome check --write src/`, `format` → `biome format --write src/`.
+- [x] 5.1 Install `@biomejs/biome`; create `biome.json` preserving current rules: `lineWidth: 80`, `quoteStyle: single`, `semicolons: asNeeded`, `indentStyle: space`, `indentWidth: 2`, `trailingCommas: none`, `arrowParentheses: asNeeded`, `bracketSpacing: true`, `objectShorthand: always`, `preferConst: error`, `curly: multi`. Remove ESLint/Prettier deps from `package.json`: `eslint`, `@babel/eslint-parser`, `@babel/preset-typescript`, `eslint-config-*`, `eslint-plugin-*`, `prettier`, `eslint-plugin-prettier`. Update scripts: `lint` → `biome check src/`, `lint:fix` → `biome check --write src/`, `format` → `biome format --write src/`.
   - **Files**: `package.json`, `biome.json`
   - **Tests**: `pnpm install && pnpm lint`
   - **Acceptance**: `biome.json` exists; ESLint deps removed; `pnpm lint` exits 0
   - **Depends on**: none
 
-- [ ] 5.2 Delete `.eslintrc`. Run `pnpm lint:fix` to auto-format. Fix any remaining lint errors manually. Verify `pnpm typecheck` still passes.
+- [x] 5.2 Delete `.eslintrc`. Run `pnpm lint:fix` to auto-format. Fix any remaining lint errors manually. Verify `pnpm typecheck` still passes.
   - **Files**: `.eslintrc` (delete), all `.ts` files (formatting adjustments)
   - **Tests**: `pnpm lint && pnpm typecheck`
   - **Acceptance**: `.eslintrc` absent; `pnpm lint` exits 0; `pnpm typecheck` exits 0
   - **Depends on**: 5.1
 
-- [ ] 5.3 Update `.github/workflows/lint.yml` if needed (likely no changes — it runs `pnpm lint`). Update `README.md` lint section to document Biome.
+- [x] 5.3 Update `.github/workflows/lint.yml` if needed (likely no changes — it runs `pnpm lint`). Update `README.md` lint section to document Biome.
   - **Files**: `.github/workflows/lint.yml` (verify), `README.md`
   - **Tests**: visual review + CI pass
   - **Acceptance**: README documents `pnpm lint`, `pnpm lint:fix`, `pnpm format` with Biome

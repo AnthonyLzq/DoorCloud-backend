@@ -6,8 +6,6 @@ import type {
   RawServerDefault
 } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { z } from 'zod'
-
 import {
   getOpenWaSetupQr,
   getOpenWaSetupStatus,
@@ -15,6 +13,7 @@ import {
   sendOpenWaSetupTest,
   startOpenWaSetupSession
 } from 'integrations'
+import { z } from 'zod'
 import { response } from '../response'
 
 type ZodFastifyInstance = FastifyInstance<
@@ -151,11 +150,11 @@ const renderSetupHtml = (): string => `<!doctype html>
 </html>`
 
 const Setup = (server: ZodFastifyInstance): void => {
-  server.get('/setup', (request, reply) => {
+  server.get('/setup', (_request, reply) => {
     reply.type('text/html').send(renderSetupHtml())
   })
 
-  server.get('/setup/openwa/status', async (request, reply) => {
+  server.get('/setup/openwa/status', async (_request, reply) => {
     try {
       const result = await getOpenWaSetupStatus(server.log)
 
@@ -181,7 +180,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   )
 
-  server.post('/setup/openwa/start', async (request, reply) => {
+  server.post('/setup/openwa/start', async (_request, reply) => {
     try {
       const result = await startOpenWaSetupSession(server.log)
 
@@ -193,7 +192,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   })
 
-  server.get('/setup/openwa/qr', async (request, reply) => {
+  server.get('/setup/openwa/qr', async (_request, reply) => {
     try {
       const result = await getOpenWaSetupQr(server.log)
 

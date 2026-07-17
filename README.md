@@ -207,13 +207,26 @@ Finally, we may have an output as follows:
 
 ![](basic_pub_sub_test.png)
 
-<!-- ### Unit test
+## Linting and Formatting
 
-In order to run the unit tests of the project you can run:
+This project uses [Biome](https://biomejs.dev/) for linting and formatting, replacing ESLint and Prettier for better performance and TypeScript 7 support.
 
 ```bash
-pnpm test:local
-``` -->
+# Check for lint errors
+pnpm lint
+
+# Auto-fix lint errors and format
+pnpm lint:fix
+
+# Format only (no lint checks)
+pnpm format
+```
+
+Biome configuration is in `biome.json`. The tool provides:
+- Fast linting and formatting (10-50x faster than ESLint + Prettier)
+- Native TypeScript 7 support
+- Single configuration file
+- Consistent code style across the project
 
 ## Release
 

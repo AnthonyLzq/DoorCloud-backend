@@ -1,6 +1,5 @@
-import type { FastifyBaseLogger } from 'fastify'
-
 import { getEnv } from 'config/env'
+import type { FastifyBaseLogger } from 'fastify'
 
 type OpenWaMessageResponse = {
   messageId: string
@@ -135,5 +134,5 @@ const sendWhatsappImage = async ({
     log
   )
 
-export { requestOpenWa, sendWhatsappImage, sendWhatsappText }
 export type { OpenWaMessageResponse, OpenWaResponse }
+export { requestOpenWa, sendWhatsappImage, sendWhatsappText }

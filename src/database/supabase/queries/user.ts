@@ -172,9 +172,9 @@ const getAllFilesFromBucket = async (
 
 export {
   createUser,
-  getUserByUserID,
-  uploadUserPhoto,
+  getAllFilesFromBucket,
   getPhotosUrls,
+  getUserByUserID,
   updateUserLastMessage,
-  getAllFilesFromBucket
+  uploadUserPhoto
 }

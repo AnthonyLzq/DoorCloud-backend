@@ -62,7 +62,7 @@ const sendPhotoDetectionResultThroughWhatsapp = async ({
 
 export {
   sayHelloThroughWhatsapp,
-  sendPhotoThroughWhatsappWithTemplate,
+  sendPhotoDetectionResultThroughWhatsapp,
   sendPhotoThroughWhatsappWithoutTemplate,
-  sendPhotoDetectionResultThroughWhatsapp
+  sendPhotoThroughWhatsappWithTemplate
 }

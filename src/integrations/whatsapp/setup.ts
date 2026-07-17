@@ -1,8 +1,7 @@
-import { readFileSync, writeFileSync } from 'fs'
-import { resolve } from 'path'
-import type { FastifyBaseLogger } from 'fastify'
-
+import { readFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { getEnv } from 'config/env'
+import type { FastifyBaseLogger } from 'fastify'
 import { requestOpenWa, sendWhatsappImage, sendWhatsappText } from './openwa'
 
 type OpenWaSession = {
@@ -274,18 +273,18 @@ const saveOpenWaSetupConfig = ({
   return { saved }
 }
 
-export {
-  ensureOpenWaSession,
-  getOpenWaSetupQr,
-  getOpenWaSetupStatus,
-  saveOpenWaSetupConfig,
-  startOpenWaSetupSession,
-  sendOpenWaSetupTest
-}
 export type {
   OpenWaQr,
   OpenWaSession,
   OpenWaSetupConfig,
   OpenWaSetupConfigResult,
   OpenWaSetupStatus
+}
+export {
+  ensureOpenWaSession,
+  getOpenWaSetupQr,
+  getOpenWaSetupStatus,
+  saveOpenWaSetupConfig,
+  sendOpenWaSetupTest,
+  startOpenWaSetupSession
 }

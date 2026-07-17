@@ -1,5 +1,5 @@
-import { MqttClient } from 'mqtt'
-import { FastifyBaseLogger } from 'fastify'
+import type { FastifyBaseLogger } from 'fastify'
+import type { MqttClient } from 'mqtt'
 
 import * as Routes from './routes'
 

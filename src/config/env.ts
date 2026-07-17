@@ -46,7 +46,7 @@ const optionalBoolean = (name: string, defaultValue: boolean) =>
     }, z.boolean({ error: `${name} must be true or false` }).optional())
     .default(defaultValue)
 
-const optionalQos = (name: string, defaultValue: 0 | 1 | 2) =>
+const optionalQos = (_name: string, defaultValue: 0 | 1 | 2) =>
   z
     .preprocess(
       value =>
@@ -79,7 +79,7 @@ const optionalString = (name: string) =>
       .optional()
   )
 
-const commaSeparatedOrigins = (name: string) =>
+const commaSeparatedOrigins = (_name: string) =>
   z.preprocess(value => {
     if (value === '' || value === undefined) return undefined
     if (typeof value === 'string')
@@ -140,5 +140,5 @@ const parseEnv = (source: NodeJS.ProcessEnv): Env => {
 
 const getEnv = (): Env => parseEnv(process.env)
 
-export { getEnv, parseEnv }
 export type { Env }
+export { getEnv, parseEnv }

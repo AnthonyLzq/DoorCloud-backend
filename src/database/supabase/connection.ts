@@ -1,7 +1,6 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { FastifyBaseLogger } from 'fastify'
-
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getEnv } from 'config/env'
+import type { FastifyBaseLogger } from 'fastify'
 
 declare global {
   // eslint-disable-next-line no-var

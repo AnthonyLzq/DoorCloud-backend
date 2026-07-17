@@ -1,18 +1,16 @@
-import fastify, { FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import { getEnv } from 'config/env'
+import { supabaseConnection } from 'database'
+import fastify, { type FastifyInstance } from 'fastify'
 import {
   serializerCompiler,
   validatorCompiler,
-  ZodTypeProvider
+  type ZodTypeProvider
 } from 'fastify-type-provider-zod'
-
-import { supabaseConnection } from 'database'
-
+import { init } from 'lib'
 import { applyRoutes } from './http'
 import { mqttConnection } from './mqtt'
-import { init } from 'lib'
-import { getEnv } from 'config/env'
 
 const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
 

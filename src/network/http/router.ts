@@ -21,10 +21,12 @@ type ZodFastifyInstance = FastifyInstance<
 >
 
 const applyRoutes = (app: ZodFastifyInstance): void => {
-  routes.forEach(route => route(app))
+  for (const route of routes) {
+    route(app)
+  }
 
   // Handling 404 error
-  app.setNotFoundHandler((request, reply) => {
+  app.setNotFoundHandler((_request, reply) => {
     response({
       error: true,
       message: 'This route does not exists',
@@ -33,7 +35,7 @@ const applyRoutes = (app: ZodFastifyInstance): void => {
     })
   })
   app.setErrorHandler(
-    (error: FastifyError & { status?: number }, request, reply) => {
+    (error: FastifyError & { status?: number }, _request, reply) => {
       const status = error.statusCode ?? error.status ?? 500
 
       response({

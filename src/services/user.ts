@@ -1,8 +1,7 @@
-import crypto from 'crypto'
-import { MultipartFile } from '@fastify/multipart'
-import { FastifyBaseLogger } from 'fastify'
-import { appendFileSync } from 'fs'
-
+import crypto from 'node:crypto'
+import { appendFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import type { MultipartFile } from '@fastify/multipart'
 import {
   createUser,
   getAllFilesFromBucket,
@@ -11,14 +10,14 @@ import {
   updateUserLastMessage,
   uploadUserPhoto
 } from 'database'
-import { CustomError } from 'network/http'
-import { compareFaces } from 'lib'
+import type { FastifyBaseLogger } from 'fastify'
 import {
   sayHelloThroughWhatsapp,
   sendPhotoDetectionResultThroughWhatsapp
 } from 'integrations'
+import { compareFaces } from 'lib'
+import { CustomError } from 'network/http'
 import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
-import { resolve } from 'path'
 
 const MAX_HOUR_DIFFERENCE = 16
 
@@ -44,7 +43,7 @@ class UserServices {
     const [userName, ...rest] = folderID.split('-')
     const userID = rest.join('-')
 
-    await getUserByUserID(parseInt(userID), this.#log)
+    await getUserByUserID(parseInt(userID, 10), this.#log)
 
     const paths: string[] = []
 
@@ -70,7 +69,7 @@ class UserServices {
     format: string,
     bufferPhoto: Buffer
   ) {
-    const [user] = await getUserByUserID(parseInt(userID), this.#log)
+    const [user] = await getUserByUserID(parseInt(userID, 10), this.#log)
 
     if (!user) {
       const errorMessage = 'User not found'
@@ -154,4 +153,5 @@ class UserServices {
     })
   }
 }
+
 export { UserServices }
