@@ -38,3 +38,60 @@ jobs:
 
       - name: Run typecheck
         run: pnpm typecheck
+
+  mqtt-integration:
+    name: MQTT integration tests with Mosquitto
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.30.1 --activate
+
+      - name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Mosquitto password file
+        run: ./scripts/mosquitto/create-password-file.sh
+
+      - name: Start Mosquitto broker
+        run: |
+          docker compose up -d mosquitto
+          echo "Waiting for Mosquitto to be ready..."
+          timeout=30
+          counter=0
+          until docker compose exec -T mosquitto mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -W 1 2>/dev/null || [ $counter -eq $timeout ]; do
+            sleep 1
+            counter=$((counter + 1))
+          done
+          if [ $counter -eq $timeout ]; then
+            echo "Mosquitto failed to start within ${timeout}s"
+            docker compose logs mosquitto
+            exit 1
+          fi
+          echo "Mosquitto is ready"
+
+      - name: Run MQTT integration tests
+        run: pnpm test:mqtt:integration
+        env:
+          MQTT_USER: doorcloud-backend
+          MQTT_PASS: doorcloud-backend-local
+          MQTT_HOST: localhost
+          MQTT_PORT: 1883
+          MQTT_PROTOCOL: mqtt
+          NODE_ENV: ci
+
+      - name: Cleanup Docker resources
+        if: always()
+        run: |
+          docker compose down -v
+          docker system prune -f

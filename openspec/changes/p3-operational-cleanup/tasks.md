@@ -104,7 +104,7 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: CI Mosquitto Integration
 
-- [ ] 4.1 Add `mqtt-integration` job to `.github/workflows/test.yml` — start Mosquitto via Docker Compose (`scripts/mosquitto/create-password-file.sh` + compose), wait for healthcheck, run `pnpm test:mqtt` with `MQTT_HOST=localhost`, `MQTT_PORT=1883`, `MQTT_PROTOCOL=mqtt`, `MQTT_USER`, `MQTT_PASS` env vars. Run in parallel with existing `test` job. Clean up containers on completion.
+- [x] 4.1 Add `mqtt-integration` job to `.github/workflows/test.yml` — start Mosquitto via Docker Compose (`scripts/mosquitto/create-password-file.sh` + compose), wait for healthcheck, run `pnpm test:mqtt` with `MQTT_HOST=localhost`, `MQTT_PORT=1883`, `MQTT_PROTOCOL=mqtt`, `MQTT_USER`, `MQTT_PASS` env vars. Run in parallel with existing `test` job. Clean up containers on completion.
   - **Files**: `.github/workflows/test.yml`
   - **Tests**: push to branch and verify CI passes
   - **Acceptance**: `mqtt-integration` job appears in workflow; runs `pnpm test:mqtt`; passes on green; fails on red
