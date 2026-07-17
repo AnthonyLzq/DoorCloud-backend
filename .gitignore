@@ -131,6 +131,7 @@ src/**/*.jpeg
 src/**/*.png
 src/tf.ts
 venv
+.venv
 infra/mosquitto/passwordfile
 .openwa/
 

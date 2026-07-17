@@ -69,7 +69,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 
 ## Phase 1: ONNX Runtime Setup (2 días)
 
-### Task 1.1: Install Dependencies
+### Task 1.1: Install Dependencies ✅
 - **Time**: 30 min
 - **Files**: `package.json`
 - **Actions**:
@@ -80,7 +80,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Dependencies instaladas sin errores
 - **Commit**: `chore: install ONNX Runtime and image processing dependencies`
 
-### Task 1.2: Download ONNX Models
+### Task 1.2: Download ONNX Models ✅
 - **Time**: 1 hora
 - **Files**: `scripts/download-models.sh`, `models/`
 - **Actions**:
@@ -91,7 +91,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Modelos descargados y validados
 - **Commit**: `chore: add model download script and initial ONNX models`
 
-### Task 1.3: Implement ONNXProvider (Preprocessing)
+### Task 1.3: Implement ONNXProvider (Preprocessing) ✅
 - **Time**: 2 horas
 - **Files**: `src/services/face-recognition/onnx-provider.ts`
 - **Actions**:
@@ -103,7 +103,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Preprocessing funciona con diferentes formatos de imagen
 - **Commit**: `feat: implement ONNX image preprocessing pipeline`
 
-### Task 1.4: Implement ONNXProvider (Inference)
+### Task 1.4: Implement ONNXProvider (Inference) ✅
 - **Time**: 3 horas
 - **Files**: `src/services/face-recognition/onnx-provider.ts`
 - **Actions**:
@@ -116,7 +116,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Can load InsightFace and get embeddings
 - **Commit**: `feat: implement ONNX model loading and inference`
 
-### Task 1.5: ONNXProvider Metrics & Registry
+### Task 1.5: ONNXProvider Metrics & Registry ✅
 - **Time**: 1 hora
 - **Files**: `src/services/face-recognition/onnx-provider.ts`
 - **Actions**:

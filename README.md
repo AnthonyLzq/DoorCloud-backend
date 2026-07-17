@@ -1,5 +1,9 @@
 # Doorcloud Backend
 
+## Development Conventions
+
+**No emojis**: Never use emojis in code, comments, commit messages, documentation, or any other project artifacts. Use plain text only.
+
 ## Prerequisites
 
 To have installed the following:
