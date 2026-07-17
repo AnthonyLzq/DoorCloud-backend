@@ -1,8 +1,8 @@
 schema: spec-driven
 change: p3-operational-cleanup
 created: 2026-07-16
-status: completed
-current_phase: archive
+status: archived
+current_phase: archived
 phases:
   explore: completed
   propose: completed
@@ -10,8 +10,8 @@ phases:
   design: completed
   tasks: completed
   apply: completed
-  verify: pending
-  archive: pending
+  verify: completed
+  archive: completed
 completed_specs:
   - mqtt-legacy-removal
   - ci-mosquitto-integration
