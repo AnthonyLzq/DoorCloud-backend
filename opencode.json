@@ -1,94 +1,27 @@
 {
-  "project": {
-    "name": "DoorCloud-backend",
-    "description": "Backend for DoorCloud - TypeScript/Fastify service with MQTT, Supabase, OpenWA, and face matching",
-    "language": "TypeScript",
-    "framework": "Fastify 5",
-    "runtime": "Node.js 22.20.0",
-    "packageManager": "pnpm@10.30.1"
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
+  "server": {
+    "port": 4096
   },
-  "instructions": {
-    "overview": "DoorCloud-backend is a TypeScript/Fastify service that combines HTTP API, MQTT client for photo processing, Supabase for storage, OpenWA for WhatsApp messaging, and TensorFlow for face comparison. The project follows simba.js patterns with layered architecture (network, services, database).",
-    "architecture": {
-      "entryPoint": "src/index.ts",
-      "serverComposition": "src/network/server.ts",
-      "httpRoutes": "src/network/http/**",
-      "mqttClient": "src/network/mqtt/**",
-      "businessLogic": "src/services/user.ts",
-      "database": "src/database/supabase/**",
-      "integrations": "src/integrations/whatsapp/**",
-      "mlProcessing": "src/lib/human/index.ts"
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "pnpm *": "allow",
+      "git *": "allow",
+      "npm *": "allow",
+      "node *": "allow",
+      "docker *": "allow",
+      "rm *": "deny"
     },
-    "conventions": {
-      "commits": "Conventional Commits (feat:, fix:, chore:, etc.)",
-      "imports": "Absolute imports from src (e.g., 'database', 'services', 'network/http')",
-      "responseEnvelope": "{ error: boolean, message: string, data?: any }",
-      "port": "Default port 1996",
-      "cors": "Currently open (Access-Control-Allow-Origin: *)",
-      "poweredBy": "x-powered-by: Simba.js (legacy from simba.js)"
-    },
-    "qualityGates": {
-      "lint": "pnpm lint",
-      "test": "pnpm test:local",
-      "typecheck": "pnpm typecheck",
-      "build": "pnpm build",
-      "mqttIntegration": "pnpm test:mqtt"
-    },
-    "dependencies": {
-      "critical": [
-        "fastify@5.10.0",
-        "zod@4.4.3",
-        "mqtt@5.15.2",
-        "@supabase/supabase-js@2.2.3",
-        "@tensorflow/tfjs-node@4.2.0",
-        "@vladmandic/human@3.0.3"
-      ],
-      "notes": "tfjs-node has native bindings - validate Node version compatibility before upgrades"
-    },
-    "mqtt": {
-      "topics": {
-        "preferred": [
-          "doorcloud/v1/photo/send",
-          "doorcloud/v1/photo/metrics",
-          "doorcloud/v1/photo/result/#"
-        ],
-        "legacy": "DoorCloud/photo/# (gated by MQTT_LEGACY_TOPICS_ENABLED)"
-      },
-      "broker": "Local Mosquitto via Docker Compose, external broker fallback available",
-      "integration": "pnpm test:mqtt starts Mosquitto and runs integration tests"
-    },
-    "whatsapp": {
-      "provider": "OpenWA (self-hosted WhatsApp API gateway)",
-      "capabilities": "Text and image messages via HTTP API",
-      "setup": "pnpm openwa:qr for QR sign-in, /setup for browser UI"
-    },
-    "deployment": {
-      "docker": "Node 22 Alpine, pnpm, Corepack",
-      "compose": "Includes Mosquitto broker service",
-      "target": "Raspberry Pi with local setup UI"
+    "edit": {
+      "*": "allow"
     }
   },
-  "scripts": {
-    "dev": "pnpm service",
-    "test": "pnpm test:local",
-    "lint": "pnpm lint",
-    "typecheck": "pnpm typecheck",
-    "build": "pnpm build"
-  },
-  "agents": {
-    "default": {
-      "model": "claude-sonnet-4-20250514",
-      "temperature": 0.3
-    },
-    "codeReview": {
-      "model": "claude-sonnet-4-20250514",
-      "temperature": 0.2
+  "formatter": {
+    "biome": {
+      "command": ["pnpm", "biome", "format", "--write", "$FILE"],
+      "extensions": [".js", ".ts", ".jsx", ".tsx", ".json"]
     }
-  },
-  "sdd": {
-    "artifactStore": "openspec",
-    "executionMode": "interactive",
-    "prStrategy": "direct-to-main",
-    "reviewBudget": "functional-spike-minimum"
   }
 }

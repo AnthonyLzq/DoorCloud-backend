@@ -1,0 +1,25 @@
+# Face Recognition Benchmarking System - State
+
+## Status
+**Phase**: Planning
+**Created**: 2024-01-17
+**Last Updated**: 2024-01-17
+
+## Change Overview
+Implementar sistema híbrido de benchmarking para modelos de face recognition, combinando ONNX Runtime (Node.js) para modelos compatibles y Python child processes para modelos sin soporte ONNX.
+
+## Current Phase
+- [x] Proposal
+- [ ] Specs
+- [ ] Design
+- [ ] Tasks
+- [ ] Implementation
+
+## Dependencies
+- P3 Operational Cleanup completado
+- Node.js 22+ runtime
+- Python 3.8+ para child processes
+- ONNX Runtime para Node.js
+
+## Risk Level
+**Medium** - Integración de dos runtimes (Node.js + Python) requiere manejo cuidadoso de IPC y gestión de recursos.
