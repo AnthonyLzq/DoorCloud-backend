@@ -3,9 +3,67 @@
 ## Overview
 Desglose de tareas para implementar el sistema híbrido de benchmarking de face recognition.
 
-**Estimated Total Time**: 8 días
-**Phases**: 5
+**Estimated Total Time**: 9 días (1 día cleanup + 8 días benchmarking)
+**Phases**: 6 (Phase 0: Cleanup + 5 phases de implementación)
 **Dependencies**: P3 Operational Cleanup completado
+
+---
+
+## Phase 0: Code Cleanup & Security (1 día)
+
+### Task 0.1: Remove Dead Code (tf.ts)
+- **Time**: 30 min
+- **Files**: `src/tf.ts`, `src/lib/human/index.ts`
+- **Actions**:
+  - Delete `src/tf.ts` (código muerto que usa @vladmandic/face-api)
+  - Verify no imports reference tf.ts
+  - Update tests if needed
+  - Run tests to ensure nothing breaks
+- **Acceptance**: tf.ts eliminado, tests pasan
+- **Commit**: `chore: remove dead code tf.ts`
+
+### Task 0.2: Remove @tensorflow/tfjs-node Dependency
+- **Time**: 30 min
+- **Files**: `package.json`, `pnpm-lock.yaml`
+- **Actions**:
+  - Remove `@tensorflow/tfjs-node` from dependencies
+  - Run `pnpm install` to update lockfile
+  - Verify no code imports tfjs-node
+  - Run tests
+- **Acceptance**: Dependency eliminada, 8 vulnerabilidades resueltas
+- **Commit**: `chore: remove @tensorflow/tfjs-node dependency`
+
+### Task 0.3: Fix Security Issues
+- **Time**: 1 hora
+- **Files**: `src/network/http/routes/setup.ts`, `src/config/env.ts`
+- **Actions**:
+  - Add authentication to `/setup/*` endpoints (use SETUP_TOKEN)
+  - Force CORS_ORIGINS in production (throw error if not set)
+  - Validate userID to prevent NaN (add Number.isNaN check)
+  - Add tests for security fixes
+- **Acceptance**: Security issues resueltos, tests pasan
+- **Commit**: `security: fix critical security vulnerabilities`
+
+### Task 0.4: Remove Unused Dependencies
+- **Time**: 30 min
+- **Files**: `package.json`, `src/`
+- **Actions**:
+  - Remove `@fastify/swagger` (installed but never used)
+  - Remove `SETUP_TOKEN` from env validation (if not used after Task 0.3)
+  - Remove `userResponseSchema` from schemas (defined but never used)
+  - Run `pnpm install`
+- **Acceptance**: Unused dependencies eliminadas
+- **Commit**: `chore: remove unused dependencies and code`
+
+### Task 0.5: Fix pub.ts Legacy Topic
+- **Time**: 30 min
+- **Files**: `src/pub.ts`
+- **Actions**:
+  - Update pub.ts to use versioned topic `doorcloud/v1/photo/send`
+  - Update payload format to JSON (not delimiter-based)
+  - Test publishing works
+- **Acceptance**: pub.ts usa topic versionado
+- **Commit**: `fix: update pub.ts to use versioned MQTT topics`
 
 ---
 
@@ -321,12 +379,13 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 
 | Phase | Tasks | Time | Status |
 |-------|-------|------|--------|
+| 0. Code Cleanup & Security | 5 | 1 día | 🔲 Pending |
 | 1. ONNX Runtime Setup | 5 | 2 días | 🔲 Pending |
 | 2. Python Child Process | 5 | 2 días | 🔲 Pending |
 | 3. Unified Service | 3 | 1 día | 🔲 Pending |
 | 4. Benchmark System | 6 | 2 días | 🔲 Pending |
 | 5. Integration | 4 | 1 día | 🔲 Pending |
-| **Total** | **23** | **8 días** | 🔲 Pending |
+| **Total** | **28** | **9 días** | 🔲 Pending |
 
 ## Dependencies
 
