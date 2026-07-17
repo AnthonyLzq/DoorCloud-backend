@@ -10,7 +10,7 @@
     "preservice": "node scripts/openwa/sync-api-key.mjs --optional",
     "service": "nodemon --exitcrash",
     "start": "NODE_PATH=dist node dist/index.js",
-    "release": "standard-version",
+    "release": "commit-and-tag-version",
     "test:local": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:ci": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:mqtt": "scripts/mosquitto/run-integration-tests.sh",
@@ -39,7 +39,7 @@
     "eslint-plugin-promise": "^6.1.1",
     "nodemon": "^2.0.20",
     "prettier": "^2.8.1",
-    "standard-version": "^9.5.0",
+    "commit-and-tag-version": "^12.6.1",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
@@ -88,5 +88,12 @@
   "bugs": {
     "url": "https://github.com/AnthonyLzq/DoorCloud-backend/issues"
   },
-  "homepage": "https://github.com/AnthonyLzq/DoorCloud-backend#readme"
+  "homepage": "https://github.com/AnthonyLzq/DoorCloud-backend#readme",
+  "commit-and-tag-version": {
+    "skip": {
+      "tag": true,
+      "commit": true,
+      "bump": true
+    }
+  }
 }

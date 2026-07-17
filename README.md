@@ -209,3 +209,27 @@ In order to run the unit tests of the project you can run:
 ```bash
 pnpm test:local
 ``` -->
+
+## Release
+
+This project uses `commit-and-tag-version` for automated changelog generation and
+version management following [Conventional Commits](https://www.conventionalcommits.org/).
+
+To generate a release:
+
+```bash
+pnpm release
+```
+
+This will:
+- Analyze commits since the last tag
+- Update `CHANGELOG.md` with new entries
+- Bump the version in `package.json`
+
+The tool is configured to skip automatic git commits and tags, so you can review
+changes before committing manually.
+
+**Commit message format:**
+- `feat:` → minor version bump
+- `fix:` → patch version bump
+- `BREAKING CHANGE:` in footer → major version bump
