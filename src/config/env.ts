@@ -103,10 +103,6 @@ const envSchema = z.object({
   MQTT_RECONNECT_PERIOD: optionalInteger('MQTT_RECONNECT_PERIOD', 1_000),
   MQTT_CONNECT_TIMEOUT: optionalInteger('MQTT_CONNECT_TIMEOUT', 30_000, 1),
   MQTT_QOS: optionalQos('MQTT_QOS', 0),
-  MQTT_LEGACY_TOPICS_ENABLED: optionalBoolean(
-    'MQTT_LEGACY_TOPICS_ENABLED',
-    true
-  ),
   SUPABASE_URL: requiredString('SUPABASE_URL').url(
     'SUPABASE_URL must be a URL'
   ),

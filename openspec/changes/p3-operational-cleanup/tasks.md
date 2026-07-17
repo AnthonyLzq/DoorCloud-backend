@@ -64,37 +64,37 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: MQTT Legacy Removal
 
-- [ ] 3.1 Remove `MQTT_LEGACY_TOPICS_ENABLED` from `src/config/env.ts` (L96-99). Remove from `.env.example`.
+- [x] 3.1 Remove `MQTT_LEGACY_TOPICS_ENABLED` from `src/config/env.ts` (L96-99). Remove from `.env.example`.
   - **Files**: `src/config/env.ts`, `.env.example`
   - **Tests**: `pnpm test:local`
   - **Acceptance**: `parseEnv` no longer accepts `MQTT_LEGACY_TOPICS_ENABLED`; existing tests pass
   - **Depends on**: none
 
-- [ ] 3.2 Remove legacy topic code from `src/network/mqtt/topics.ts` — delete `LEGACY_PHOTO_TOPIC_FILTER`, `isLegacyPhotoTopic`, `legacy` key from `MQTT_TOPICS.photo`; simplify `getPhotoSubscriptionTopics` (no parameter), `isPhotoSendTopic` and `isPhotoMetricsTopic` (no `legacyTopicsEnabled` param). Update exports.
+- [x] 3.2 Remove legacy topic code from `src/network/mqtt/topics.ts` — delete `LEGACY_PHOTO_TOPIC_FILTER`, `isLegacyPhotoTopic`, `legacy` key from `MQTT_TOPICS.photo`; simplify `getPhotoSubscriptionTopics` (no parameter), `isPhotoSendTopic` and `isPhotoMetricsTopic` (no `legacyTopicsEnabled` param). Update exports.
   - **Files**: `src/network/mqtt/topics.ts`
   - **Tests**: `pnpm test:local && pnpm typecheck`
   - **Acceptance**: Only versioned topics exported; no `DoorCloud/photo` references; functions have simplified signatures
   - **Depends on**: 3.1
 
-- [ ] 3.3 Remove legacy payload parsers from `src/network/mqtt/photoPayloads.ts` — delete `parseLegacyPhotoSendPayload`, `parseLegacyPhotoMetricsPayload` and their exports.
+- [x] 3.3 Remove legacy payload parsers from `src/network/mqtt/photoPayloads.ts` — delete `parseLegacyPhotoSendPayload`, `parseLegacyPhotoMetricsPayload` and their exports.
   - **Files**: `src/network/mqtt/photoPayloads.ts`
   - **Tests**: `pnpm test:local && pnpm typecheck`
   - **Acceptance**: Only `parsePhotoSendPayload` and `parsePhotoMetricsPayload` exported
   - **Depends on**: 3.1
 
-- [ ] 3.4 Simplify `src/network/mqtt/routes/photo.ts` — remove legacy imports (`parseLegacyPhotoSendPayload`, `parseLegacyPhotoMetricsPayload`, `isLegacyPhotoTopic`); remove `MQTT_LEGACY_TOPICS_ENABLED` usage from `sub()`; simplify `getPhotoSendPayload`/`getPhotoMetricsPayload` to call versioned parsers directly; update `isPhotoSendTopic`/`isPhotoMetricsTopic` calls (no second arg).
+- [x] 3.4 Simplify `src/network/mqtt/routes/photo.ts` — remove legacy imports (`parseLegacyPhotoSendPayload`, `parseLegacyPhotoMetricsPayload`, `isLegacyPhotoTopic`); remove `MQTT_LEGACY_TOPICS_ENABLED` usage from `sub()`; simplify `getPhotoSendPayload`/`getPhotoMetricsPayload` to call versioned parsers directly; update `isPhotoSendTopic`/`isPhotoMetricsTopic` calls (no second arg).
   - **Files**: `src/network/mqtt/routes/photo.ts`
   - **Tests**: `pnpm test:local && pnpm typecheck`
   - **Acceptance**: No legacy references; `sub()` calls `getPhotoSubscriptionTopics()` with no args; message handler calls simplified topic checks
   - **Depends on**: 3.2, 3.3
 
-- [ ] 3.5 Remove `DoorCloud/photo/#` lines from `infra/mosquitto/aclfile` (L4, L6, L10, L13).
+- [x] 3.5 Remove `DoorCloud/photo/#` lines from `infra/mosquitto/aclfile` (L4, L6, L10, L13).
   - **Files**: `infra/mosquitto/aclfile`
   - **Tests**: `pnpm test:mqtt` (if Mosquitto available)
   - **Acceptance**: No `DoorCloud/photo` entries in ACL file
   - **Depends on**: 3.4
 
-- [ ] 3.6 Update `README.md` MQTT section — remove legacy topic references, document only `doorcloud/v1/photo/*`. Add `CHANGELOG.md` breaking change entry.
+- [x] 3.6 Update `README.md` MQTT section — remove legacy topic references, document only `doorcloud/v1/photo/*`. Add `CHANGELOG.md` breaking change entry.
   - **Files**: `README.md`, `CHANGELOG.md`
   - **Tests**: visual review
   - **Acceptance**: README shows only versioned topics; CHANGELOG has breaking change notice

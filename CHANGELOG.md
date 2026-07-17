@@ -1,6 +1,12 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
+
+## [Unreleased]
+
+### BREAKING CHANGES
+
+* **mqtt:** remove legacy `DoorCloud/photo/#` topic support. All publishers must migrate to versioned `doorcloud/v1/photo/*` topics. The `MQTT_LEGACY_TOPICS_ENABLED` environment variable has been removed. Legacy delimiter-based payloads (`userID----format----photo`) are no longer supported; use JSON payloads instead.
 
 ## [1.0.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.4.0...v1.0.0) (2023-01-15)
 

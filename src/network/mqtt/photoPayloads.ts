@@ -49,27 +49,6 @@ const parsePhotoSendPayload = (message: Buffer): PhotoSendPayload => {
   }
 }
 
-/**
- * @deprecated Legacy delimiter payloads are kept only for transition.
- * Prefer JSON payloads on `doorcloud/v1/photo/send`.
- */
-const parseLegacyPhotoSendPayload = (message: Buffer): PhotoSendPayload => {
-  const [userID, format, photo] = message.toString().split('----')
-
-  if (!userID || !format || !photo)
-    throw new Error(
-      'Legacy photo send payload must include userID, format, and photo'
-    )
-
-  imageFormatSchema.parse(format)
-
-  return {
-    userID,
-    format,
-    base64Photo: stripDataUrlPrefix(photo, format)
-  }
-}
-
 const parsePhotoMetricsPayload = (message: Buffer): PhotoMetricsPayload => {
   const payload = photoMetricsPayloadSchema.parse(parseJsonMessage(message))
   const timestampSent = Number(payload.timestampSent)
@@ -80,26 +59,5 @@ const parsePhotoMetricsPayload = (message: Buffer): PhotoMetricsPayload => {
   return { timestampSent }
 }
 
-/**
- * @deprecated Legacy delimiter payloads are kept only for transition.
- * Prefer JSON payloads on `doorcloud/v1/photo/metrics`.
- */
-const parseLegacyPhotoMetricsPayload = (
-  message: Buffer
-): PhotoMetricsPayload => {
-  const [timestampSent] = message.toString().split('----')
-  const parsedTimestamp = Number(timestampSent)
-
-  if (!Number.isFinite(parsedTimestamp))
-    throw new Error('Legacy metrics payload must include a valid timestamp')
-
-  return { timestampSent: parsedTimestamp }
-}
-
-export {
-  parseLegacyPhotoMetricsPayload,
-  parseLegacyPhotoSendPayload,
-  parsePhotoMetricsPayload,
-  parsePhotoSendPayload
-}
+export { parsePhotoMetricsPayload, parsePhotoSendPayload }
 export type { PhotoMetricsPayload, PhotoSendPayload }

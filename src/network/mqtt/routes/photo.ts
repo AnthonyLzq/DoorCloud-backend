@@ -6,8 +6,6 @@ import { UserServices } from 'services'
 import { diffTimeInSeconds, getTimestamp } from 'utils'
 import { getEnv } from 'config/env'
 import {
-  parseLegacyPhotoMetricsPayload,
-  parseLegacyPhotoSendPayload,
   parsePhotoMetricsPayload,
   parsePhotoSendPayload,
   PhotoMetricsPayload,
@@ -15,7 +13,6 @@ import {
 } from '../photoPayloads'
 import {
   getPhotoSubscriptionTopics,
-  isLegacyPhotoTopic,
   isPhotoMetricsTopic,
   isPhotoSendTopic,
   MQTT_TOPICS
@@ -25,22 +22,6 @@ import type { MqttRoute } from '../types'
 const PUB_TOPIC = 'doorcloud/v1/photo'
 const SUB_TOPIC = MQTT_TOPICS.photo.send
 
-const getPhotoSendPayload = (
-  topic: string,
-  message: Buffer
-): PhotoSendPayload =>
-  isLegacyPhotoTopic(topic)
-    ? parseLegacyPhotoSendPayload(message)
-    : parsePhotoSendPayload(message)
-
-const getPhotoMetricsPayload = (
-  topic: string,
-  message: Buffer
-): PhotoMetricsPayload =>
-  isLegacyPhotoTopic(topic)
-    ? parseLegacyPhotoMetricsPayload(message)
-    : parsePhotoMetricsPayload(message)
-
 const handlePhotoSend = async (
   topic: string,
   message: Buffer,
@@ -48,7 +29,7 @@ const handlePhotoSend = async (
 ) => {
   log.info({ topic }, 'Received a photo')
 
-  const { base64Photo, format, userID } = getPhotoSendPayload(topic, message)
+  const { base64Photo, format, userID } = parsePhotoSendPayload(message)
   const us = new UserServices(log)
 
   await us.sendPhotoThroughWhatsapp(
@@ -84,8 +65,8 @@ const sub = async (
   client: MqttClient,
   log: FastifyBaseLogger
 ): Promise<void> => {
-  const { MQTT_LEGACY_TOPICS_ENABLED, MQTT_QOS } = getEnv()
-  const topics = getPhotoSubscriptionTopics(MQTT_LEGACY_TOPICS_ENABLED)
+  const { MQTT_QOS } = getEnv()
+  const topics = getPhotoSubscriptionTopics()
 
   await new Promise<void>((resolve, reject) => {
     client.subscribe(topics, { qos: MQTT_QOS }, error => {
@@ -107,14 +88,14 @@ const sub = async (
 
   client.on('message', async (topic, message) => {
     try {
-      if (isPhotoSendTopic(topic, MQTT_LEGACY_TOPICS_ENABLED)) {
+      if (isPhotoSendTopic(topic)) {
         await handlePhotoSend(topic, message, log)
 
         return
       }
 
-      if (isPhotoMetricsTopic(topic, MQTT_LEGACY_TOPICS_ENABLED))
-        recordMetrics(getPhotoMetricsPayload(topic, message), log, topic)
+      if (isPhotoMetricsTopic(topic))
+        recordMetrics(parsePhotoMetricsPayload(message), log, topic)
     } catch (error) {
       log.error({ error, topic }, 'Error processing MQTT photo message')
     }

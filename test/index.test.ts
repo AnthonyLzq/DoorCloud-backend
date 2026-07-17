@@ -22,8 +22,6 @@ import {
   mqttConnection
 } from '../src/network/mqtt/mqtt'
 import {
-  parseLegacyPhotoMetricsPayload,
-  parseLegacyPhotoSendPayload,
   parsePhotoMetricsPayload,
   parsePhotoSendPayload
 } from '../src/network/mqtt/photoPayloads'
@@ -133,7 +131,6 @@ describe('DoorCloud backend tests', () => {
         MQTT_CONNECT_TIMEOUT: 30_000,
         MQTT_HOST: 'mqtt.example.com',
         MQTT_KEEPALIVE: 60,
-        MQTT_LEGACY_TOPICS_ENABLED: true,
         MQTT_PORT: 8883,
         MQTT_PROTOCOL: 'mqtt',
         MQTT_QOS: 0,
@@ -189,22 +186,18 @@ describe('DoorCloud backend tests', () => {
   })
 
   describe('MQTT photo topics and payloads', () => {
-    test('builds subscriptions with legacy topics enabled', () => {
-      expect(getPhotoSubscriptionTopics(true)).toMatchObject([
+    test('builds subscriptions with versioned topics only', () => {
+      expect(getPhotoSubscriptionTopics()).toMatchObject([
         MQTT_TOPICS.photo.send,
-        MQTT_TOPICS.photo.metrics,
-        MQTT_TOPICS.photo.legacy
+        MQTT_TOPICS.photo.metrics
       ])
     })
 
-    test('identifies versioned and legacy photo topics', () => {
-      expect(isPhotoSendTopic('doorcloud/v1/photo/send', false)).toBe(true)
-      expect(isPhotoSendTopic('DoorCloud/photo/send', true)).toBe(true)
-      expect(isPhotoSendTopic('DoorCloud/photo/send', false)).toBe(false)
-      expect(isPhotoMetricsTopic('doorcloud/v1/photo/metrics', false)).toBe(
-        true
-      )
-      expect(isPhotoMetricsTopic('DoorCloud/photo/metrics', true)).toBe(true)
+    test('identifies versioned photo topics', () => {
+      expect(isPhotoSendTopic('doorcloud/v1/photo/send')).toBe(true)
+      expect(isPhotoSendTopic('doorcloud/v1/photo/metrics')).toBe(false)
+      expect(isPhotoMetricsTopic('doorcloud/v1/photo/metrics')).toBe(true)
+      expect(isPhotoMetricsTopic('doorcloud/v1/photo/send')).toBe(false)
     })
 
     test('parses versioned photo send payloads', () => {
@@ -223,27 +216,10 @@ describe('DoorCloud backend tests', () => {
       })
     })
 
-    test('parses legacy photo send payloads', () => {
-      expect(
-        parseLegacyPhotoSendPayload(
-          Buffer.from('42----png----data:image/png;base64,aGVsbG8=')
-        )
-      ).toMatchObject({
-        userID: '42',
-        format: 'png',
-        base64Photo: 'aGVsbG8='
-      })
-    })
-
-    test('parses versioned and legacy metrics payloads', () => {
+    test('parses versioned metrics payloads', () => {
       expect(
         parsePhotoMetricsPayload(Buffer.from('{"timestampSent":1730000000000}'))
       ).toMatchObject({ timestampSent: 1_730_000_000_000 })
-      expect(
-        parseLegacyPhotoMetricsPayload(Buffer.from('1730000000000----x'))
-      ).toMatchObject({
-        timestampSent: 1_730_000_000_000
-      })
     })
   })
 

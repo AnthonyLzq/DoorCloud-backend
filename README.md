@@ -19,8 +19,7 @@ or WhatsApp sends. `OPENWA_CHAT_ID` should be the WhatsApp chat ID for the
 destination number, e.g. `51999999999@c.us`. `PORT` defaults to `1996`,
 `NODE_ENV` defaults to `development`, `MQTT_PROTOCOL` defaults to `mqtts`, and
 MQTT lifecycle settings default to clean sessions, 60s keepalive, 1s reconnect
-period, 30s connect timeout, QoS 0 subscriptions, and legacy
-`DoorCloud/photo/#` compatibility enabled.
+period, 30s connect timeout, and QoS 0 subscriptions.
 
 `CORS_ORIGINS` is optional and accepts a comma-separated list of allowed origins
 (e.g., `http://localhost:3000,https://app.doorcloud.com`). When not set, CORS
@@ -85,8 +84,9 @@ Preferred MQTT topics are versioned:
   `{"userId":"123","format":"jpeg","photo":"data:image/jpeg;base64,..."}`
 - `doorcloud/v1/photo/metrics` receives JSON metrics payloads:
   `{"timestampSent": 1730000000000}`
-- Deprecated `DoorCloud/photo/#` remains available while
-  `MQTT_LEGACY_TOPICS_ENABLED=true` for existing delimiter-based messages.
+
+**Note:** Legacy `DoorCloud/photo/#` topics are no longer supported. All
+publishers must use the versioned `doorcloud/v1/photo/*` topics.
 
 Use `MOSQUITTO_BACKEND_PASSWORD` and `MOSQUITTO_DEVICE_PASSWORD` to generate
 different local passwords. The generated `infra/mosquitto/passwordfile` is

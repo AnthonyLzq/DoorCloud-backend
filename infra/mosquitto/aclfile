@@ -1,14 +1,10 @@
 user doorcloud-backend
 topic read $SYS/broker/#
 topic readwrite doorcloud/healthcheck
-topic read DoorCloud/photo/#
 topic read doorcloud/v1/photo/#
-topic write DoorCloud/photo/result/#
 topic write doorcloud/v1/photo/result/#
 
 user doorcloud-device
-topic write DoorCloud/photo/#
 topic write doorcloud/v1/photo/send
 topic write doorcloud/v1/photo/metrics
-topic read DoorCloud/photo/result/#
 topic read doorcloud/v1/photo/result/#
