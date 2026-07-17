@@ -15,6 +15,7 @@ import {
 } from 'integrations'
 import { z } from 'zod'
 import { response } from '../response'
+import { setupAuthMiddleware } from '../middleware/setup-auth'
 
 type ZodFastifyInstance = FastifyInstance<
   RawServerDefault,
@@ -150,25 +151,33 @@ const renderSetupHtml = (): string => `<!doctype html>
 </html>`
 
 const Setup = (server: ZodFastifyInstance): void => {
+  // GET /setup - Página de setup (no requiere autenticación)
   server.get('/setup', (_request, reply) => {
     reply.type('text/html').send(renderSetupHtml())
   })
 
-  server.get('/setup/openwa/status', async (_request, reply) => {
-    try {
-      const result = await getOpenWaSetupStatus(server.log)
+  // GET /setup/openwa/status - Requiere autenticación
+  server.get(
+    '/setup/openwa/status',
+    { preHandler: setupAuthMiddleware },
+    async (_request, reply) => {
+      try {
+        const result = await getOpenWaSetupStatus(server.log)
 
-      return response({ error: false, message: result, reply, status: 200 })
-    } catch (error) {
-      server.log.error({ error }, 'OpenWA setup status failed')
+        return response({ error: false, message: result, reply, status: 200 })
+      } catch (error) {
+        server.log.error({ error }, 'OpenWA setup status failed')
 
-      throw error
+        throw error
+      }
     }
-  })
+  )
 
+  // POST /setup/config - Requiere autenticación
   server.post(
     '/setup/config',
     {
+      preHandler: setupAuthMiddleware,
       schema: {
         body: setupConfigSchema
       }
@@ -180,33 +189,45 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   )
 
-  server.post('/setup/openwa/start', async (_request, reply) => {
-    try {
-      const result = await startOpenWaSetupSession(server.log)
+  // POST /setup/openwa/start - Requiere autenticación
+  server.post(
+    '/setup/openwa/start',
+    { preHandler: setupAuthMiddleware },
+    async (_request, reply) => {
+      try {
+        const result = await startOpenWaSetupSession(server.log)
 
-      return response({ error: false, message: result, reply, status: 200 })
-    } catch (error) {
-      server.log.error({ error }, 'OpenWA setup start failed')
+        return response({ error: false, message: result, reply, status: 200 })
+      } catch (error) {
+        server.log.error({ error }, 'OpenWA setup start failed')
 
-      throw error
+        throw error
+      }
     }
-  })
+  )
 
-  server.get('/setup/openwa/qr', async (_request, reply) => {
-    try {
-      const result = await getOpenWaSetupQr(server.log)
+  // GET /setup/openwa/qr - Requiere autenticación
+  server.get(
+    '/setup/openwa/qr',
+    { preHandler: setupAuthMiddleware },
+    async (_request, reply) => {
+      try {
+        const result = await getOpenWaSetupQr(server.log)
 
-      return response({ error: false, message: result, reply, status: 200 })
-    } catch (error) {
-      server.log.error({ error }, 'OpenWA setup QR failed')
+        return response({ error: false, message: result, reply, status: 200 })
+      } catch (error) {
+        server.log.error({ error }, 'OpenWA setup QR failed')
 
-      throw error
+        throw error
+      }
     }
-  })
+  )
 
+  // POST /setup/openwa/send-test - Requiere autenticación
   server.post(
     '/setup/openwa/send-test',
     {
+      preHandler: setupAuthMiddleware,
       schema: {
         body: setupTestSchema
       }

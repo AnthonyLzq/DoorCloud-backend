@@ -120,7 +120,19 @@ const envSchema = z.object({
   MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
     'MODELS_CDN_URL must be a URL'
   )
-})
+}).refine(
+  data => {
+    // In production, CORS_ORIGINS must be configured
+    if (data.NODE_ENV === 'production' && !data.CORS_ORIGINS) {
+      return false
+    }
+    return true
+  },
+  {
+    message: 'CORS_ORIGINS is required in production environment',
+    path: ['CORS_ORIGINS']
+  }
+)
 
 type Env = z.infer<typeof envSchema>
 

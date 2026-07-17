@@ -42,8 +42,16 @@ class UserServices {
   ): Promise<string[]> {
     const [userName, ...rest] = folderID.split('-')
     const userID = rest.join('-')
+    const parsedUserID = parseInt(userID, 10)
 
-    await getUserByUserID(parseInt(userID, 10), this.#log)
+    if (Number.isNaN(parsedUserID)) {
+      const errorMessage = 'Invalid userID: must be a number'
+      this.#log.error(errorMessage)
+
+      throw new CustomError(errorMessage, 400)
+    }
+
+    await getUserByUserID(parsedUserID, this.#log)
 
     const paths: string[] = []
 
@@ -69,7 +77,16 @@ class UserServices {
     format: string,
     bufferPhoto: Buffer
   ) {
-    const [user] = await getUserByUserID(parseInt(userID, 10), this.#log)
+    const parsedUserID = parseInt(userID, 10)
+
+    if (Number.isNaN(parsedUserID)) {
+      const errorMessage = 'Invalid userID: must be a number'
+      this.#log.error(errorMessage)
+
+      throw new CustomError(errorMessage, 400)
+    }
+
+    const [user] = await getUserByUserID(parsedUserID, this.#log)
 
     if (!user) {
       const errorMessage = 'User not found'
