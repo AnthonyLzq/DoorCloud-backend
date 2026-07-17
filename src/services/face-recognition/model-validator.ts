@@ -5,20 +5,20 @@ const REQUIRED_MODELS = [
   // InsightFace buffalo_l (detection + recognition)
   'models/insightface/det_10g.onnx',
   'models/insightface/w600k_r50.onnx',
-
+  
   // InsightFace buffalo_m (detection + recognition)
   'models/insightface/buffalo_m/det_2.5g.onnx',
   'models/insightface/buffalo_m/w600k_r50.onnx',
-
+  
   // InsightFace buffalo_s (detection + recognition)
   'models/insightface/det_500m.onnx',
   'models/insightface/w600k_mbf.onnx',
-
+  
   // MediaPipe FaceMesh
-  'models/mediapipe/face_mesh.task',
-
-  // dlib face recognition
-  'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
+  'models/mediapipe/face_mesh.task'
+  
+  // Note: dlib models (.dat format) are not compatible with ONNX Runtime
+  // They will be loaded via Python Manager in Phase 2
 ]
 
 export const validateModels = (): void => {

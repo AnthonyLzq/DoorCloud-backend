@@ -10,6 +10,7 @@
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
     "models:download": "./scripts/download-models.sh",
+    "models:test": "tsx scripts/test-onnx-inference.ts",
     "preservice": "node scripts/openwa/sync-api-key.mjs --optional",
     "service": "nodemon --exitcrash",
     "start": "NODE_PATH=dist node dist/index.js",
