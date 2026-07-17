@@ -22,6 +22,11 @@ MQTT lifecycle settings default to clean sessions, 60s keepalive, 1s reconnect
 period, 30s connect timeout, QoS 0 subscriptions, and legacy
 `DoorCloud/photo/#` compatibility enabled.
 
+`CORS_ORIGINS` is optional and accepts a comma-separated list of allowed origins
+(e.g., `http://localhost:3000,https://app.doorcloud.com`). When not set, CORS
+allows all origins (backward compatible). When set, only the specified origins
+are allowed.
+
 ## Setup
 
 Use the pinned runtime and package manager before installing dependencies:

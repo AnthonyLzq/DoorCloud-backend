@@ -151,6 +151,41 @@ describe('DoorCloud backend tests', () => {
         'MQTT_HOST'
       )
     })
+
+    test('parses CORS_ORIGINS as comma-separated array', () => {
+      expect(
+        parseEnv({
+          ...validEnv,
+          CORS_ORIGINS: 'http://localhost:3000,https://app.doorcloud.com'
+        })
+      ).toMatchObject({
+        CORS_ORIGINS: ['http://localhost:3000', 'https://app.doorcloud.com']
+      })
+    })
+
+    test('parses single CORS_ORIGIN', () => {
+      expect(
+        parseEnv({ ...validEnv, CORS_ORIGINS: 'https://app.doorcloud.com' })
+      ).toMatchObject({
+        CORS_ORIGINS: ['https://app.doorcloud.com']
+      })
+    })
+
+    test('CORS_ORIGINS is undefined when not set', () => {
+      const env = parseEnv(validEnv)
+      expect(env.CORS_ORIGINS).toBeUndefined()
+    })
+
+    test('trims whitespace from CORS_ORIGINS', () => {
+      expect(
+        parseEnv({
+          ...validEnv,
+          CORS_ORIGINS: ' http://localhost:3000 , https://app.doorcloud.com '
+        })
+      ).toMatchObject({
+        CORS_ORIGINS: ['http://localhost:3000', 'https://app.doorcloud.com']
+      })
+    })
   })
 
   describe('MQTT photo topics and payloads', () => {

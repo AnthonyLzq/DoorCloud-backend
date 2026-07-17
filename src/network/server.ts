@@ -40,7 +40,11 @@ class Server {
   }
 
   #config() {
-    this.#app.register(cors, {})
+    const { CORS_ORIGINS } = getEnv()
+
+    this.#app.register(cors, {
+      origin: CORS_ORIGINS ?? true
+    })
     this.#app.register(multipart, {
       limits: {
         fields: 3,
@@ -48,16 +52,6 @@ class Server {
       }
     })
 
-    this.#app.addHook('preHandler', (req, reply, done) => {
-      reply.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE')
-      reply.header('Access-Control-Allow-Origin', '*')
-      reply.header(
-        'Access-Control-Allow-Headers',
-        'Authorization, Content-Type'
-      )
-      reply.header('x-powered-by', 'Simba.js')
-      done()
-    })
     this.#app.setValidatorCompiler(validatorCompiler)
     this.#app.setSerializerCompiler(serializerCompiler)
     applyRoutes(this.#app.withTypeProvider<ZodTypeProvider>())

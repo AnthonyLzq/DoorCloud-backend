@@ -42,19 +42,19 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: HTTP Security Hardening
 
-- [ ] 2.1 Add `CORS_ORIGINS` optional env var to `src/config/env.ts` — parse as comma-separated string, default to `undefined`. Add unit test in `test/index.test.ts` for `parseEnv` with/without `CORS_ORIGINS`.
+- [x] 2.1 Add `CORS_ORIGINS` optional env var to `src/config/env.ts` — parse as comma-separated string, default to `undefined`. Add unit test in `test/index.test.ts` for `parseEnv` with/without `CORS_ORIGINS`.
   - **Files**: `src/config/env.ts`, `test/index.test.ts`
   - **Tests**: `pnpm test:local`
   - **Acceptance**: `parseEnv({})` returns `CORS_ORIGINS: undefined`; `parseEnv({CORS_ORIGINS:'http://a,https://b'})` returns `['http://a','https://b']`
   - **Depends on**: none
 
-- [ ] 2.2 Configure CORS allowlist in `src/network/server.ts` — replace `cors, {}` with `cors, { origin: CORS_ORIGINS ?? true }`. Remove entire `preHandler` hook (x-powered-by + redundant CORS headers).
+- [x] 2.2 Configure CORS allowlist in `src/network/server.ts` — replace `cors, {}` with `cors, { origin: CORS_ORIGINS ?? true }`. Remove entire `preHandler` hook (x-powered-by + redundant CORS headers).
   - **Files**: `src/network/server.ts`
   - **Tests**: `pnpm test:local && pnpm typecheck`
   - **Acceptance**: No `x-powered-by` header in responses; CORS respects `CORS_ORIGINS`; unset `CORS_ORIGINS` allows all origins
   - **Depends on**: 2.1
 
-- [ ] 2.3 Update `.env.example` and `README.md` to document `CORS_ORIGINS`.
+- [x] 2.3 Update `.env.example` and `README.md` to document `CORS_ORIGINS`.
   - **Files**: `.env.example`, `README.md`
   - **Tests**: visual review
   - **Acceptance**: `CORS_ORIGINS` documented with format and default behavior

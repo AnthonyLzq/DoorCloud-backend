@@ -79,9 +79,19 @@ const optionalString = (name: string) =>
       .optional()
   )
 
+const commaSeparatedOrigins = (name: string) =>
+  z.preprocess(value => {
+    if (value === '' || value === undefined) return undefined
+    if (typeof value === 'string')
+      return value.split(',').map(origin => origin.trim())
+
+    return value
+  }, z.array(z.string().trim().min(1)).optional())
+
 const envSchema = z.object({
   NODE_ENV: z.string().trim().min(1).default('development'),
   PORT: optionalPort(1996),
+  CORS_ORIGINS: commaSeparatedOrigins('CORS_ORIGINS'),
   MQTT_HOST: requiredString('MQTT_HOST'),
   MQTT_PROTOCOL: z.enum(['mqtt', 'mqtts']).default('mqtts'),
   MQTT_PORT: port('MQTT_PORT'),
