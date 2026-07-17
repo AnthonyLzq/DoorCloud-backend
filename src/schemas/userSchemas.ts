@@ -5,18 +5,11 @@ const userSchema = z.object({
   phone: z.string().min(1, 'phone is required')
 })
 
-const userResponseSchema = z.object({
-  name: z.string(),
-  phone: z.string(),
-  idFolder: z.string()
-})
-
 const uploadUserPhotoParamsSchema = z.object({
   folderID: z.string().min(1, 'folderID is required')
 })
 
 type UserRequest = z.infer<typeof userSchema>
-type UserResponse = z.infer<typeof userResponseSchema>
 
-export type { UserRequest, UserResponse }
-export { uploadUserPhotoParamsSchema, userResponseSchema, userSchema }
+export type { UserRequest }
+export { uploadUserPhotoParamsSchema, userSchema }
