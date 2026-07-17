@@ -1,14 +1,20 @@
 schema: spec-driven
 change: p3-operational-cleanup
 created: 2026-07-16
-status: ready-for-specs
-current_phase: spec
+status: completed
+current_phase: archive
 phases:
   explore: completed
   propose: completed
-  spec: pending
-  design: pending
-  tasks: pending
-  apply: pending
+  spec: completed
+  design: completed
+  tasks: completed
+  apply: completed
   verify: pending
   archive: pending
+completed_specs:
+  - mqtt-legacy-removal
+  - ci-mosquitto-integration
+  - http-security-hardening
+  - lint-tooling-upgrade
+  - release-tooling-migration
