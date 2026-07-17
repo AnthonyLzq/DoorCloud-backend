@@ -9,6 +9,7 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
+    "models:download": "./scripts/download-models.sh",
     "preservice": "node scripts/openwa/sync-api-key.mjs --optional",
     "service": "nodemon --exitcrash",
     "start": "NODE_PATH=dist node dist/index.js",

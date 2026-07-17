@@ -133,3 +133,6 @@ src/tf.ts
 venv
 infra/mosquitto/passwordfile
 .openwa/
+
+# Face recognition models (downloaded via scripts/download-models.sh)
+models/

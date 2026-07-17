@@ -26,6 +26,29 @@ period, 30s connect timeout, and QoS 0 subscriptions.
 allows all origins (backward compatible). When set, only the specified origins
 are allowed.
 
+### Face Recognition Models (Required)
+
+**⚠️ HARD GATE:** The application will not start if the face recognition models are not downloaded.
+
+Download the required ONNX models (~500MB) before running the application:
+
+```bash
+pnpm models:download
+```
+
+Or run the script directly:
+
+```bash
+./scripts/download-models.sh
+```
+
+This script downloads:
+- InsightFace buffalo_l/m/s (512D embeddings, 106 landmarks)
+- MediaPipe FaceMesh (468 landmarks)
+- dlib face recognition (128D embeddings)
+
+Models are saved to the `models/` directory (gitignored). The application validates model existence on startup and will fail with a clear error message if any required model is missing.
+
 ## Setup
 
 Use the pinned runtime and package manager before installing dependencies:
@@ -35,6 +58,7 @@ nvm use
 corepack enable
 corepack prepare pnpm@10.30.1 --activate
 pnpm install --frozen-lockfile
+pnpm models:download  # Download face recognition models (~500MB)
 pnpm test:local
 ```
 
