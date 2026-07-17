@@ -4,7 +4,6 @@ import mqtt from 'mqtt'
 import { applyRoutes } from './router'
 
 declare global {
-  // eslint-disable-next-line no-var
   var __mqttClient__: mqtt.MqttClient
 }
 

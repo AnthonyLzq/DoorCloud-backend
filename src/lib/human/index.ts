@@ -4,7 +4,6 @@ import type { FastifyBaseLogger } from 'fastify'
 import { CustomError } from 'network/http'
 
 declare global {
-  // eslint-disable-next-line no-var
   var __human__: Human
 }
 

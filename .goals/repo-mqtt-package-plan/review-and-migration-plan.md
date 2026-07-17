@@ -1,8 +1,13 @@
 # DoorCloud-backend review and migration plan
 
 Date: 2026-07-15
-Scope: planning only; no product source, dependency manifest, lockfile, env,
-deployment, or runtime behavior changes.
+Original scope: planning only; no product source, dependency manifest, lockfile,
+env, deployment, or runtime behavior changes.
+
+Status refreshed: 2026-07-16. This refresh reflects implementation already
+present in the repository after the original planning pass. P0 and P1 are
+complete. P2 is complete through Fastify 5/Zod 4, MQTT.js 5, and replacing
+Twilio with an OpenWA WhatsApp provider that can send images.
 
 ## 1. Executive summary
 
@@ -11,7 +16,7 @@ DoorCloud-backend is a small TypeScript/Fastify service that combines:
 - an HTTP API for creating users and uploading reference photos;
 - a long-lived MQTT client that subscribes to photo-processing topics;
 - Supabase for user records and photo storage;
-- Twilio WhatsApp messaging;
+- OpenWA WhatsApp messaging;
 - `@vladmandic/human` / TensorFlow face comparison; and
 - CSV/PNG metric artifacts.
 
@@ -20,14 +25,15 @@ The code still carries clear `simba.js` generator assumptions: a singleton
 absolute imports from `src`, a `{ error, message }` response envelope, default
 port `1996`, open CORS, and the `x-powered-by: Simba.js` header.
 
-The MQTT path is currently only a client of an externally managed TLS broker
-(`protocol: "mqtts"`, `MQTT_HOST`, `MQTT_PORT`, `MQTT_USER`, `MQTT_PASS`). There
-is no local broker configuration, no Docker Compose service, no Mosquitto
-configuration, no topic ACLs, no broker persistence plan, and no integration
-test that starts a broker. Mosquitto is a good primary candidate for the next
-implementation stage because it is small, well known, easy to run in Docker,
-supports TLS/password/ACLs/bridging, and can preserve MQTT compatibility while
-removing the externally managed broker dependency.
+The original MQTT gap has been substantially reduced. The repository now has a
+local Mosquitto Compose service, broker config/ACL files, password-file
+generation outside git, local MQTT environment documentation, versioned
+`doorcloud/v1/photo/*` topics, JSON payload parsing/validation, MQTT.js 5, and
+Mosquitto-backed integration tests. The remaining MQTT work is no longer
+"introduce Mosquitto"; it is production cutover/decommission work: update CI and
+deployment paths, decide how long to keep the external broker fallback, migrate
+all publishers off legacy `DoorCloud/photo/#` topics, and remove legacy
+compatibility after a safe window.
 
 The requested SkyTech reference at `/home/anthony/Development/SkyTech/SkyTech`
 does **not** contain MQTT, Mosquitto, Docker, Compose, broker, publish, or
@@ -35,12 +41,13 @@ subscribe implementation. It appears to be an Astro/React static site. That
 means the DoorCloud Mosquitto design should be treated as new infrastructure,
 not a direct port from SkyTech.
 
-Package modernization should be phased. The project is on a 2022/2023 stack
-with `pnpm` lockfile v5.4, Node engine `>=16`, Fastify 4, MQTT.js 4,
-TypeScript 4.9, ESLint 8, Jest 29, Twilio 3, and old native ML packages. The
-local machine has Node `v24.13.1` and pnpm `10.30.1`; `pnpm outdated` failed
-against this old lockfile, so the first future package phase should pin/choose
-the package-manager and Node baseline before upgrading dependencies.
+Package modernization is now past the baseline/tooling phase and the first
+application-major phase. The project pins pnpm `10.30.1`, Node `22.20.0`,
+lockfile version `9.0`, TypeScript `7.0.2`, Fastify `5.10.0`, Zod `4.4.3`,
+MQTT.js `5.15.2`, OpenWA HTTP messaging, and Vitest `4.1.10`; `pnpm lint`,
+`pnpm test:local`, `pnpm test:mqtt`, `pnpm build`, and `pnpm typecheck` pass
+locally. Twilio has been removed because image delivery to a controlled
+WhatsApp number is now handled through OpenWA.
 
 ## 2. Review inputs and limits
 
@@ -77,7 +84,7 @@ Key files:
   notification, face comparison, metrics.
 - `src/database/supabase/**`: Supabase client singleton and user/storage
   queries.
-- `src/integrations/twilio/**`: Twilio client singleton and WhatsApp helpers.
+- `src/integrations/whatsapp/**`: OpenWA HTTP client and WhatsApp helpers.
 - `src/lib/human/index.ts`: Human/TensorFlow initialization and face matching.
 - `metrics/**` and `scripts/histogramForMetrics.py`: metrics collection and
   plotting artifacts.
@@ -85,7 +92,7 @@ Key files:
 The service boots as:
 
 1. `src/index.ts` calls `Server.start()`.
-2. `Server.start()` creates or reuses Supabase and Twilio clients.
+2. `Server.start()` creates or reuses the Supabase client.
 3. `Server.start()` starts the MQTT route registration through
    `mqttConnection(...).start()`.
 4. Fastify listens on `PORT` or `1996`.
@@ -97,13 +104,13 @@ The service boots as:
 
 - `@fastify/cors` with open/default settings;
 - `@fastify/multipart` with `fields: 3` and `files: 3`;
-- Zod-generated user schemas via `fastify-zod`;
+- Zod route schemas through `fastify-type-provider-zod`;
 - a custom pre-handler setting:
   - `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE`;
   - `Access-Control-Allow-Origin: *`;
   - `Access-Control-Allow-Headers: Authorization, Content-Type`;
   - `x-powered-by: Simba.js`;
-- a custom AJV validator compiler from `src/network/http/utils/validatorCompiler.ts`;
+- validator and serializer compilers from `fastify-type-provider-zod`;
 - HTTP routes from `src/network/http/router.ts`.
 
 Implemented HTTP routes:
@@ -168,35 +175,48 @@ Current MQTT client configuration is in `src/network/mqtt/mqtt.ts`:
 
 - `mqtt.connect(options)` is called once and stored in global
   `__mqttClient__`.
-- `protocol` is hard-coded to `mqtts`.
-- `host`, `port`, `username`, and `password` come from environment variables.
-- `keepalive` is set to `0`.
-- On connect, it logs `Connected to mqtt server`.
-- Route registration is dynamic: `src/network/mqtt/router.ts` imports all
-  exports from `src/network/mqtt/routes`.
+- `protocol`, `host`, `port`, `username`, `password`, `clientId`, `clean`,
+  `keepalive`, `reconnectPeriod`, and `connectTimeout` come from validated
+  environment variables.
+- `MQTT_PROTOCOL` supports both `mqtt` and `mqtts`; this enables local
+  Mosquitto development while preserving external TLS broker compatibility.
+- Lifecycle logging covers connect, reconnect, offline, close, and error
+  events.
+- Route registration is dynamic and guarded by `WeakSet` idempotence in
+  `src/network/mqtt/router.ts`.
+- Subscriptions use configurable QoS through `MQTT_QOS`.
 
 Current MQTT topic constants:
 
-- `PUB_TOPIC = "DoorCloud"`.
-- `SUB_TOPIC = "DoorCloud/photo/#"`.
+- Preferred send topic: `doorcloud/v1/photo/send`.
+- Preferred metrics topic: `doorcloud/v1/photo/metrics`.
+- Preferred result topic prefix: `doorcloud/v1/photo/result/#`.
+- Deprecated legacy compatibility topic: `DoorCloud/photo/#`, gated by
+  `MQTT_LEGACY_TOPICS_ENABLED`.
 
-Key gaps to address in the Mosquitto migration:
+Implemented Mosquitto/local MQTT pieces:
 
-- no local broker service or config;
-- no Docker Compose/Kubernetes/systemd deployment model for a broker;
-- no `MQTT_URL` or local default such as `mqtt://mosquitto:1883`;
-- hard-coded TLS protocol makes local plaintext development awkward;
-- no TLS CA/cert/key configuration despite using `mqtts`;
-- no topic ACLs;
-- no broker persistence or backup plan;
-- no explicit QoS/session/clean/reconnect/backoff strategy;
+- `compose.yaml` defines an authenticated local Mosquitto broker.
+- `infra/mosquitto/mosquitto.conf` and `infra/mosquitto/aclfile` are committed
+  broker config inputs.
+- `scripts/mosquitto/create-password-file.sh` generates the password file
+  outside git.
+- `scripts/mosquitto/run-integration-tests.sh` starts Mosquitto and runs
+  integration tests.
+- JSON MQTT payloads are parsed/validated with Zod in
+  `src/network/mqtt/photoPayloads.ts`.
+
+Remaining MQTT/Mosquitto gaps:
+
+- production broker deployment, monitoring, credential rotation, backup/restore,
+  and rollback procedure;
+- CI integration job for Mosquitto when Docker is available;
+- external broker fallback/removal decision and rollout window;
+- legacy `DoorCloud/photo/#` compatibility still remains;
+- no TLS CA/cert/key configuration for a production-owned TLS broker;
 - no Last Will and Testament;
-- no payload schema validation before splitting strings;
 - image payloads are large base64 blobs over MQTT;
-- errors thrown inside `client.on("message")` can destabilize the process;
-- route registration is not obviously idempotent if the singleton is reused in
-  tests or hot reloads;
-- no MQTT integration tests with a real broker.
+- MQTT.js 5 upgrade is still pending.
 
 ### 3.5 Data stores and external services
 
@@ -207,43 +227,39 @@ Supabase:
 - Queries operate on a `users` table and `photos` storage bucket.
 - Signed URLs are generated with a 900-second lifetime.
 
-Twilio:
+WhatsApp/OpenWA:
 
-- `src/integrations/twilio/connection.ts` creates a global Twilio client from
-  `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`.
-- WhatsApp messages use `TWILIO_PHONE_NUMBER`.
-- `.env.example` does not list the Twilio variables.
+- `src/integrations/whatsapp/openwa.ts` sends HTTP requests to an OpenWA
+  gateway.
+- Text messages use `POST /api/sessions/:sessionId/messages/send-text`.
+- Image messages use `POST /api/sessions/:sessionId/messages/send-image` with a
+  Supabase signed image URL and caption.
+- `.env.example` lists `OPENWA_BASE_URL`, `OPENWA_API_KEY`,
+  `OPENWA_SESSION_ID`, and `OPENWA_CHAT_ID`.
 
 Human/TensorFlow:
 
 - `src/lib/human/index.ts` creates a global `Human` instance.
 - `MODELS_CDN_URL` controls model download location.
-- `.env.example` does not list `MODELS_CDN_URL`.
-
-Redis:
-
-- `redis` is declared in `package.json` but no Redis imports or usage were found
-  in `src`.
+- `.env.example` lists `MODELS_CDN_URL`.
 
 ### 3.6 Package/dependency surface
 
 Runtime dependencies in `package.json`:
 
 - Fastify stack: `fastify`, `@fastify/cors`, `@fastify/multipart`,
-  `@fastify/busboy`, `fastify-zod`, `ajv`, `http-errors`, `pino-pretty`.
+  `@fastify/swagger`, `fastify-type-provider-zod`, `http-errors`,
+  `pino-pretty`.
 - MQTT: `mqtt`.
 - Supabase: `@supabase/supabase-js`, `@supabase/postgrest-js`.
-- Messaging: `twilio`.
-- ML/image: `@tensorflow/tfjs-node`, `@vladmandic/human`,
-  `@vladmandic/face-api`.
-- Utilities: `debug`, `zod`, `redis`.
+- Messaging: OpenWA over Node `fetch`.
+- ML/image: `@tensorflow/tfjs-node`, `@vladmandic/human`.
+- Utilities: `debug`, `zod`.
 
 Development dependencies:
 
-- TypeScript runtime/build: `typescript`, `ts-node`, `ts-loader`,
-  `tsconfig-paths`, `tsconfig-paths-webpack-plugin`.
-- Test: `jest`, `ts-jest`, `@jest/types`, `@types/jest`,
-  `jest-mock-extended`, `jest-unit`.
+- TypeScript runtime/build: `typescript`, `tsx`.
+- Test: `vitest`.
 - Lint/format: `eslint`, TypeScript ESLint 5, Prettier 2, Standard-related
   plugins.
 - Release: `standard-version`.
@@ -251,66 +267,63 @@ Development dependencies:
 Other dependency context:
 
 - `requirements.txt` contains Python plotting/data packages for metrics.
-- `pnpm-lock.yaml` is lockfile version `5.4`, consistent with old pnpm 7-era
-  workflows.
-- Local tool versions observed during this review:
-  - Node `v24.13.1`;
-  - pnpm `10.30.1`;
-  - Python `3.14.5`.
+- `pnpm-lock.yaml` is lockfile version `9.0`, consistent with the current pnpm
+  10 baseline.
+- Runtime/tooling baseline:
+  - `.nvmrc`: Node `22.20.0`;
+  - `packageManager`: `pnpm@10.30.1`;
+  - `engines`: Node `>=22.20.0 <23`, pnpm `>=10.30.1 <11`.
 
 ### 3.7 Quality-gate situation
 
 Configured scripts:
 
 - `pnpm lint`: `eslint src/* --ext .ts --no-error-on-unmatched-pattern`
-- `pnpm test:local`: `jest --setupFiles dotenv/config --ci -i`
-- `pnpm test:ci`: `jest --ci -i`
-
-No project script was found for:
-
-- build;
-- typecheck;
-- preflight/check.
+- `pnpm build`: `tsc -p tsconfig.json`
+- `pnpm test:local`: `vitest run --exclude "**/*.integration.test.ts"`
+- `pnpm test:ci`: `vitest run --exclude "**/*.integration.test.ts"`
+- `pnpm test:mqtt`: starts Mosquitto and runs the MQTT integration suite.
+- `pnpm test:mqtt:integration`: runs `test/mqtt.integration.test.ts`.
+- `pnpm typecheck`: checks both runtime and test TypeScript configs.
 
 CI workflows:
 
-- `.github/workflows/lint.yml`: Node 16, `corepack enable`, `pnpm i`, then a
-  lint action with `auto_fix: true`.
-- `.github/workflows/test.yml`: Node 16, `corepack enable`, `pnpm i`, then
-  `pnpm test:ci`; MQTT credentials are supplied from secrets.
+- `.github/workflows/lint.yml`: Node `22.20.0`, Corepack with pnpm `10.30.1`,
+  `pnpm install --frozen-lockfile`, then `pnpm lint`.
+- `.github/workflows/test.yml`: Node `22.20.0`, Corepack with pnpm `10.30.1`,
+  `pnpm install --frozen-lockfile`, then `pnpm test:ci` and
+  `pnpm typecheck`; MQTT credentials are supplied from secrets for tests that
+  need them.
 
-Observed local gate attempts in this planning pass:
+Observed local gates during the 2026-07-16 refresh:
 
-- `pnpm lint` failed because `eslint` was not found and `node_modules` is
-  missing.
-- `pnpm test:local` failed because `jest` was not found and `node_modules` is
-  missing.
-- `pnpm outdated --format json` failed under pnpm `10.30.1` with
-  `Cannot read properties of undefined (reading 'optionalDependencies')`,
-  which reinforces the need to standardize the pnpm version before package
-  upgrade work.
+- `pnpm typecheck`: pass.
+- `pnpm test:local`: pass, 12 Vitest tests.
+- `pnpm build`: pass.
+- `pnpm lint`: pass.
 
-Test-risk findings from static inspection:
+Current gate risk:
 
-- `test/index.test.ts` imports `../src/network/router`, but the current router
-  files are under `src/network/http/router.ts` and `src/network/mqtt/router.ts`.
-- The same test calls `mqttServer.start()` / `mqttServer.stop()`, but
-  `src/network/mqtt/index.ts` exports the MQTT helpers, not top-level
-  `start/stop` functions.
-- Future modernization should repair the test suite before using it as a
-  package-upgrade safety net.
+- `pnpm lint` now uses Babel's ESLint parser for TypeScript syntax because
+  current `@typescript-eslint` releases do not support TS7. Type-aware lint
+  rules such as TypeScript-aware unused checks should be revisited when the
+  ecosystem supports TS7 or when moving to a different lint stack.
+- Mosquitto integration is available locally through `pnpm test:mqtt`, but CI
+  does not yet run a Docker-backed broker job.
 
 ### 3.8 Deployment/runtime findings
 
-- `Dockerfile` uses `node:16-alpine`, `yarn install --prod`, temporary
-  webpack packages, `yarn build`, and `yarn start`.
-- The repository declares pnpm, has a pnpm lockfile, and has no `build` script.
-- This makes the Dockerfile inconsistent with the package-manager and script
-  surface.
-- No `docker-compose.yml`, Mosquitto config, broker volume, or broker health
-  check was found.
-- `.env.example` lists MQTT and Supabase variables but omits Twilio,
-  `MODELS_CDN_URL`, `PORT`, and any future broker-mode variables.
+- `Dockerfile` now uses Node 22 Alpine, Corepack, pnpm `10.30.1`,
+  `pnpm install --frozen-lockfile`, `pnpm build`, and `pnpm start`.
+- `compose.yaml` now defines a local Mosquitto service with config, ACL,
+  passwordfile, healthcheck, and broker data/log volumes.
+- `infra/mosquitto/**` stores committed broker config/ACL files; generated
+  password files remain outside git.
+- `.env.example` now includes Node, MQTT lifecycle, Supabase, OpenWA, and
+  `MODELS_CDN_URL` variables.
+- Deployment/cutover is still pending: production broker operations, CI broker
+  job, external broker rollback window, and legacy topic retirement are not yet
+  closed.
 
 ## 4. Comparison with `simba.js`
 
@@ -335,38 +348,40 @@ DoorCloud appears to inherit or preserve these Simba-generated patterns:
 | Response envelope | `response({ error, message, reply, status })` | Simba Fastify response template is equivalent |
 | Route registration array/function pattern | `Home`, `User`, `applyRoutes(app)` | Simba Fastify router template uses route functions |
 | Fastify schema validation | DoorCloud has a custom validator compiler | Current Simba uses Fastify/Zod type-provider compilers |
-| Global clients | Supabase, Twilio, MQTT, Human stored on `global` | Simba examples use global DB client patterns |
+| Global clients | Supabase, MQTT, Human stored on `global`; OpenWA is stateless HTTP | Simba examples use global DB client patterns |
 
 ### 4.2 Outdated structural assumptions
 
 DoorCloud differs from current Simba in ways that matter for modernization:
 
 - Runtime baseline:
-  - DoorCloud: Node `>=16`, pnpm `>=7`.
+  - DoorCloud: Node `>=22.20.0 <23`, pnpm `>=10.30.1 <11`.
   - Simba: Node `>=20`, npm `>=8`; current Docker template uses
     `node:22-alpine`.
 - Tooling:
-  - DoorCloud: ESLint + Prettier + Jest + `ts-node`.
+  - DoorCloud: TypeScript 7, ESLint + Babel parser, Prettier, Vitest, and
+    `tsx`.
   - Current Simba generated Express example: Biome + Vitest + `tsx`.
 - Fastify/Zod integration:
-  - DoorCloud: `fastify-zod` and a custom AJV compiler.
+  - DoorCloud: `fastify-type-provider-zod` with validator and serializer
+    compilers.
   - Current Simba Fastify template: `fastify-type-provider-zod` with validator
     and serializer compilers, plus generated docs.
 - API docs:
   - DoorCloud has no Swagger/OpenAPI route.
   - Current Simba templates include docs routes.
 - Docker:
-  - DoorCloud Dockerfile mixes pnpm project state with Yarn and a missing build
-    script.
+  - DoorCloud Dockerfile and CI workflows now use the Node 22/pnpm baseline.
   - Current Simba Dockerfile is simpler and package-manager-aware.
 - Release tooling:
   - DoorCloud uses `standard-version`.
   - Current Simba uses `commit-and-tag-version`.
 - Tests:
-  - DoorCloud tests are stale and currently cannot run without dependencies.
+  - DoorCloud has a working Vitest baseline locally and CI now runs Vitest plus
+    typecheck on the Node 22/pnpm 10 baseline.
   - Current Simba examples use HTTP-level Vitest tests against a real server.
 - Domain integrations:
-  - DoorCloud adds MQTT, Supabase, Twilio, and ML processing; these are
+  - DoorCloud adds MQTT, Supabase, OpenWA, and ML processing; these are
     DoorCloud-specific and should not be blindly regenerated from Simba.
 
 ### 4.3 Modernization opportunities from Simba
@@ -375,8 +390,7 @@ Recommended future alignment points:
 
 1. Raise the runtime baseline to Node 20 or 22 after confirming
    `tfjs-node`/Human native compatibility.
-2. Replace `ts-node` runtime scripts with `tsx` for dev/local execution, or add
-   a real TypeScript build and run compiled JS in production.
+2. Keep `tsx` for dev/local execution and run compiled JS in production.
 3. Add an explicit `typecheck` script (`tsc --noEmit`) before package upgrades.
 4. Revisit Fastify/Zod integration with `fastify-type-provider-zod`.
 5. Add API docs once schemas and response contracts are stable.
@@ -429,7 +443,7 @@ DoorCloud must handle concerns that SkyTech does not:
 - reconnect/backoff/session lifecycle;
 - topic ACLs and broker auth;
 - large binary/base64 image payloads;
-- Supabase and Twilio side effects;
+- Supabase and WhatsApp/OpenWA side effects;
 - ML model loading;
 - integration tests with a broker;
 - deployment of a broker next to the backend.
@@ -584,7 +598,7 @@ Deliverables:
   - message received;
   - decode/validation errors;
   - processing duration;
-  - Twilio send result;
+  - OpenWA send result;
   - face-match result.
 
 Quality gates:
@@ -592,7 +606,7 @@ Quality gates:
 - contract tests for valid/invalid payloads;
 - load test with representative photo sizes;
 - duplicate-message tests;
-- Twilio/Supabase mocked tests for side effects.
+- OpenWA/Supabase mocked tests for side effects.
 
 Rollback:
 
@@ -702,7 +716,7 @@ Security risks:
   workarounds during local testing.
 - Open CORS and `Access-Control-Allow-Origin: *` should be revisited for HTTP
   endpoints.
-- `.env.example` is incomplete for Twilio and model settings.
+- `.env.example` now documents OpenWA and model settings.
 - MQTT payloads are not schema validated before decoding.
 
 Compatibility risks:
@@ -710,7 +724,7 @@ Compatibility risks:
 - Current device/topic contract is not documented outside code and README.
 - `src/pub.ts` publishes to a topic that does not match active subscriptions.
 - Existing tests appear stale relative to current file layout.
-- Moving to Fastify 5, Zod 4, MQTT.js 5, Twilio 6, and newer TypeScript should
+- Moving to Fastify 5, Zod 4, MQTT.js 5, OpenWA, and newer TypeScript should
   be handled in separate commits/phases.
 
 Operational risks:
@@ -719,7 +733,7 @@ Operational risks:
 - Large photos over MQTT can increase memory pressure and broker disk usage.
 - `tfjs-node` native bindings may constrain Node version upgrades.
 - Dockerfile is currently inconsistent with pnpm and missing `build` script.
-- CI only provides MQTT secrets; Supabase/Twilio/model env assumptions are not
+- CI only provides MQTT secrets; Supabase/OpenWA/model env assumptions are not
   fully represented.
 
 Mitigations:
@@ -734,170 +748,269 @@ Mitigations:
 
 ### 9.1 Current package-manager context
 
-- Declared package manager expectation: pnpm `>=7`.
-- Lockfile: `pnpm-lock.yaml` lockfile version `5.4`.
-- Local pnpm used during review: `10.30.1`.
-- `pnpm outdated --format json` failed under pnpm 10 against the current repo.
-- Dockerfile uses Yarn even though the repo is pnpm-based.
+- Declared package manager: `pnpm@10.30.1`.
+- Engine baseline: Node `>=22.20.0 <23`, pnpm `>=10.30.1 <11`.
+- `.nvmrc`: `22.20.0`.
+- Lockfile: `pnpm-lock.yaml` lockfile version `9.0`.
+- Test runner: Vitest `4.1.10`.
+- Dockerfile: aligned with Node 22, Corepack, pnpm, `pnpm build`, and
+  `pnpm start`.
+- CI: aligned with Node `22.20.0`, pnpm `10.30.1`, frozen lockfile installs,
+  deterministic lint/test commands, and typecheck.
 
-Future package work should first choose one of these paths:
-
-1. Conservative baseline: use pnpm 7.x via Corepack to work with the existing
-   lockfile, repair tests, then upgrade packages.
-2. Modern baseline: intentionally upgrade the lockfile/package-manager to a
-   current pnpm version in its own commit, then upgrade packages.
-
-Recommended: move to a modern pnpm and Node 20/22 baseline in a dedicated
-tooling phase, but do not combine that with application dependency upgrades.
+The package-manager/runtime/CI baseline phase is complete, and the TypeScript 7,
+Fastify 5/Zod 4, MQTT.js 5, and OpenWA messaging phases are complete. The next
+decision is operational: how to run and monitor OpenWA.
 
 ### 9.2 Current vs latest package inventory
 
-Latest versions below were fetched with `npm view <package> version` during this
-planning pass because `pnpm outdated` failed locally.
+Latest versions below were fetched with `npm view <package> version` during the
+original planning pass; current ranges were refreshed from the present
+`package.json`.
 
 Runtime packages:
 
 | Package | Current range | Latest observed | Notes |
 | --- | ---: | ---: | --- |
-| `@fastify/busboy` | `^1.1.0` | `3.2.0` | Used for multipart types; may be redundant after multipart upgrade |
-| `@fastify/cors` | `^8.2.0` | `11.3.0` | Upgrade with Fastify compatibility checks |
-| `@fastify/multipart` | `^7.3.0` | `10.1.0` | Breaking changes likely; validate file iterator APIs |
+| `@fastify/cors` | `^11.3.0` | `11.3.0` | Current Fastify 5-compatible baseline |
+| `@fastify/multipart` | `^10.1.0` | `10.1.0` | Current Fastify 5-compatible baseline |
+| `@fastify/swagger` | `^9.8.1` | `9.8.1` | Peer required by `fastify-type-provider-zod` |
 | `@supabase/postgrest-js` | `^1.1.1` | `2.110.6` | May be unnecessary when using `@supabase/supabase-js` |
 | `@supabase/supabase-js` | `^2.2.3` | `2.110.6` | Large version gap within v2 |
 | `@tensorflow/tfjs-node` | `^4.2.0` | `4.22.0` | Native/runtime compatibility risk |
-| `@vladmandic/face-api` | `^1.7.8` | `1.7.15` | No source usage found; confirm before keeping |
 | `@vladmandic/human` | `^3.0.3` | `3.3.6` | Validate model loading and matching thresholds |
-| `ajv` | `^8.11.2` | `8.20.0` | May be replaced by Fastify/Zod provider path |
 | `debug` | `^4.3.4` | `4.4.3` | Low-risk |
-| `fastify` | `^4.10.2` | `5.10.0` | Major upgrade; plugin compatibility required |
-| `fastify-zod` | `^1.2.0` | `1.4.0` | Consider replacing with `fastify-type-provider-zod` |
+| `fastify` | `^5.10.0` | `5.10.0` | Current server baseline |
+| `fastify-type-provider-zod` | `7.0.0` | `7.0.0` | Current Zod provider baseline |
 | `http-errors` | `^2.0.0` | `2.0.1` | Low-risk |
-| `mqtt` | `^4.3.7` | `5.15.2` | Major upgrade; pair with Mosquitto tests |
+| `mqtt` | `^5.15.2` | `5.15.2` | Current MQTT.js baseline |
 | `pino-pretty` | `^9.1.1` | `13.1.3` | Check Fastify/Pino transport compatibility |
-| `redis` | `^4.5.1` | `6.1.0` | No source usage found; remove if unused |
-| `twilio` | `^3.84.0` | `6.0.2` | Major upgrade; API/auth behavior must be tested |
-| `zod` | `^3.20.2` | `4.4.3` | Major upgrade; schemas/type-provider changes |
+| `zod` | `^4.4.3` | `4.4.3` | Current validation baseline |
 
 Development packages:
 
 | Package | Current range | Latest observed | Notes |
 | --- | ---: | ---: | --- |
-| `@jest/types` | `^29.3.1` | `30.4.1` | Pair with Jest upgrade |
+| `@babel/core` | `^7.29.7` | `7.29.7` | Used by ESLint parser for TS7 syntax |
+| `@babel/eslint-parser` | `^7.29.7` | `7.29.7` | Replaces `@typescript-eslint/parser` until TS7 support lands |
+| `@babel/preset-typescript` | `^7.29.7` | `7.29.7` | Parses TypeScript syntax for ESLint |
 | `@types/debug` | `^4.1.7` | `4.1.13` | Low-risk |
 | `@types/http-errors` | `^2.0.1` | `2.0.5` | Low-risk |
-| `@types/jest` | `^29.2.5` | `30.0.0` | Pair with Jest upgrade |
-| `@types/node` | `^18.11.18` | `26.1.1` | Match chosen Node runtime |
-| `@typescript-eslint/eslint-plugin` | `^5.47.1` | `8.64.0` | Major with ESLint compatibility |
-| `@typescript-eslint/parser` | `^5.47.1` | `8.64.0` | Major with ESLint compatibility |
+| `@types/node` | `^22.20.1` | `26.1.1` | Keep matched to chosen Node runtime |
 | `dotenv` | `^16.0.3` | `17.4.2` | Low/medium risk |
 | `eslint` | `^8.31.0` | `10.7.0` | Major; config migration likely |
 | `eslint-config-prettier` | `^8.5.0` | `10.1.8` | Pair with ESLint/Prettier |
 | `eslint-config-standard` | `^17.0.0` | `17.1.0` | Evaluate continued use |
 | `eslint-plugin-import` | `^2.26.0` | `2.32.0` | Pair with ESLint |
-| `eslint-plugin-jest` | `^27.1.7` | `29.15.4` | Pair with Jest/ESLint |
 | `eslint-plugin-n` | `^15.6.0` | `18.2.2` | Pair with ESLint |
-| `eslint-plugin-node` | `^11.1.0` | `11.1.0` | Likely obsolete if using `eslint-plugin-n` |
 | `eslint-plugin-prettier` | `^4.2.1` | `5.5.6` | Pair with Prettier 3 |
 | `eslint-plugin-promise` | `^6.1.1` | `7.3.0` | Pair with ESLint |
-| `jest` | `^29.3.1` | `30.4.2` | Repair stale tests first |
-| `jest-mock-extended` | `^3.0.1` | `4.0.1` | Pair with Jest/TS |
-| `jest-unit` | `^0.0.2` | `0.0.2` | Evaluate removal |
 | `nodemon` | `^2.0.20` | `3.1.14` | Low/medium risk |
 | `prettier` | `^2.8.1` | `3.9.5` | Formatting changes |
-| `reflect-metadata` | `^0.1.13` | `0.2.2` | No source usage found; remove if unused |
 | `standard-version` | `^9.5.0` | `9.5.0` | Consider `commit-and-tag-version` |
-| `ts-jest` | `^29.0.3` | `29.4.11` | Compatible with Jest 29/30 matrix must be checked |
-| `ts-loader` | `^9.4.2` | `9.6.2` | Only needed if Webpack remains |
-| `ts-node` | `^10.9.1` | `10.9.2` | Consider replacing dev runtime with `tsx` |
-| `tsconfig-paths` | `^4.1.1` | `4.2.0` | Low-risk |
-| `tsconfig-paths-webpack-plugin` | `^4.0.0` | `4.2.0` | Only needed if Webpack remains |
-| `typescript` | `^4.9.4` | `7.0.2` | Upgrade in controlled steps; current Simba examples use TS 5.x |
+| `tsx` | `^4.23.1` | `4.23.1` | Current dev/local TS runtime |
+| `typescript` | `^7.0.2` | `7.0.2` | Current compiler baseline |
+| `vitest` | `^4.1.10` | `4.1.10` | Current test runner baseline |
 
 Python metrics packages in `requirements.txt` are also old and should be treated
 as a separate, optional metrics-tooling update.
 
-### 9.3 Dependency groups and likely breaking areas
+### 9.3 Remaining dependency groups and likely breaking areas
 
-1. Package manager / runtime baseline:
-   - pnpm lockfile upgrade;
-   - Node 20/22 decision;
-   - Dockerfile consistency.
-2. Test and type safety:
-   - repair stale Jest imports;
-   - add typecheck;
-   - consider Vitest later, but not before tests are green.
-3. Fastify and validation:
-   - Fastify 4 to 5;
-   - `@fastify/cors` and `@fastify/multipart` compatibility;
-   - Zod 3 to 4;
-   - `fastify-zod` replacement decision;
-   - response schema serialization.
-4. MQTT:
-   - MQTT.js 4 to 5;
-   - Mosquitto integration;
-   - protocol/config lifecycle changes;
-   - QoS and reconnect semantics.
-5. Supabase:
-   - update `@supabase/supabase-js` within v2;
-   - remove direct `@supabase/postgrest-js` unless required.
-6. Twilio:
-   - Twilio 3 to 6;
-   - WhatsApp API behavior and error handling.
-7. ML/native packages:
-   - `tfjs-node` binary compatibility with chosen Node;
-   - Human model path/loading;
-   - face-match threshold regression tests.
-8. Lint/format/release:
-   - ESLint 8 to 10 and flat-config migration risk;
+Completed P0 baseline work:
+
+- ambient globals from `src/@types` were removed;
+- Supabase row types and MQTT route types are explicit exported/imported
+  modules;
+- `tsconfig.test.json` no longer includes `src/@types/**/*.d.ts`;
+- CI now uses Node `22.20.0`, pnpm `10.30.1`, frozen lockfile installs,
+  deterministic lint/test commands, and typecheck.
+
+Completed P1 compiler/tooling work:
+
+- TypeScript was upgraded to `7.0.2`.
+- Removed compiler options were replaced:
+  - `baseUrl` was replaced by `paths`;
+  - `downlevelIteration` was removed;
+  - `moduleResolution: "node"` became `moduleResolution: "node16"`;
+  - `module` became `Node16`.
+- `vitest.config.ts` became `vitest.config.mts` to keep the app CommonJS while
+  allowing ESM-only `vitest/config`.
+- ESLint now uses `@babel/eslint-parser` plus `@babel/preset-typescript`
+  because `@typescript-eslint` currently crashes/declares unsupported peers
+  with TS7.
+
+Completed P2 Fastify/Zod work:
+
+- Fastify was upgraded to `5.10.0`.
+- `@fastify/cors` and `@fastify/multipart` were upgraded to Fastify
+  5-compatible versions.
+- Zod was upgraded to `4.4.3`.
+- `fastify-zod`, direct `ajv`, and direct `@fastify/busboy` dependencies were
+  removed.
+- `fastify-type-provider-zod` was added, with `@fastify/swagger` to satisfy its
+  peer dependency.
+- HTTP route schemas now use Zod schemas directly through the provider.
+- The old AJV validator compiler was removed in favor of
+  `validatorCompiler`/`serializerCompiler` from `fastify-type-provider-zod`.
+
+Completed P2 MQTT work:
+
+- MQTT.js was upgraded to `5.15.2`.
+- Existing client lifecycle code remained compatible with MQTT.js 5.
+- MQTT is required. Startup waits for broker connection and route subscriptions
+  and fails fast if either step fails.
+- `pnpm test:mqtt` was run successfully against local Mosquitto.
+- The Mosquitto password-file generator now creates files with the local UID/GID
+  and permissions that the Mosquitto container can read.
+- The MQTT integration script now defaults to host port `1884` to avoid
+  collisions with a local broker already bound to `1883`.
+
+Completed P2 WhatsApp provider work:
+
+- CallMeBot exposes a simple HTTP API:
+  `https://api.callmebot.com/whatsapp.php?phone=[phone_number]&text=[message]&apikey=[your_apikey]`.
+  It requires an API key obtained for the target WhatsApp number and is best for
+  low-volume notifications to a known personal number. It is the simplest path
+  if DoorCloud only needs to notify our own number and text/link messages are
+  acceptable.
+- OpenWA is a self-hosted WhatsApp API gateway with Docker, dashboard, sessions,
+  API keys, text/media endpoints, webhooks, and whatsapp-web.js/Baileys engines.
+  It is a better fit if media delivery, self-hosting, and operational control
+  matter, but it adds a separate service, QR/session operations, storage, and
+  unofficial WhatsApp Web automation risk.
+- Because image delivery is required, Twilio was replaced with an OpenWA HTTP
+  provider instead of being upgraded to Twilio 6.
+- DoorCloud now sends greeting text through OpenWA `send-text`.
+- DoorCloud now uploads detection result photos to Supabase, signs the URL, and
+  sends it through OpenWA `send-image`.
+- OpenWA env is optional at boot so `/setup` can be used before the gateway is
+  fully configured. `OPENWA_BASE_URL` defaults to `http://localhost:2785`,
+  `OPENWA_SESSION_ID` defaults to `main`, and `OPENWA_API_KEY`/`OPENWA_CHAT_ID`
+  are required only when setup actions or WhatsApp sends are used.
+- `pnpm openwa:qr` creates/starts the configured OpenWA session and saves the
+  sign-in QR PNG to `.openwa/qr.png`.
+- `/setup` now serves a local browser UI for OpenWA status/start/QR/send-test.
+- `/setup/openwa/status`, `/setup/openwa/start`, `/setup/openwa/qr`, and
+  `/setup/openwa/send-test` are implemented.
+- `/setup/config` stores OpenWA setup values in `.env` and `process.env` so the
+  local UI can bootstrap the QR flow.
+- `pnpm service` runs the `preservice` script
+  (`scripts/openwa/sync-api-key.mjs --optional`) before
+  starting the backend; it fills an empty `OPENWA_API_KEY` from
+  `/app/data/.api-key` in a running OpenWA Compose service when available.
+- OpenWA send success and error behavior is covered by unit tests.
+
+Remaining groups:
+
+1. OpenWA operations:
+   - deploy and persist the OpenWA gateway;
+   - create a scoped operator API key;
+   - pair the WhatsApp session with `/setup` or `pnpm openwa:qr`;
+   - monitor session readiness;
+   - define restart/session recovery runbooks.
+2. Mosquitto cutover/decommission:
+   - production deployment and operations;
+   - external broker fallback/rollback window;
+   - legacy `DoorCloud/photo/#` publisher migration and eventual removal.
+3. Lint/format/release:
+   - ESLint 8 to newer major and flat-config migration risk;
+   - revisit TypeScript-aware lint once `@typescript-eslint` supports TS7;
    - Prettier 2 to 3 formatting churn;
    - `standard-version` maintenance status.
-9. Unused packages:
-   - confirm and remove `redis`, `reflect-metadata`, and possibly
-     `@vladmandic/face-api` if not used.
+4. ML/native packages:
+   - `tfjs-node` binary compatibility with Node 22 and future Node changes;
+   - Human model path/loading;
+   - face-match threshold regression tests.
 
-### 9.4 Recommended upgrade order
+### 9.4 Recommended remaining upgrade order
 
 Each item should be a separate future commit/PR with its own validation.
 
-1. Reproducibility baseline:
-   - choose Node 20 or 22;
-   - choose pnpm version;
-   - install with frozen lockfile;
-   - document local setup;
-   - fix tests only enough to run.
-2. Add missing non-invasive gates:
-   - `typecheck`;
-   - a smoke test script;
-   - broker integration test placeholder if Mosquitto is added next.
-3. Patch/minor updates within existing major ranges:
-   - low-risk runtime patches;
-   - Supabase v2 latest;
-   - `debug`, `http-errors`, `ajv`, patch-level ML packages.
-4. Remove unused packages:
-   - remove only after static search and tests confirm no usage.
-5. MQTT/Mosquitto implementation:
-   - add local broker and tests while still on MQTT.js 4 if possible;
-   - then upgrade to MQTT.js 5 with broker tests in place.
-6. Fastify/Zod major upgrade:
-   - upgrade Fastify plugins together;
-   - migrate validation/provider approach;
-   - add response schemas/docs if desired.
-7. Twilio major upgrade:
-   - mock Twilio tests first;
-   - verify WhatsApp sends in staging.
-8. Tooling modernization:
-   - TypeScript major update;
-   - ESLint/Prettier update or Biome migration;
-   - Jest 30 or Vitest migration.
-9. ML/native update:
+1. OpenWA operations:
+   - deploy OpenWA with persistent session data;
+   - configure `OPENWA_BASE_URL`, `OPENWA_COMPOSE_SERVICE`,
+     `OPENWA_SESSION_ID`, and `OPENWA_CHAT_ID`;
+   - sync `OPENWA_API_KEY` from the OpenWA container with
+     `pnpm openwa:sync-api-key` or let `pnpm service` do it automatically;
+   - generate and scan the session QR with `pnpm openwa:qr`;
+   - verify one staging `send-text` and `send-image`;
+   - add health monitoring for session readiness.
+2. Broker decommission and legacy removal:
+   - complete production Mosquitto operations;
+   - migrate all publishers to versioned topics;
+   - disable/remove legacy topic compatibility after the rollback window.
+3. Tooling cleanup:
+   - ESLint/Prettier major updates or Biome migration;
+   - restore TypeScript-aware lint when TS7 support is available;
+   - reconsider release tooling.
+4. ML/native update:
    - validate on target Node and Docker image;
    - compare face-match outputs against fixtures.
+
+### 9.5 Raspberry Pi local deployment and setup UX
+
+Target deployment shape:
+
+- Raspberry Pi runs DoorCloud backend, OpenWA, and Mosquitto on the local
+  network, preferably through Docker Compose.
+- OpenWA data is mounted on a persistent volume so the WhatsApp session survives
+  restarts and upgrades.
+- Mosquitto keeps its config/ACL/passwordfile outside image layers and persists
+  broker data/logs where needed.
+- DoorCloud exposes a local setup surface over LAN, for example
+  `http://doorcloud.local:1996/setup` or the Raspberry Pi IP address.
+- Optional later enhancement: make the Raspberry Pi expose an initial WiFi
+  access point/captive setup mode, then join the user's WiFi after
+  configuration.
+
+Local setup flow:
+
+1. User connects a computer or phone to the Raspberry Pi on the same WiFi/LAN.
+2. User opens the DoorCloud setup UI.
+3. Setup UI stores or validates:
+   - `OPENWA_BASE_URL`;
+   - `OPENWA_API_KEY`;
+   - `OPENWA_SESSION_ID`;
+   - `OPENWA_CHAT_ID`;
+   - MQTT local broker settings;
+   - any Supabase/model settings required by the current deployment.
+4. Setup UI calls backend setup endpoints for OpenWA session status/start/QR.
+5. Backend calls OpenWA:
+   - `POST /api/sessions` if the session does not exist;
+   - `POST /api/sessions/:id/start`;
+   - `GET /api/sessions/:id/qr`.
+6. UI renders the QR code for the user to scan with the WhatsApp account that
+   should send DoorCloud notifications.
+7. After QR scan, setup UI polls OpenWA session status until it is ready.
+8. Setup UI sends a test text and test image to `OPENWA_CHAT_ID`.
+
+Implementation backlog for setup UX:
+
+1. Add optional `POST /setup/config` for local config persistence.
+2. Expand the current `/setup` UI into a complete local setup flow for Raspberry
+   Pi installs.
+3. Consider local-only binding, setup PIN rotation, one-time token, or explicit
+   setup-mode flag so QR/API key access is not exposed accidentally beyond LAN.
+4. Document Raspberry Pi Compose profiles and volume backup/restore for OpenWA
+   session data.
+
+Tests to run when hardware/OpenWA is available:
+
+1. Raspberry Pi boots services from clean volumes.
+2. Setup UI creates/starts OpenWA session and displays QR.
+3. User scans QR and OpenWA reaches `ready`.
+4. DoorCloud sends one text message to `OPENWA_CHAT_ID`.
+5. DoorCloud sends one image message to `OPENWA_CHAT_ID`.
+6. Raspberry Pi reboots and OpenWA remains authenticated without a new QR.
+7. OpenWA volume deletion forces a new QR as expected.
+8. Mosquitto local publish/subscribe flow still passes on the Raspberry Pi.
 10. Docker/CI production hardening:
     - pnpm-based Dockerfile;
     - no missing build script;
     - Compose smoke tests including Mosquitto.
 
-### 9.5 Inspection/apply commands for future package work
+### 9.6 Inspection/apply commands for future package work
 
 Inspection:
 
@@ -922,6 +1035,8 @@ Modern package-manager phase:
 
 ```bash
 corepack prepare pnpm@latest --activate
+pnpm pkg set packageManager="pnpm@<chosen-version>"
+pnpm pkg set engines.pnpm=">=<chosen-major>"
 pnpm install
 git diff -- package.json pnpm-lock.yaml
 ```
@@ -942,18 +1057,17 @@ pnpm update --interactive --latest
 pnpm add fastify@latest @fastify/cors@latest @fastify/multipart@latest
 pnpm add mqtt@latest
 pnpm add -D typescript@latest @types/node@latest
+pnpm add -D vitest
 ```
 
 Security and cleanup:
 
 ```bash
 pnpm audit
-pnpm why redis
-pnpm why reflect-metadata
-pnpm why @vladmandic/face-api
+pnpm why @supabase/postgrest-js
 ```
 
-### 9.6 Validation gates after each update phase
+### 9.7 Validation gates after each update phase
 
 Minimum after every package phase:
 
@@ -972,11 +1086,11 @@ MQTT/Mosquitto-specific:
 5. invalid payload test is rejected and logged without process crash
 6. rollback env points backend back to external broker
 
-HTTP/Supabase/Twilio:
+HTTP/Supabase/OpenWA:
 
 1. Fastify route tests with mocked services
 2. Supabase query/storage mock tests
-3. Twilio client mock tests
+3. OpenWA HTTP client mock tests
 4. one staging end-to-end run with non-production credentials
 
 ML:
@@ -992,7 +1106,7 @@ Docker/CI:
 3. CI runs install/lint/test/typecheck
 4. no workflow auto-fixes commit unexpected source changes
 
-### 9.7 Package rollback guidance
+### 9.8 Package rollback guidance
 
 - Keep one logical upgrade per commit/PR.
 - Tag or record the last green baseline before major upgrades.
@@ -1009,32 +1123,54 @@ Docker/CI:
 
 ## 10. Recommended next implementation backlog
 
-High priority:
+P0 — complete:
 
-1. Restore reproducible local install and tests.
-2. Fix stale `test/index.test.ts` imports/API assumptions.
-3. Add `typecheck`.
-4. Document and validate all required env vars.
-5. Add Mosquitto Compose/config with password/ACL files generated outside git.
-6. Add MQTT integration tests using Mosquitto.
-7. Refactor MQTT config to support local `mqtt://` and external `mqtts://`.
-8. Define versioned topics and payload schemas.
+1. Ambient `src/@types` globals were replaced by explicit modules:
+   - `src/database/supabase/types.ts` exports `UserSupabase`;
+   - `src/network/mqtt/types.ts` exports `MqttRoute`;
+   - call sites import those types explicitly.
+2. `tsconfig.test.json` no longer includes `src/@types/**/*.d.ts`.
+3. CI now uses Node `22.20.0`, pnpm `10.30.1`, frozen lockfile installs,
+   deterministic `pnpm lint`/`pnpm test:ci`, and `pnpm typecheck`.
 
-Medium priority:
+P1 — complete:
 
-1. Align Dockerfile with pnpm and actual scripts.
-2. Remove unused dependencies.
-3. Upgrade low-risk patches/minors.
-4. Add API docs/schema responses.
-5. Revisit open CORS and `x-powered-by`.
+1. TypeScript was upgraded to `7.0.2`.
+2. `tsconfig.base.json` was updated for TS7 removals:
+   - `baseUrl` replaced by `paths`;
+   - `downlevelIteration` removed;
+   - `moduleResolution` changed to `node16`;
+   - `module` changed to `Node16`.
+3. `vitest.config.ts` became `vitest.config.mts` for ESM `vitest/config`.
+4. ESLint stayed on ESLint 8 but now parses TypeScript through Babel because
+   `@typescript-eslint` does not yet support TS7.
+5. Fastify, Zod, and MQTT.js majors stayed unchanged until their dedicated P2
+   steps; Twilio was later removed in favor of OpenWA.
 
-Later/major:
+P2 — application dependency majors:
 
-1. Fastify 5 + Zod 4/provider migration.
-2. MQTT.js 5 upgrade.
-3. Twilio 6 upgrade.
-4. Node 22 runtime after ML validation.
-5. Biome/Vitest/tsx migration if desired to align with current Simba.
+1. Fastify 5 + Zod 4/provider migration is complete:
+   - `fastify-zod` was replaced with `fastify-type-provider-zod`;
+   - Zod schemas are used directly in route schemas;
+   - custom AJV validation was removed.
+2. MQTT.js 5 is complete:
+   - `mqtt` was upgraded to `5.15.2`;
+   - Mosquitto integration tests pass with MQTT.js 5.
+3. Twilio replacement is complete:
+   - Twilio env/dependency/client code was removed;
+   - OpenWA handles text and image messages;
+   - CallMeBot was not selected because image delivery is required.
+
+P3 — operational cleanup:
+
+1. Finish Mosquitto production cutover/decommission:
+   - external broker fallback/rollback window;
+   - all publishers migrated to `doorcloud/v1/photo/*`;
+   - remove legacy `DoorCloud/photo/#` compatibility when safe.
+2. Add or update CI for Mosquitto integration tests if Docker is available.
+3. Revisit open CORS and `x-powered-by: Simba.js`.
+4. Consider ESLint/Prettier major updates, Biome/tsx alignment with current
+   Simba, and release-tooling cleanup.
 
 ## 11. Acceptance checklist
 
@@ -1051,4 +1187,5 @@ Later/major:
   sections 6, 7, and 8.
 - Complete package-update strategy with context, groups, breaking areas, order,
   commands, validation, and rollback: covered in section 9.
-- Scope boundary respected: this stage is a planning artifact only.
+- Original planning scope was respected in the initial goal stage; subsequent
+  refreshes now track implementation progress such as P0 completion.

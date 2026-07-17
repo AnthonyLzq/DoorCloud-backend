@@ -3,7 +3,6 @@ import { getEnv } from 'config/env'
 import type { FastifyBaseLogger } from 'fastify'
 
 declare global {
-  // eslint-disable-next-line no-var
   var __supabaseClient__: SupabaseClient
 }
 
