@@ -2,11 +2,23 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const REQUIRED_MODELS = [
-  'models/insightface/buffalo_l.onnx',
-  'models/insightface/buffalo_m.onnx',
-  'models/insightface/buffalo_s.onnx',
-  'models/mediapipe/face_mesh.onnx',
-  'models/dlib/face_recognition.onnx'
+  // InsightFace buffalo_l (detection + recognition)
+  'models/insightface/det_10g.onnx',
+  'models/insightface/w600k_r50.onnx',
+  
+  // InsightFace buffalo_m (detection + recognition)
+  'models/insightface/buffalo_m/det_2.5g.onnx',
+  'models/insightface/buffalo_m/w600k_r50.onnx',
+  
+  // InsightFace buffalo_s (detection + recognition)
+  'models/insightface/det_500m.onnx',
+  'models/insightface/w600k_mbf.onnx',
+  
+  // MediaPipe FaceMesh
+  'models/mediapipe/face_mesh.task',
+  
+  // dlib face recognition
+  'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
 ]
 
 export const validateModels = (): void => {
