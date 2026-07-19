@@ -357,6 +357,51 @@ FaceRecognitionError (base)
 - **Cache**: Cachear imágenes preprocesadas
 - **Resize**: Usar interpolación rápida (bilinear)
 
+### Multi-Core Optimization (Future Enhancement)
+
+**Context**: Los child processes de Python corren en procesos separados del SO, lo que permite distribuir carga en múltiples cores automáticamente. Sin embargo, el procesamiento post-inference (comparación de embeddings, cálculo de métricas) se ejecuta en el event loop principal de Node.js.
+
+**Options**:
+1. **Worker Threads**: Paralelizar procesamiento de embeddings en Node.js
+2. **Multiple Python processes**: Load balancer entre múltiples procesos Python
+3. **Keep current**: Single Python process + single Node.js event loop
+
+**Recommendation**: **Worker Threads para post-procesamiento**
+
+**Rationale**:
+- Worker threads permiten paralelizar comparación de embeddings (CPU-intensive)
+- Comparten memoria con el proceso principal (SharedArrayBuffer)
+- Menor overhead que child processes
+- Ideal para procesar batches de embeddings en paralelo
+
+**Implementation Strategy**:
+```typescript
+// Worker thread para comparación de embeddings
+const worker = new Worker('./embedding-comparator.js', {
+  workerData: { embeddings1, embeddings2 }
+})
+
+worker.on('message', (result) => {
+  // Resultado de comparación
+})
+```
+
+**Use Cases**:
+- Comparar 1 embedding contra N embeddings de referencia
+- Procesar batches de imágenes en paralelo
+- Calcular métricas de benchmark en paralelo
+
+**When to Implement**:
+- Si el benchmarking se vuelve un bottleneck
+- Si necesitamos comparar contra muchos embeddings simultáneamente
+- Si el throughput actual no es suficiente para producción
+
+**Trade-offs**:
+- ✅ Mejor uso de multi-core CPUs
+- ✅ Menor latencia para batches grandes
+- ⚠️ Mayor complejidad de implementación
+- ⚠️ Overhead de comunicación thread-main
+
 ## Security Considerations
 
 ### Input Validation
