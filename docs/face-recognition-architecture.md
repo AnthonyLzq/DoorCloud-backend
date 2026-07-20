@@ -11,24 +11,24 @@ Arquitectura híbrida que usa ONNX Runtime para Node.js (modelos compatibles) y 
 ┌─────────────────────────────────────────────────────────┐
 │              DoorCloud Backend (Node.js)                │
 │                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │      FaceRecognitionService (Unified API)        │  │
-│  │  - compare(image1, image2, modelName)            │  │
-│  │  - getEmbedding(image, modelName)                │  │
-│  │  - benchmark(datasetName, modelNames[])          │  │
-│  └──────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │      FaceRecognitionService (Unified API)        │   │
+│  │  - compare(image1, image2, modelName)            │   │
+│  │  - getEmbedding(image, modelName)                │   │
+│  │  - benchmark(datasetName, modelNames[])          │   │
+│  └──────────────────────────────────────────────────┘   │
 │                          │                              │
-│              ┌───────────┴───────────┐                 │
-│              │                       │                 │
-│    ┌─────────▼─────────┐   ┌────────▼────────┐        │
-│    │  ONNX Runtime     │   │ Python Manager  │        │
-│    │  (Direct)         │   │ (Child Process) │        │
-│    │                   │   │                 │        │
-│    │  • InsightFace    │   │  • AdaFace      │        │
-│    │  • MediaPipe      │   │  • MagFace      │        │
-│    │  • dlib (parcial) │   │  • OpenFace     │        │
-│    │                   │   │  • Custom       │        │
-│    └───────────────────┘   └─────────────────┘        │
+│              ┌───────────┴───────────┐                  │
+│              │                       │                  │
+│    ┌─────────▼─────────┐   ┌────────▼────────┐          │
+│    │  ONNX Runtime     │   │ Python Manager  │          │
+│    │  (Direct)         │   │ (Child Process) │          │
+│    │                   │   │                 │          │
+│    │  • InsightFace    │   │  • AdaFace      │          │
+│    │  • MediaPipe      │   │  • MagFace      │          │
+│    │  • dlib (parcial) │   │  • OpenFace     │          │
+│    │                   │   │  • Custom       │          │
+│    └───────────────────┘   └─────────────────┘          │
 └─────────────────────────────────────────────────────────┘
 ```
 
