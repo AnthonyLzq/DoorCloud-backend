@@ -515,7 +515,13 @@ export class PythonManager extends EventEmitter {
       throw new Error('Python process not ready')
     }
 
-    const json = `${JSON.stringify(request)}\n`
+    // Ensure request has an ID for response correlation
+    const requestWithId = {
+      id: ++this.requestId,
+      ...request
+    }
+
+    const json = `${JSON.stringify(requestWithId)}\n`
     this.process.stdin!.write(json)
   }
 
