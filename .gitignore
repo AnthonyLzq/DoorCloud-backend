@@ -141,3 +141,7 @@ models/
 # OpenCode transient locks
 .opencode/goals/*.lock/
 .opencode/goals/**/*.lock/
+
+# Metrics (runtime data, not code)
+metrics/*.csv
+metrics/*.png
