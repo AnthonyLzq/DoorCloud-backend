@@ -4,10 +4,19 @@
   "server": {
     "port": 4096
   },
+  "instructions": ["AGENTS.md", "docs/ai/AI_CONTEXT.md"],
   "permission": {
+    "read": {
+      "*": "allow",
+      "pnpm-lock.yaml": "deny",
+      "metrics/**": "deny",
+      "openspec/changes/archive/**": "deny",
+      "*.png": "deny",
+      "*.csv": "deny"
+    },
     "bash": {
       "*": "ask",
-      "pnpm *": "allow",
+      "git *": "ask",
       "git add *": "allow",
       "git stash *": "allow",
       "git mv *": "allow",
@@ -21,7 +30,7 @@
       "git pull *": "ask",
       "git rm *": "ask",
       "git clean *": "ask",
-      "git *": "ask",
+      "pnpm *": "allow",
       "npm *": "allow",
       "node *": "allow",
       "docker *": "allow",
@@ -33,18 +42,8 @@
   },
   "formatter": {
     "biome": {
-      "command": ["pnpm", "biome", "format", "--write", "$FILE"],
+      "command": ["pnpm", "exec", "biome", "format", "--write", "$FILE"],
       "extensions": [".js", ".ts", ".jsx", ".tsx", ".json"]
     }
-  },
-  "context": {
-    "alwaysRead": ["AGENTS.md", "docs/ai/AI_CONTEXT.md"],
-    "exclude": [
-      "pnpm-lock.yaml",
-      "metrics/**",
-      "openspec/changes/archive/**",
-      "*.png",
-      "*.csv"
-    ]
   }
 }
