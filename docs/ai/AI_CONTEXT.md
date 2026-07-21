@@ -78,6 +78,37 @@ Files:
 - **Database**: Supabase in `src/database/supabase/`
 - **Config**: Environment validation in `src/config/env.ts`
 
+## Database schema (Supabase)
+
+Tables:
+- `users` - id, name, phone, lastMessage
+
+Storage buckets:
+- `photos` - User photo storage
+
+Key queries:
+- `createUser(name, phone)` - INSERT
+- `getUserByUserID(id)` - SELECT
+- `uploadUserPhoto(path, buffer)` - Storage upload
+- `getPhotosUrls(paths, time)` - Signed URLs
+
+## Error handling patterns
+
+**Python IPC:**
+- Timeout: 30s default
+- Auto-restart: up to 3 attempts on crash
+- Pending requests rejected on process death
+
+**MQTT:**
+- Subscription errors logged and rejected
+- Message processing errors caught and logged
+- Connection loss requires manual intervention
+
+**HTTP:**
+- CustomError class with status codes
+- Database errors throw 500
+- Validation errors return 400
+
 ## Testing
 
 ```bash

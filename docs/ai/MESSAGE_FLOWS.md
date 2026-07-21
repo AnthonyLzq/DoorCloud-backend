@@ -10,7 +10,7 @@
                                │
                                ▼
                         ┌──────────────┐
-                        │ Face Recong  │
+                        │ Face Recogn  │
                         │   Service    │
                         └──────────────┘
                                │
@@ -221,3 +221,280 @@
 ### Configuration
 - `src/config/env.ts` - Environment validation
 - `.env.example` - Required variables
+
+## ONNX Provider Flow
+
+### Flow Diagram
+
+```
+1. Load ONNX model
+   └─▶ ONNXProvider.loadModel(name, modelPath, metadata)
+   └─▶ Creates InferenceSession with CPU execution provider
+   └─▶ Stores model + metadata + metrics in Maps
+
+2. Get embedding from image
+   └─▶ ONNXProvider.getEmbedding(image, modelName)
+   └─▶ Preprocess: resize to 112x112, convert to Float32Array
+   └─▶ Normalize to [-1, 1] range
+   └─▶ Create tensor with shape [1, 3, 112, 112]
+   └─▶ Run inference session
+   └─▶ Return Float32Array embedding
+   └─▶ Update metrics (latency, request count)
+
+3. List models
+   └─▶ ONNXProvider.listModels()
+   └─▶ Returns array of ONNXModelMetadata
+
+4. Get metrics
+   └─▶ ONNXProvider.getMetrics(modelName)
+   └─▶ Returns { avgLatency, requestCount }
+
+5. Unload model
+   └─▶ ONNXProvider.unloadModel(name)
+   └─▶ Removes from all Maps
+```
+
+### Image Preprocessing
+
+```
+Input: Buffer (any image format)
+  ↓
+Sharp: resize to 112x112, remove alpha, convert to raw RGB
+  ↓
+Convert to Float32Array: RGB → CHW format (Channel, Height, Width)
+  ↓
+Normalize: pixel / 127.5 - 1.0 (range [-1, 1])
+  ↓
+Create tensor: shape [1, 3, 112, 112]
+  ↓
+Output: ort.Tensor ready for inference
+```
+
+### Supported Models
+
+| Model | Embedding Size | Speed | Notes |
+|-------|---------------|-------|-------|
+| InsightFace buffalo_l | 512 | Fast | Recommended |
+| InsightFace buffalo_m | 512 | Medium | Balanced |
+| InsightFace buffalo_s | 512 | Slow | Smallest |
+| MediaPipe FaceMesh | 128 | Fast | Lightweight |
+
+### Critical Implementation Details
+
+**Node.js side:**
+- Uses `onnxruntime-node` for inference
+- Image preprocessing with `sharp`
+- Metrics tracking per model (latency, request count)
+- CPU execution provider only (no GPU support yet)
+
+## End-to-End Photo Comparison Flow
+
+### Complete Flow
+
+```
+1. External client publishes photo to MQTT
+   └─▶ Topic: doorcloud/v1/photo/send
+   └─▶ Payload: { base64Photo, format, userID }
+
+2. MQTT route receives and parses
+   └─▶ src/network/mqtt/routes/photo.ts
+   └─▶ Extracts: base64Photo, format, userID
+
+3. Convert to Buffer
+   └─▶ Buffer.from(base64Photo, 'base64')
+
+4. Face Recognition Service
+   └─▶ FaceRecognitionService.compare(image1, image2, modelName)
+   └─▶ Selects provider: ONNX or Python based on model
+   └─▶ Gets embeddings from both images
+   └─▶ Computes cosine similarity
+   └─▶ Returns similarity score (0.0 - 1.0)
+
+5. Decision logic
+   └─▶ If similarity > threshold (e.g., 0.8): MATCH
+   └─▶ If similarity < threshold: NO_MATCH
+
+6. Send result via WhatsApp
+   └─▶ UserServices.sendPhotoThroughWhatsapp(userID, format, buffer)
+   └─▶ src/integrations/whatsapp/openwa.ts
+   └─▶ OpenWA API call
+
+7. Record metrics
+   └─▶ Topic: doorcloud/v1/photo/metrics
+   └─▶ Append to metrics/receivePhoto.csv
+```
+
+### Provider Selection Logic
+
+```typescript
+if (model is ONNX-compatible) {
+  use ONNXProvider (Node.js, faster, no IPC overhead)
+} else {
+  use PythonManager (Python process, supports dlib/AdaFace/MagFace)
+}
+```
+
+### Similarity Calculation
+
+```typescript
+cosineSimilarity(embedding1, embedding2) = 
+  dot(embedding1, embedding2) / 
+  (norm(embedding1) * norm(embedding2))
+
+Result: 0.0 (completely different) to 1.0 (identical)
+```
+
+## Database Schema (Supabase)
+
+### Tables
+
+#### users
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | number | Primary key |
+| name | string | User name |
+| phone | string | WhatsApp phone number |
+| lastMessage | Date | Last message timestamp |
+
+### Storage Buckets
+
+#### photos
+
+Used for storing user photos.
+
+**Operations:**
+- `upload(path, buffer, { contentType })` - Upload photo
+- `createSignedUrls(paths, time)` - Get temporary URLs
+- `list(folder)` - List all files in folder
+
+### Critical Queries
+
+| Function | Table | Operation | Notes |
+|----------|-------|-----------|-------|
+| `createUser(name, phone)` | users | INSERT | Creates new user |
+| `getUserByUserID(id)` | users | SELECT | Get user by ID |
+| `updateUserLastMessage(id)` | users | UPDATE | Update last message timestamp |
+| `uploadUserPhoto(path, buffer)` | photos | UPLOAD | Upload to storage |
+| `getPhotosUrls(paths, time)` | photos | SIGNED URL | Get temporary URLs |
+| `getAllFilesFromBucket(folder)` | photos | LIST | List all files |
+
+### Connection Pattern
+
+```typescript
+// Singleton pattern
+const supabaseConnection = (log?: FastifyBaseLogger) => {
+  if (!global.__supabaseClient__) {
+    const { SUPABASE_URL, SUPABASE_KEY } = getEnv()
+    global.__supabaseClient__ = createClient(SUPABASE_URL, SUPABASE_KEY)
+  }
+  return global.__supabaseClient__
+}
+```
+
+## Error Handling Patterns
+
+### Python IPC Error Handling
+
+**Timeout (30s default):**
+```typescript
+const timeout = setTimeout(() => {
+  reject(new Error(`Request timed out after ${this.defaultTimeout}ms`))
+}, this.defaultTimeout)
+```
+
+**Auto-restart (up to 3 attempts):**
+```typescript
+if (this.restartAttempts < this.maxRestartAttempts) {
+  this.restartAttempts++
+  setTimeout(() => this.start(), this.restartDelay)
+}
+```
+
+**Process crash detection:**
+```typescript
+this.process.on('exit', (code) => {
+  if (code !== 0) {
+    // Reject all pending requests
+    // Attempt restart
+  }
+})
+```
+
+### MQTT Error Handling
+
+**Subscription errors:**
+```typescript
+client.subscribe(topics, { qos: MQTT_QOS }, error => {
+  if (error) {
+    log.error({ error, topics }, 'Error subscribing to MQTT photo topics')
+    reject(error)
+  }
+})
+```
+
+**Message processing errors:**
+```typescript
+client.on('message', async (topic, message) => {
+  try {
+    // Process message
+  } catch (error) {
+    log.error({ error, topic }, 'Error processing MQTT photo message')
+  }
+})
+```
+
+### HTTP Error Handling
+
+**Custom errors with status codes:**
+```typescript
+class CustomError extends Error {
+  constructor(message: string, statusCode: number = 500) {
+    super(message)
+    this.statusCode = statusCode
+  }
+}
+```
+
+**Database errors:**
+```typescript
+if (error) {
+  log.error(error, errorMessage)
+  throw new CustomError(errorMessage)
+}
+
+if (!data) {
+  throw new CustomError('User not found', 404)
+}
+```
+
+### Error Recovery Patterns
+
+| Flow | Error Type | Recovery |
+|------|-----------|----------|
+| Python IPC | Timeout | Reject request, log error |
+| Python IPC | Process crash | Auto-restart up to 3 times |
+| MQTT | Subscription fail | Log error, reject connection |
+| MQTT | Message processing | Log error, continue processing |
+| HTTP | Database error | Throw CustomError with status |
+| HTTP | Validation error | Return 400 with details |
+
+### Critical Error Scenarios
+
+**Python process dies:**
+1. Detect exit code != 0
+2. Reject all pending requests with error
+3. Attempt restart (up to 3 times)
+4. If restart fails, emit error event
+
+**MQTT connection lost:**
+1. Detect connection error
+2. Log error
+3. Fastify server continues running
+4. Manual intervention required
+
+**Database connection fail:**
+1. Supabase client throws error
+2. CustomError thrown with 500 status
+3. Request fails gracefully
+4. No automatic retry (stateless)
