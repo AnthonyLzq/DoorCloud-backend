@@ -73,4 +73,79 @@ describe('FaceRecognitionService', () => {
       expect(service.isInitialized()).toBe(false)
     })
   })
+
+  describe('getEmbedding', () => {
+    it('should throw error if not initialized', async () => {
+      const image = Buffer.from('test')
+      await expect(service.getEmbedding(image, 'test-model')).rejects.toThrow(
+        'FaceRecognitionService not initialized. Call init() first.'
+      )
+    })
+
+    it('should throw error if model not loaded', async () => {
+      await service.init()
+      const image = Buffer.from('test')
+      await expect(
+        service.getEmbedding(image, 'non-existent-model')
+      ).rejects.toThrow()
+    })
+  })
+
+  describe('compare', () => {
+    it('should throw error if not initialized', async () => {
+      const image1 = Buffer.from('test1')
+      const image2 = Buffer.from('test2')
+      await expect(
+        service.compare(image1, image2, 'test-model')
+      ).rejects.toThrow(
+        'FaceRecognitionService not initialized. Call init() first.'
+      )
+    })
+
+    it('should throw error if model not loaded', async () => {
+      await service.init()
+      const image1 = Buffer.from('test1')
+      const image2 = Buffer.from('test2')
+      await expect(
+        service.compare(image1, image2, 'non-existent-model')
+      ).rejects.toThrow()
+    })
+  })
+
+  describe('calculateSimilarity', () => {
+    it('should return 1 for identical embeddings', () => {
+      const embedding = new Float32Array([1, 2, 3, 4])
+      const similarity = service.calculateSimilarity(embedding, embedding)
+      expect(similarity).toBeCloseTo(1, 5)
+    })
+
+    it('should return 0 for orthogonal embeddings', () => {
+      const embedding1 = new Float32Array([1, 0])
+      const embedding2 = new Float32Array([0, 1])
+      const similarity = service.calculateSimilarity(embedding1, embedding2)
+      expect(similarity).toBeCloseTo(0, 5)
+    })
+
+    it('should return -1 for opposite embeddings', () => {
+      const embedding1 = new Float32Array([1, 2, 3])
+      const embedding2 = new Float32Array([-1, -2, -3])
+      const similarity = service.calculateSimilarity(embedding1, embedding2)
+      expect(similarity).toBeCloseTo(-1, 5)
+    })
+
+    it('should throw error for different size embeddings', () => {
+      const embedding1 = new Float32Array([1, 2, 3])
+      const embedding2 = new Float32Array([1, 2])
+      expect(() => service.calculateSimilarity(embedding1, embedding2)).toThrow(
+        'Embedding size mismatch'
+      )
+    })
+
+    it('should return 0 for zero embeddings', () => {
+      const embedding1 = new Float32Array([0, 0, 0])
+      const embedding2 = new Float32Array([0, 0, 0])
+      const similarity = service.calculateSimilarity(embedding1, embedding2)
+      expect(similarity).toBe(0)
+    })
+  })
 })

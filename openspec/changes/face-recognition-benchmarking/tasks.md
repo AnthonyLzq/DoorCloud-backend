@@ -213,7 +213,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Status**: Completado
 - **Fixed**: Bug en `sendRequest()` que no incluía ID en requests, causando timeout en tests
 
-### Task 3.2: Implement FaceRecognitionService (Operations)
+### Task 3.2: Implement FaceRecognitionService (Operations) ✅
 - **Time**: 3 horas
 - **Files**: `src/services/face-recognition/index.ts`
 - **Actions**:
@@ -225,6 +225,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Integration tests
 - **Acceptance**: Can compare faces using different models
 - **Commit**: `feat: implement face comparison and embedding generation`
+- **Status**: Completado
 
 ### Task 3.3: Implement FaceRecognitionService (Metrics)
 - **Time**: 1 hora
