@@ -255,9 +255,12 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Commit**: `chore: add dataset download script and initial datasets`
 - **Status**: Completado
   - Script `scripts/download-datasets.sh` creado y ejecutable
-  - Directorio `datasets/` creado y agregado a .gitignore
-  - README.md creado con documentación de datasets
-  - Nota: Los datasets deben descargarse manualmente ejecutando el script (~2GB)
+  - Script usa archivos existentes en `datasets/temp/` y los extrae
+  - LFW: ✅ Descargado y extraído (13,233 images, pairs.txt)
+  - CFP-FP: ✅ Descargado y extraído (500 subjects, Data/Protocol)
+  - AgeDB-30: ⏳ Pendiente de descarga manual (requiere password)
+  - README.md actualizado con estado y instrucciones
+  - Script usa python como fallback para extraer zip si unzip no está disponible
 
 ### Task 4.2: Implement Dataset Loader
 - **Time**: 2 horas

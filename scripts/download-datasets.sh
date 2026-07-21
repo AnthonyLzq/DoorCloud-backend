@@ -1,21 +1,18 @@
 #!/bin/bash
 
-# Download face recognition benchmark datasets
-# LFW, CFP-FP, and AgeDB-30
+# Setup face recognition benchmark datasets
+# Uses existing files in datasets/temp/ or downloads if needed
 
 set -e  # Exit on error
 
 DATASETS_DIR="datasets"
 TEMP_DIR="$DATASETS_DIR/temp"
 
-echo "Creating datasets directory..."
-mkdir -p "$DATASETS_DIR"
-mkdir -p "$TEMP_DIR"
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 log_info() {
@@ -30,156 +27,186 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Download LFW dataset
-download_lfw() {
-    log_info "Downloading LFW dataset (Labeled Faces in the Wild)..."
+log_step() {
+    echo -e "${BLUE}[STEP]${NC} $1"
+}
 
-    LFW_URL="http://vis-www.cs.umass.edu/lfw/lfw.tgz"
-    LFW_FILE="$TEMP_DIR/lfw.tgz"
+# Setup LFW dataset
+setup_lfw() {
+    log_step "Setting up LFW dataset..."
+    
     LFW_DIR="$DATASETS_DIR/lfw"
-
-    if [ -d "$LFW_DIR" ]; then
-        log_warn "LFW dataset already exists, skipping download"
+    
+    if [ -d "$LFW_DIR" ] && [ -f "$LFW_DIR/pairs.txt" ]; then
+        log_info "LFW dataset already exists, skipping setup"
         return 0
     fi
-
-    # Download
-    if command -v curl &> /dev/null; then
-        curl -L -o "$LFW_FILE" "$LFW_URL"
-    elif command -v wget &> /dev/null; then
-        wget -O "$LFW_FILE" "$LFW_URL"
+    
+    # Check if we have the files in temp
+    if [ -f "$TEMP_DIR/lfw.tgz" ]; then
+        log_info "Found lfw.tgz in temp directory"
+        
+        # Create directory
+        mkdir -p "$LFW_DIR"
+        
+        # Extract
+        log_info "Extracting LFW dataset..."
+        tar -xzf "$TEMP_DIR/lfw.tgz" -C "$DATASETS_DIR"
+        
+        # Copy pairs.txt if it exists in temp
+        if [ -f "$TEMP_DIR/pairs.txt" ]; then
+            cp "$TEMP_DIR/pairs.txt" "$LFW_DIR/"
+            log_info "Copied pairs.txt to LFW directory"
+        fi
+        
+        log_info "LFW dataset setup successfully"
     else
-        log_error "Neither curl nor wget found. Please install one of them."
+        log_warn "LFW dataset not found in temp directory"
+        log_warn "To download LFW manually:"
+        echo "  1. Visit: http://vis-www.cs.umass.edu/lfw/"
+        echo "  2. Download lfw.tgz and pairs.txt"
+        echo "  3. Place them in $TEMP_DIR/"
+        echo "  4. Run this script again"
         return 1
     fi
-
-    # Extract
-    log_info "Extracting LFW dataset..."
-    tar -xzf "$LFW_FILE" -C "$DATASETS_DIR"
-
-    # Rename to lfw
-    if [ -d "$DATASETS_DIR/lfw" ]; then
-        log_info "LFW dataset extracted successfully"
-    else
-        log_error "Failed to extract LFW dataset"
-        return 1
-    fi
-
-    # Download pairs.txt for verification
-    log_info "Downloading LFW pairs.txt..."
-    PAIRS_URL="http://vis-www.cs.umass.edu/lfw/pairs.txt"
-    curl -L -o "$LFW_DIR/pairs.txt" "$PAIRS_URL"
-
-    # Cleanup
-    rm -f "$LFW_FILE"
-
-    log_info "LFW dataset downloaded and validated"
 }
 
-# Download CFP-FP dataset
-download_cfp_fp() {
-    log_info "Downloading CFP-FP dataset (Celebrities Frontal-Profile)..."
-
-    # CFP-FP is available from the official website
-    CFP_URL="http://www.cfpw.io/datasets/CFP-FP.zip"
-    CFP_FILE="$TEMP_DIR/CFP-FP.zip"
+# Setup CFP-FP dataset
+setup_cfp_fp() {
+    log_step "Setting up CFP-FP dataset..."
+    
     CFP_DIR="$DATASETS_DIR/cfp-fp"
-
+    
     if [ -d "$CFP_DIR" ]; then
-        log_warn "CFP-FP dataset already exists, skipping download"
+        log_info "CFP-FP dataset already exists, skipping setup"
         return 0
     fi
-
-    # Download
-    if command -v curl &> /dev/null; then
-        curl -L -o "$CFP_FILE" "$CFP_URL"
-    elif command -v wget &> /dev/null; then
-        wget -O "$CFP_FILE" "$CFP_URL"
+    
+    # Check if we have the file in temp
+    if [ -f "$TEMP_DIR/cfp-dataset.zip" ]; then
+        log_info "Found cfp-dataset.zip in temp directory"
+        
+        # Extract using python (unzip might not be available)
+        log_info "Extracting CFP-FP dataset..."
+        if command -v unzip &> /dev/null; then
+            unzip -q "$TEMP_DIR/cfp-dataset.zip" -d "$DATASETS_DIR"
+        else
+            python3 -c "import zipfile; zipfile.ZipFile('$TEMP_DIR/cfp-dataset.zip').extractall('$DATASETS_DIR')"
+        fi
+        
+        # Rename to cfp-fp (the extracted directory might have a different name)
+        if [ -d "$DATASETS_DIR/CFP" ]; then
+            mv "$DATASETS_DIR/CFP" "$CFP_DIR"
+            log_info "CFP-FP dataset setup successfully"
+        elif [ -d "$DATASETS_DIR/cfp-dataset" ]; then
+            mv "$DATASETS_DIR/cfp-dataset" "$CFP_DIR"
+            log_info "CFP-FP dataset setup successfully"
+        elif [ -d "$DATASETS_DIR/cfp-fp" ]; then
+            log_info "CFP-FP dataset setup successfully"
+        else
+            log_error "Unexpected directory structure after extraction"
+            log_error "Please check the extracted contents manually"
+            return 1
+        fi
     else
-        log_error "Neither curl nor wget found. Please install one of them."
+        log_warn "CFP-FP dataset not found in temp directory"
+        log_warn "To download CFP-FP manually:"
+        echo "  1. Visit: http://www.cfpw.io/"
+        echo "  2. Download the dataset"
+        echo "  3. Place cfp-dataset.zip in $TEMP_DIR/"
+        echo "  4. Run this script again"
         return 1
     fi
-
-    # Extract
-    log_info "Extracting CFP-FP dataset..."
-    unzip -q "$CFP_FILE" -d "$DATASETS_DIR"
-
-    # Rename to cfp-fp
-    if [ -d "$DATASETS_DIR/CFP" ]; then
-        mv "$DATASETS_DIR/CFP" "$CFP_DIR"
-        log_info "CFP-FP dataset extracted successfully"
-    else
-        log_error "Failed to extract CFP-FP dataset"
-        return 1
-    fi
-
-    # Cleanup
-    rm -f "$CFP_FILE"
-
-    log_info "CFP-FP dataset downloaded and validated"
 }
 
-# Download AgeDB-30 dataset
-download_agedb() {
-    log_info "Downloading AgeDB-30 dataset..."
-
-    # AgeDB-30 is part of AgeDB dataset
-    AGEDB_URL="https://ibug.doc.ic.ac.uk/media/upload/files/AgeDB.zip"
-    AGEDB_FILE="$TEMP_DIR/AgeDB.zip"
+# Setup AgeDB-30 dataset
+setup_agedb() {
+    log_step "Setting up AgeDB-30 dataset..."
+    
     AGEDB_DIR="$DATASETS_DIR/agedb-30"
-
+    
     if [ -d "$AGEDB_DIR" ]; then
-        log_warn "AgeDB-30 dataset already exists, skipping download"
+        log_info "AgeDB-30 dataset already exists, skipping setup"
         return 0
     fi
-
-    # Download
-    if command -v curl &> /dev/null; then
-        curl -L -o "$AGEDB_FILE" "$AGEDB_URL"
-    elif command -v wget &> /dev/null; then
-        wget -O "$AGEDB_FILE" "$AGEDB_URL"
+    
+    # Check if we have the file in temp
+    if [ -f "$TEMP_DIR/AgeDB.zip" ]; then
+        log_info "Found AgeDB.zip in temp directory"
+        
+        # Extract using python (unzip might not be available)
+        log_info "Extracting AgeDB dataset..."
+        if command -v unzip &> /dev/null; then
+            unzip -q "$TEMP_DIR/AgeDB.zip" -d "$DATASETS_DIR"
+        else
+            python3 -c "import zipfile; zipfile.ZipFile('$TEMP_DIR/AgeDB.zip').extractall('$DATASETS_DIR')"
+        fi
+        
+        # Rename to agedb-30
+        if [ -d "$DATASETS_DIR/AgeDB" ]; then
+            mv "$DATASETS_DIR/AgeDB" "$AGEDB_DIR"
+            log_info "AgeDB-30 dataset setup successfully"
+        elif [ -d "$DATASETS_DIR/agedb-30" ]; then
+            log_info "AgeDB-30 dataset setup successfully"
+        else
+            log_error "Unexpected directory structure after extraction"
+            log_error "Please check the extracted contents manually"
+            return 1
+        fi
     else
-        log_error "Neither curl nor wget found. Please install one of them."
+        log_warn "AgeDB-30 dataset not found in temp directory"
+        log_warn "AgeDB-30 requires manual download:"
+        echo "  1. Visit: https://ibug.doc.ic.ac.uk/resources/agedb/"
+        echo "  2. Email: s.moschoglou@imperial.ac.uk for the zip password"
+        echo "  3. Download AgeDB.zip"
+        echo "  4. Place it in $TEMP_DIR/"
+        echo "  5. Run this script again"
         return 1
     fi
-
-    # Extract
-    log_info "Extracting AgeDB dataset..."
-    unzip -q "$AGEDB_FILE" -d "$DATASETS_DIR"
-
-    # Rename to agedb-30
-    if [ -d "$DATASETS_DIR/AgeDB" ]; then
-        mv "$DATASETS_DIR/AgeDB" "$AGEDB_DIR"
-        log_info "AgeDB-30 dataset extracted successfully"
-    else
-        log_error "Failed to extract AgeDB dataset"
-        return 1
-    fi
-
-    # Cleanup
-    rm -f "$AGEDB_FILE"
-
-    log_info "AgeDB-30 dataset downloaded and validated"
 }
 
 # Main execution
 main() {
-    log_info "Starting dataset download process..."
-    log_info "This will download approximately 2GB of data"
-
-    # Download all datasets
-    download_lfw
-    download_cfp_fp
-    download_agedb
-
-    # Cleanup temp directory
-    rm -rf "$TEMP_DIR"
-
-    log_info "All datasets downloaded successfully!"
+    log_info "Starting dataset setup process..."
+    
+    # Create directories
+    mkdir -p "$DATASETS_DIR"
+    mkdir -p "$TEMP_DIR"
+    
+    # Track success
+    SUCCESS_COUNT=0
+    TOTAL_COUNT=3
+    
+    # Setup datasets
+    if setup_lfw; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    fi
+    
+    if setup_cfp_fp; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    fi
+    
+    if setup_agedb; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    fi
+    
+    # Summary
+    echo ""
+    log_info "Dataset setup complete!"
+    log_info "Successfully set up: $SUCCESS_COUNT/$TOTAL_COUNT datasets"
+    
+    if [ $SUCCESS_COUNT -lt $TOTAL_COUNT ]; then
+        echo ""
+        log_warn "Some datasets were not set up. Please download them manually."
+        log_warn "Check the instructions above for each missing dataset."
+    fi
+    
+    # Show dataset locations
+    echo ""
     log_info "Dataset locations:"
-    log_info "  - LFW: $DATASETS_DIR/lfw"
-    log_info "  - CFP-FP: $DATASETS_DIR/cfp-fp"
-    log_info "  - AgeDB-30: $DATASETS_DIR/agedb-30"
+    [ -d "$DATASETS_DIR/lfw" ] && log_info "  ✓ LFW: $DATASETS_DIR/lfw"
+    [ -d "$DATASETS_DIR/cfp-fp" ] && log_info "  ✓ CFP-FP: $DATASETS_DIR/cfp-fp"
+    [ -d "$DATASETS_DIR/agedb-30" ] && log_info "  ✓ AgeDB-30: $DATASETS_DIR/agedb-30"
 }
 
 # Run main function
