@@ -198,7 +198,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 
 ## Phase 3: Unified Service (1 día)
 
-### Task 3.1: Implement FaceRecognitionService (Core)
+### Task 3.1: Implement FaceRecognitionService (Core) ✅
 - **Time**: 3 horas
 - **Files**: `src/services/face-recognition/index.ts`
 - **Actions**:
@@ -210,6 +210,8 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Unit tests
 - **Acceptance**: Service initializes and lists models
 - **Commit**: `feat: implement unified face recognition service core`
+- **Status**: Completado
+- **Fixed**: Bug en `sendRequest()` que no incluía ID en requests, causando timeout en tests
 
 ### Task 3.2: Implement FaceRecognitionService (Operations)
 - **Time**: 3 horas
