@@ -285,7 +285,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - ✅ 18 unit tests pasando
   - ✅ Lint y typecheck pasan
 
-### Task 4.3: Implement Metrics Calculation
+### Task 4.3: Implement Metrics Calculation ✅
 - **Time**: 3 horas
 - **Files**: `src/services/benchmark/metrics.ts`
 - **Actions**:
@@ -296,6 +296,14 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Unit tests con known values
 - **Acceptance**: Metrics calculated correctly
 - **Commit**: `feat: implement face recognition accuracy metrics calculation`
+- **Status**: Completado
+  - ✅ `calculateROC()` - ROC curve from similarity scores and labels
+  - ✅ `calculateTarAtFar()` - TPR at specific FAR threshold
+  - ✅ `calculateEER()` - Equal Error Rate with tie-breaking
+  - ✅ `calculateAUC()` - Area Under Curve via trapezoidal rule
+  - ✅ `calculateAllMetrics()` convenience wrapper
+  - ✅ 16 unit tests pasando
+  - ✅ Lint y typecheck pasan
 
 ### Task 4.4: Implement Benchmark Runner
 - **Time**: 4 horas
