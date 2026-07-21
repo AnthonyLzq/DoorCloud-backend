@@ -15,78 +15,64 @@ This directory contains datasets used for benchmarking face recognition models.
 ### CFP-FP (Celebrities Frontal-Profile) ✅
 - **Size**: 500 subjects, 7,000 images, 7,000 pairs
 - **Purpose**: Frontal-profile face verification
-- **Format**: 
-  - `Data/` - Images organized by subject
-  - `Protocol/` - Verification pairs
+- **Format**: Images at root level + `cfp_ff_pair.txt`
 - **Status**: Downloaded and extracted
 - **Website**: http://www.cfpw.io/
 
-### AgeDB-30 ⏳
+### AgeDB-30 ✅
 - **Size**: 12,240 images, 570 subjects, 6,000 pairs
 - **Purpose**: Age-invariant face verification
-- **Format**: Directory structure with age groups
-- **Status**: Pending manual download
+- **Format**: Images at root level + `agedb_30_pair.txt`
+- **Status**: Downloaded and extracted
 - **Website**: https://ibug.doc.ic.ac.uk/resources/agedb/
-- **Note**: Requires email to s.moschoglou@imperial.ac.uk for zip password
 
-## Setup
+### CALFW (Cross-Age LFW) ✅
+- **Size**: 13,233 images, 5,749 subjects, 6,000 pairs
+- **Purpose**: Cross-age face verification
+- **Format**: Images at root level + `calfw_pair.txt`
+- **Status**: Downloaded and extracted
+- **Website**: http://www.calfw.org/
 
-Run the setup script:
+### CASIA-WebFace (Training Dataset) ✅
+- **Size**: ~500K images, 10K subjects
+- **Purpose**: Training dataset for face recognition models
+- **Format**: Directory structure with subject IDs as folders
+- **Status**: Downloaded and extracted
+- **Website**: http://www.cbsr.ia.ac.cn/english/casia-webface.html
 
-```bash
-./scripts/download-datasets.sh
+## Dataset Structure
+
+All validation datasets follow a consistent structure:
 ```
-
-This script will:
-1. Extract datasets from `datasets/temp/` to their final locations
-2. Skip datasets that are already set up
-3. Provide instructions for missing datasets
-
-## Manual Download
-
-If the script reports missing datasets, download them manually:
-
-### LFW
-1. Visit: http://vis-www.cs.umass.edu/lfw/
-2. Download `lfw.tgz` and `pairs.txt`
-3. Place in `datasets/temp/`
-4. Run script again
-
-### CFP-FP
-1. Visit: http://www.cfpw.io/
-2. Download the dataset
-3. Place `cfp-dataset.zip` in `datasets/temp/`
-4. Run script again
-
-### AgeDB-30
-1. Visit: https://ibug.doc.ic.ac.uk/resources/agedb/
-2. Email: s.moschoglou@imperial.ac.uk for the zip password
-3. Download `AgeDB.zip`
-4. Place in `datasets/temp/`
-5. Run script again
-
-## Usage
-
-These datasets are used by the benchmark system to evaluate face recognition models:
-
-```typescript
-import { FaceRecognitionService } from './services/face-recognition'
-import { BenchmarkSystem } from './services/benchmark'
-
-const service = new FaceRecognitionService()
-await service.init()
-
-const benchmark = new BenchmarkSystem(service)
-const results = await benchmark.runBenchmark({
-  dataset: 'lfw',
-  models: ['insightface-buffalo-l', 'dlib']
-})
+datasets/
+├── lfw/
+│   ├── [person_name]/
+│   │   ├── [person_name]_0001.jpg
+│   │   └── ...
+│   └── pairs.txt
+├── cfp-fp/
+│   ├── 00001.jpg
+│   ├── 00002.jpg
+│   └── cfp_ff_pair.txt
+├── agedb-30/
+│   ├── 00001.jpg
+│   ├── 00002.jpg
+│   └── agedb_30_pair.txt
+├── calfw/
+│   ├── 00001.jpg
+│   ├── 00002.jpg
+│   └── calfw_pair.txt
+└── casia-webface/
+    ├── 000000/
+    │   ├── 000001.jpg
+    │   └── ...
+    └── ...
 ```
 
 ## Notes
 
 - Datasets are not included in the git repository (gitignored)
-- Download them manually or use the provided script
-- Some datasets may require registration on their websites
-- Respect the terms of use for each dataset
-- Total size: ~500MB compressed, ~1.5GB extracted
+- All datasets are pre-processed to 96x96 resolution
+- Pair files are already formatted for benchmarking
+- Total size: ~1.6GB extracted
+- Source: [TVConv](https://github.com/JierunChen/TVConv/blob/master/README.MD) - manually downloaded and extracted

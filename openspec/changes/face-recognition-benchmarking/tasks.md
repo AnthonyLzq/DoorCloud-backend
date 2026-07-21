@@ -244,23 +244,26 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 
 ### Task 4.1: Download Datasets ✅
 - **Time**: 2 horas
-- **Files**: `scripts/download-datasets.sh`, `datasets/`
+- **Files**: `datasets/`
 - **Actions**:
-  - Crear script para descargar datasets
+  - Investigar y obtener datasets de face recognition
   - Descargar LFW (13,233 images, 6000 pairs)
   - Descargar CFP-FP (500 subjects)
   - Descargar AgeDB-30 (12,240 images)
+  - Descargar CALFW (bonus)
+  - Descargar CASIA-WebFace (training)
   - Validar integridad
 - **Acceptance**: Datasets descargados y validados
-- **Commit**: `chore: add dataset download script and initial datasets`
+- **Commit**: `chore: add face recognition benchmark datasets`
 - **Status**: Completado
-  - Script `scripts/download-datasets.sh` creado y ejecutable
-  - Script usa archivos existentes en `datasets/temp/` y los extrae
-  - LFW: ✅ Descargado y extraído (13,233 images, pairs.txt)
-  - CFP-FP: ✅ Descargado y extraído (500 subjects, Data/Protocol)
-  - AgeDB-30: ⏳ Pendiente de descarga manual (requiere password)
-  - README.md actualizado con estado y instrucciones
-  - Script usa python como fallback para extraer zip si unzip no está disponible
+  - ✅ Todos los datasets obtenidos manualmente desde [TVConv](https://github.com/JierunChen/TVConv/blob/master/README.MD)
+  - ✅ LFW: 13,233 images + pairs.txt
+  - ✅ CFP-FP: 7,000 images + cfp_ff_pair.txt
+  - ✅ AgeDB-30: 12,240 images + agedb_30_pair.txt
+  - ✅ CALFW: 13,233 images + calfw_pair.txt (bonus)
+  - ✅ CASIA-WebFace: ~500K images (training dataset)
+  - ✅ README.md con documentación completa
+  - Nota: Datasets pre-procesados a 96x96, investigación y descarga manual
 
 ### Task 4.2: Implement Dataset Loader
 - **Time**: 2 horas
