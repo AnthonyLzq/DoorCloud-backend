@@ -327,7 +327,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - ✅ 7 unit tests pasando (con mock de compareFn)
   - ✅ Lint y typecheck pasan
 
-### Task 4.5: Implement Results Storage (SQLite)
+### Task 4.5: Implement Results Storage (SQLite) ✅
 - **Time**: 2 horas
 - **Files**: `src/services/benchmark/storage.ts`, `data/benchmarks.db`
 - **Actions**:
@@ -338,6 +338,15 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Unit tests
 - **Acceptance**: Results stored and queryable
 - **Commit**: `feat: implement SQLite storage for benchmark results`
+- **Status**: Completado
+  - ✅ Schema SQLite con indices en model, dataset, timestamp
+  - ✅ `saveResult(result)` - almacena run con accuracy y performance
+  - ✅ `getHistory(options)` - historial con filtros por model/dataset/limit
+  - ✅ `getLeaderboard(options)` - mejor run por modelo+dataset, ordenado por AUC
+  - ✅ ROC points serializados como JSON
+  - ✅ 11 unit tests pasando
+  - ✅ Lint y typecheck pasan
+  - Nota: Se agregaron `@types/better-sqlite3` y config pnpm para builds nativos
 
 ### Task 4.6: Implement Leaderboard Generation
 - **Time**: 1 hora
