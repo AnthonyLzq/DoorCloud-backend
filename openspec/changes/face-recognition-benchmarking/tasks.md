@@ -369,9 +369,31 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 
 ---
 
-## Phase 5: Integration (1 día)
+## Phase 5: Benchmark Execution (2 días)
 
-### Task 5.1: Integrate with DoorCloud
+### Task 5.0: Run Benchmarks & Compare Models
+- **Time**: 2 días
+- **Files**: `scripts/run-benchmarks.ts`, `src/services/face-recognition/index.ts`, `metrics/`
+- **Actions**:
+  - Agregar `loadModel(name, type, config)` al FaceRecognitionService
+  - Crear `scripts/run-benchmarks.ts` que:
+    - Inicializa FaceRecognitionService
+    - Carga modelos disponibles (insightface buffalo_l/m/s, dlib)
+    - Corre benchmarks contra LFW, CFP-FP, AgeDB-30, CALFW
+    - Guarda resultados en SQLite
+    - Exporta CSV a `metrics/benchmark-results.csv`
+  - Correr benchmark completo
+  - Comparar resultados contra vladmandic/human actual
+  - Generar histogramas con `scripts/histogram_for_metrics.py`
+  - Exportar leaderboard final como CSV para analisis
+- **Acceptance**: Benchmarks ejecutados, resultados comparados, CSV exportados
+- **Commit**: `feat: run face recognition benchmarks and export results`
+
+---
+
+## Phase 6: Integration (1 día)
+
+### Task 6.1: Integrate with DoorCloud
 - **Time**: 2 horas
 - **Files**: `src/services/user.ts`, `src/network/mqtt/routes/photo.ts`
 - **Actions**:
@@ -383,7 +405,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: DoorCloud uses new face recognition service
 - **Commit**: `feat: integrate face recognition service with DoorCloud`
 
-### Task 5.2: Add Benchmark API Endpoints
+### Task 6.2: Add Benchmark API Endpoints
 - **Time**: 2 horas
 - **Files**: `src/network/http/routes/benchmark.ts`
 - **Actions**:
@@ -395,7 +417,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Benchmark API endpoints work
 - **Commit**: `feat: add HTTP API endpoints for benchmarking`
 
-### Task 5.3: Documentation
+### Task 6.3: Documentation
 - **Time**: 1 hora
 - **Files**: `README.md`, `docs/face-recognition.md`
 - **Actions**:
@@ -410,7 +432,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Documentation complete
 - **Commit**: `docs: add face recognition and benchmarking documentation`
 
-### Task 5.4: Final Testing & Validation
+### Task 6.4: Final Testing & Validation
 - **Time**: 1 hora
 - **Files**: Various
 - **Actions**:
@@ -429,12 +451,13 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 | Phase | Tasks | Time | Status |
 |-------|-------|------|--------|
 | 0. Code Cleanup & Security | 5 | 1 día | ✅ Complete |
-| 1. ONNX Runtime Setup | 5 | 2 días | 🔲 Pending |
+| 1. ONNX Runtime Setup | 5 | 2 días | ✅ Complete |
 | 2. Python Child Process | 5 | 2 días | 🔲 Pending |
-| 3. Unified Service | 3 | 1 día | 🔲 Pending |
-| 4. Benchmark System | 6 | 2 días | 🔲 Pending |
-| 5. Integration | 4 | 1 día | 🔲 Pending |
-| **Total** | **28** | **9 días** | 🔲 Pending |
+| 3. Unified Service | 3 | 1 día | ✅ Complete |
+| 4. Benchmark System | 6 | 2 días | ✅ Complete |
+| 5. Benchmark Execution | 1 | 2 días | 🔲 Pending |
+| 6. Integration | 4 | 1 día | 🔲 Pending |
+| **Total** | **29** | **11 días** | 🔲 Pending |
 
 ## Dependencies
 
