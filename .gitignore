@@ -137,3 +137,7 @@ infra/mosquitto/passwordfile
 
 # Face recognition models (downloaded via scripts/download-models.sh)
 models/
+
+# OpenCode transient locks
+.opencode/goals/*.lock/
+.opencode/goals/**/*.lock/
