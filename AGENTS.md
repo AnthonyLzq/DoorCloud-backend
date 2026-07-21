@@ -207,9 +207,53 @@ MODELS_CDN_URL=https://models.example.com
 2. Ejecutar `pnpm models:download` si faltan
 3. Verificar compatibilidad de versiones ONNX
 
+## Token Budget Rules
+
+Para reducir consumo de tokens, seguir estas reglas:
+
+### Archivos que NO deben leerse por defecto
+
+- `pnpm-lock.yaml` - Solo si trabajas con dependencias
+- `metrics/**` - Data de runtime, usar resúmenes en vez de CSV completos
+- `openspec/changes/archive/**` - Cambios ya completados (históricos)
+- `*.png`, `*.csv` - Binarios y datos
+
+### Archivos largos (>500 líneas)
+
+Antes de leer archivos largos, considerar:
+
+1. ¿Realmente necesito el archivo completo?
+2. ¿Puedo usar `rg` (ripgrep) para buscar símbolos específicos?
+3. ¿Puedo leer solo secciones relevantes con offset/limit?
+
+Archivos conocidos como largos:
+- `.goals/repo-mqtt-package-plan/review-and-migration-plan.md` (1191 líneas)
+- `docs/face-recognition-architecture.md` (635 líneas)
+- `test/index.test.ts` (513 líneas)
+
+Para estos archivos, preferir búsqueda dirigida con `rg` antes que lectura completa.
+
+### Contexto curado
+
+Para contexto general del proyecto, leer primero:
+- `docs/ai/AI_CONTEXT.md` - Resumen compacto del sistema
+- `docs/ai/MESSAGE_FLOWS.md` - Diagramas de flujos
+
+Para decisiones arquitectónicas, consultar:
+- `docs/adr/` - Architecture Decision Records
+
+### Regla general
+
+Antes de leer múltiples archivos, preguntarse:
+- ¿Estoy leyendo para entender o para ejecutar?
+- Si es para entender, ¿puedo leer solo índices/resúmenes?
+- Si es para ejecutar, ¿cuáles son los archivos mínimamente necesarios?
+
 ## Recursos
 
-- [Architecture Decision Records](docs/adr/)
+- [AI Context Guide](docs/ai/AI_CONTEXT.md) - Resumen compacto
+- [Message Flows](docs/ai/MESSAGE_FLOWS.md) - Diagramas de flujos
+- [Architecture Decision Records](docs/adr/) - Decisiones arquitectónicas
 - [README.md](README.md)
 - [CHANGELOG.md](CHANGELOG.md)
 

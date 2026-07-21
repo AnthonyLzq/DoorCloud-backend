@@ -36,5 +36,15 @@
       "command": ["pnpm", "biome", "format", "--write", "$FILE"],
       "extensions": [".js", ".ts", ".jsx", ".tsx", ".json"]
     }
+  },
+  "context": {
+    "alwaysRead": ["AGENTS.md", "docs/ai/AI_CONTEXT.md"],
+    "exclude": [
+      "pnpm-lock.yaml",
+      "metrics/**",
+      "openspec/changes/archive/**",
+      "*.png",
+      "*.csv"
+    ]
   }
 }
