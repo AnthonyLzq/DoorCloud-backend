@@ -348,7 +348,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - ✅ Lint y typecheck pasan
   - Nota: Se agregaron `@types/better-sqlite3` y config pnpm para builds nativos
 
-### Task 4.6: Implement Leaderboard Generation
+### Task 4.6: Implement Leaderboard Generation ✅
 - **Time**: 1 hora
 - **Files**: `src/services/benchmark/leaderboard.ts`
 - **Actions**:
@@ -360,6 +360,12 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Unit tests
 - **Acceptance**: Leaderboard generated correctly
 - **Commit**: `feat: implement leaderboard generation with filtering and sorting`
+- **Status**: Completado
+  - ✅ `generateLeaderboard(entries, options, format)` con filtrado, ordenamiento y limite
+  - ✅ Sort por AUC, EER, avgLatency, tarAtFar001 (asc/desc)
+  - ✅ Export a JSON, CSV (con header), Markdown (tabla formateada)
+  - ✅ 10 unit tests pasando
+  - ✅ Lint y typecheck pasan
 
 ---
 
