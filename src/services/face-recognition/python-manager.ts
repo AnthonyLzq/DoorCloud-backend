@@ -1,72 +1,72 @@
 /**
- * PythonManager - Gestor de comunicación IPC con proceso Python
+ * PythonManager - IPC communication manager with Python process
  *
- * Este módulo implementa la comunicación entre Node.js y un proceso Python
- * para ejecutar modelos de face recognition que no están disponibles en ONNX Runtime.
+ * This module implements communication between Node.js and a Python process
+ * to run face recognition models not available in ONNX Runtime.
  *
- * ## Arquitectura de Comunicación
+ * ## Communication Architecture
  *
- * La comunicación se realiza mediante pipes stdin/stdout usando un protocolo
- * JSON-line con correlación por ID. Ver docs/adr/001-python-ipc-communication.md
- * para detalles completos de la decisión arquitectónica.
+ * Communication uses stdin/stdout pipes with a JSON-line protocol
+ * with ID correlation. See docs/adr/001-python-ipc-communication.md
+ * for full architectural decision details.
  *
- * ## Flujo de Comunicación
+ * ## Communication Flow
  *
  * ```
- * 1. Node.js spawnea proceso Python con stdio: ['pipe', 'pipe', 'pipe']
- * 2. Python imprime "READY" en stdout
- * 3. Node.js detecta "READY" y marca el proceso como listo
- * 4. Node.js envía request JSON en stdin (con ID único)
- * 5. Python lee stdin, procesa, escribe response JSON en stdout (con mismo ID)
- * 6. Node.js lee stdout, parsea JSON, correlaciona por ID, resuelve Promise
+ * 1. Node.js spawns Python process with stdio: ['pipe', 'pipe', 'pipe']
+ * 2. Python prints "READY" to stdout
+ * 3. Node.js detects "READY" and marks process as ready
+ * 4. Node.js sends JSON request to stdin (with unique ID)
+ * 5. Python reads stdin, processes, writes JSON response to stdout (with same ID)
+ * 6. Node.js reads stdout, parses JSON, correlates by ID, resolves Promise
  * ```
  *
- * ## Protocolo de Mensajería
+ * ## Messaging Protocol
  *
- * ### Request (Node.js → Python via stdin)
+ * ### Request (Node.js -> Python via stdin)
  * ```json
  * {"id":1,"method":"load_model","args":["test-model",{"type":"dlib","path":"..."}]}
  * ```
  *
- * ### Response (Python → Node.js via stdout)
+ * ### Response (Python -> Node.js via stdout)
  * ```json
- * // Éxito:
+ * // Success:
  * {"id":1,"success":true,"model":"test-model"}
  *
  * // Error:
  * {"id":1,"error":"Missing model type or path"}
  * ```
  *
- * ## Características
+ * ## Features
  *
- * - **Correlación por ID**: Cada request tiene un ID único para correlacionar con response
- * - **Timeout**: 30 segundos por defecto, configurable
- * - **Buffering**: Acumulación de datos hasta encontrar newline
- * - **Concurrencia**: Múltiples requests pueden estar pendientes simultáneamente
- * - **Tipado**: Validación de schemas con Zod
- * - **Reinicio automático**: Hasta 3 intentos si el proceso Python crashea
+ * - **ID Correlation**: Each request has a unique ID to correlate with response
+ * - **Timeout**: 30 seconds default, configurable
+ * - **Buffering**: Accumulates data until newline is found
+ * - **Concurrency**: Multiple requests can be pending simultaneously
+ * - **Typing**: Schema validation with Zod
+ * - **Auto-restart**: Up to 3 attempts if Python process crashes
  *
- * ## Uso
+ * ## Usage
  *
  * ```typescript
  * const manager = new PythonManager()
  * await manager.start()
  *
- * // Cargar modelo
+ * // Load model
  * await manager.call('load_model', 'my-model', {
  *   type: 'dlib',
  *   path: 'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
  * })
  *
- * // Obtener embedding
+ * // Get embedding
  * const embedding = await manager.call('get_embedding', imageBase64, 'my-model')
  *
  * await manager.stop()
  * ```
  *
- * @see {@link file://./python-schemas.ts} - Schemas de validación
- * @see {@link file://../../../../scripts/face_recognition_server.py} - Servidor Python
- * @see {@link file://../../../../docs/adr/001-python-ipc-communication.md} - ADR completo
+ * @see {@link file://./python-schemas.ts} - Validation schemas
+ * @see {@link file://../../../../scripts/face_recognition_server.py} - Python server
+ * @see {@link file://../../../../docs/adr/001-python-ipc-communication.md} - Full ADR
  */
 
 import { type ChildProcess, spawn } from 'node:child_process'
@@ -357,21 +357,21 @@ export class PythonManager extends EventEmitter {
    *    y resuelve/rechaza la Promise correspondiente
    *
    * @param method - Nombre del método a ejecutar en Python (ej: 'load_model', 'get_embedding')
-   * @param args - Argumentos para el método (se serializan como array JSON)
-   * @returns Promise con el resultado del método Python
-   * @throws Error si el proceso Python no está listo
-   * @throws Error si el request timeout (30s por defecto)
-   * @throws Error si falla la escritura en stdin
+   * @param args - Arguments for the method (serialized as JSON array)
+   * @returns Promise with the Python method result
+   * @throws Error if Python process is not ready
+   * @throws Error if request times out (30s default)
+   * @throws Error if stdin write fails
    *
    * @example
    * ```typescript
-   * // Cargar modelo
+   * // Load model
    * await manager.call('load_model', 'my-model', {
    *   type: 'dlib',
    *   path: 'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
    * })
    *
-   * // Obtener embedding
+   * // Get embedding
    * const embedding = await manager.call('get_embedding', imageBase64, 'my-model')
    * ```
    */
@@ -416,11 +416,11 @@ export class PythonManager extends EventEmitter {
   }
 
   /**
-   * Carga un modelo de face recognition en el proceso Python
+   * Loads a face recognition model in the Python process
    *
-   * @param name - Nombre único para identificar el modelo
-   * @param config - Configuración del modelo (type, path, etc.)
-   * @returns Promise con el resultado de la carga
+   * @param name - Unique name to identify the model
+   * @param config - Model configuration (type, path, etc.)
+   * @returns Promise with the load result
    *
    * @example
    * ```typescript
@@ -451,9 +451,9 @@ export class PythonManager extends EventEmitter {
   }
 
   /**
-   * Lista todos los modelos cargados en el proceso Python
+   * Lists all models loaded in the Python process
    *
-   * @returns Promise con array de nombres de modelos
+   * @returns Promise with array of model names
    */
   async listModels(): Promise<string[]> {
     const result = await this.call('list_models')
@@ -462,13 +462,13 @@ export class PythonManager extends EventEmitter {
   }
 
   /**
-   * Obtiene las métricas de un modelo específico
+   * Gets metrics for a specific model
    *
-   * Las métricas incluyen latencia promedio (incluyendo IPC overhead) y
-   * cantidad de requests procesados.
+   * Metrics include average latency (including IPC overhead) and
+   * number of processed requests.
    *
-   * @param modelName - Nombre del modelo
-   * @returns Métricas del modelo o null si no hay datos
+   * @param modelName - Model name
+   * @returns Model metrics or null if no data available
    */
   getMetrics(
     modelName: string
@@ -485,11 +485,11 @@ export class PythonManager extends EventEmitter {
   }
 
   /**
-   * Obtiene el embedding facial de una imagen usando un modelo específico
+   * Gets the face embedding from an image using a specific model
    *
-   * @param imageBase64 - Imagen en formato base64
-   * @param modelName - Nombre del modelo a usar
-   * @returns Promise con el embedding (array de números)
+   * @param imageBase64 - Image in base64 format
+   * @param modelName - Model name to use
+   * @returns Promise with the embedding (array of numbers)
    */
   async getEmbedding(
     imageBase64: string,
