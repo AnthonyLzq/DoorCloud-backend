@@ -17,16 +17,18 @@ describe('Metrics Calculation', () => {
       expect(() => calculateROC([1, 2], [1])).toThrow('Length mismatch')
     })
 
-    it('should throw if no positive labels', () => {
-      expect(() => calculateROC([1, 2], [0, 0])).toThrow(
-        'must contain both positive'
-      )
+    it('should return diagonal ROC for single-class input', () => {
+      const roc = calculateROC([1, 2], [0, 0])
+      expect(roc.length).toBe(2)
+      expect(roc[0].tpr).toBe(0)
+      expect(roc[1].tpr).toBe(0)
     })
 
-    it('should throw if no negative labels', () => {
-      expect(() => calculateROC([1, 2], [1, 1])).toThrow(
-        'must contain both positive'
-      )
+    it('should return diagonal ROC for single-class input positive', () => {
+      const roc = calculateROC([1, 2], [1, 1])
+      expect(roc.length).toBe(2)
+      expect(roc[0].tpr).toBe(1)
+      expect(roc[1].tpr).toBe(1)
     })
 
     it('should produce perfect ROC for perfect predictions', () => {

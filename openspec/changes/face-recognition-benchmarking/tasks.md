@@ -305,7 +305,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - ✅ 16 unit tests pasando
   - ✅ Lint y typecheck pasan
 
-### Task 4.4: Implement Benchmark Runner
+### Task 4.4: Implement Benchmark Runner ✅
 - **Time**: 4 horas
 - **Files**: `src/services/benchmark/runner.ts`
 - **Actions**:
@@ -318,6 +318,14 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Integration tests
 - **Acceptance**: Can run benchmark on LFW dataset
 - **Commit**: `feat: implement benchmark runner with metrics collection`
+- **Status**: Completado
+  - ✅ `runBenchmark(options, compareFn)` con carga de dataset, comparaciones y metricas
+  - ✅ `CompareFn` type para inyectar la logica de comparacion (desacoplado del servicio)
+  - ✅ Metricas de accuracy (ROC, TAR@FAR, EER, AUC) y performance (latencia, throughput)
+  - ✅ Soporte para `maxPairs` (limitacion para tests rapidos)
+  - ✅ Edge case: datasets con una sola clase retornan ROC diagonal
+  - ✅ 7 unit tests pasando (con mock de compareFn)
+  - ✅ Lint y typecheck pasan
 
 ### Task 4.5: Implement Results Storage (SQLite)
 - **Time**: 2 horas

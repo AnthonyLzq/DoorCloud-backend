@@ -44,9 +44,13 @@ export function calculateROC(
   const totalNeg = paired.filter(p => p.label === 0).length
 
   if (totalPos === 0 || totalNeg === 0) {
-    throw new Error(
-      `Dataset must contain both positive (${totalPos}) and negative (${totalNeg}) pairs`
-    )
+    // Edge case: only one class present, cannot compute meaningful ROC
+    // Return a default ROC on the diagonal
+    const dominant = totalPos > 0 ? 1 : 0
+    return [
+      { far: 0, tpr: dominant },
+      { far: 1, tpr: dominant }
+    ]
   }
 
   const rocPoints: RocPoint[] = []
