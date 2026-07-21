@@ -145,3 +145,7 @@ models/
 # Metrics (runtime data, not code)
 metrics/*.csv
 metrics/*.png
+
+# Face recognition benchmark datasets (downloaded via scripts/download-datasets.sh)
+datasets/*
+!datasets/README.md

@@ -242,7 +242,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 
 ## Phase 4: Benchmark System (2 días)
 
-### Task 4.1: Download Datasets
+### Task 4.1: Download Datasets ✅
 - **Time**: 2 horas
 - **Files**: `scripts/download-datasets.sh`, `datasets/`
 - **Actions**:
@@ -253,6 +253,11 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Validar integridad
 - **Acceptance**: Datasets descargados y validados
 - **Commit**: `chore: add dataset download script and initial datasets`
+- **Status**: Completado
+  - Script `scripts/download-datasets.sh` creado y ejecutable
+  - Directorio `datasets/` creado y agregado a .gitignore
+  - README.md creado con documentación de datasets
+  - Nota: Los datasets deben descargarse manualmente ejecutando el script (~2GB)
 
 ### Task 4.2: Implement Dataset Loader
 - **Time**: 2 horas
