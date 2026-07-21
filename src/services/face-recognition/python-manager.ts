@@ -93,6 +93,8 @@ export class PythonManager extends EventEmitter {
   private pendingRequests: Map<number, PendingRequest> = new Map()
   private stdoutBuffer: string = ''
   private defaultTimeout: number = 30000
+  private metrics: Map<string, { totalLatency: number; requestCount: number }> =
+    new Map()
 
   constructor() {
     super()
@@ -397,7 +399,7 @@ export class PythonManager extends EventEmitter {
 
       this.pendingRequests.set(id, { resolve, reject, timeout, method })
 
-      const json = JSON.stringify(request) + '\n'
+      const json = `${JSON.stringify(request)}\n`
       this.process!.stdin!.write(json, error => {
         if (error) {
           clearTimeout(timeout)
@@ -413,12 +415,107 @@ export class PythonManager extends EventEmitter {
     })
   }
 
+  /**
+   * Carga un modelo de face recognition en el proceso Python
+   *
+   * @param name - Nombre único para identificar el modelo
+   * @param config - Configuración del modelo (type, path, etc.)
+   * @returns Promise con el resultado de la carga
+   *
+   * @example
+   * ```typescript
+   * await manager.loadModel('dlib-model', {
+   *   type: 'dlib',
+   *   path: 'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
+   * })
+   * ```
+   */
+  async loadModel(
+    name: string,
+    config: { type: string; path: string }
+  ): Promise<unknown> {
+    const startTime = performance.now()
+    const result = await this.call('load_model', name, config)
+    const loadLatency = performance.now() - startTime
+
+    // Initialize metrics for this model (load time not counted in inference metrics)
+    if (!this.metrics.has(name)) {
+      this.metrics.set(name, { totalLatency: 0, requestCount: 0 })
+    }
+
+    console.log(
+      `[PythonManager] Model ${name} loaded in ${loadLatency.toFixed(2)}ms`
+    )
+
+    return result
+  }
+
+  /**
+   * Lista todos los modelos cargados en el proceso Python
+   *
+   * @returns Promise con array de nombres de modelos
+   */
+  async listModels(): Promise<string[]> {
+    const result = await this.call('list_models')
+    const response = result as { models?: string[] }
+    return response.models ?? []
+  }
+
+  /**
+   * Obtiene las métricas de un modelo específico
+   *
+   * Las métricas incluyen latencia promedio (incluyendo IPC overhead) y
+   * cantidad de requests procesados.
+   *
+   * @param modelName - Nombre del modelo
+   * @returns Métricas del modelo o null si no hay datos
+   */
+  getMetrics(
+    modelName: string
+  ): { avgLatency: number; requestCount: number } | null {
+    const metric = this.metrics.get(modelName)
+    if (!metric || metric.requestCount === 0) {
+      return null
+    }
+
+    return {
+      avgLatency: metric.totalLatency / metric.requestCount,
+      requestCount: metric.requestCount
+    }
+  }
+
+  /**
+   * Obtiene el embedding facial de una imagen usando un modelo específico
+   *
+   * @param imageBase64 - Imagen en formato base64
+   * @param modelName - Nombre del modelo a usar
+   * @returns Promise con el embedding (array de números)
+   */
+  async getEmbedding(
+    imageBase64: string,
+    modelName: string
+  ): Promise<number[]> {
+    const startTime = performance.now()
+    const result = await this.call('get_embedding', imageBase64, modelName)
+    const latency = performance.now() - startTime
+
+    // Update metrics (includes IPC overhead)
+    const metric = this.metrics.get(modelName)
+    if (metric) {
+      metric.totalLatency += latency
+      metric.requestCount++
+    }
+
+    const response = result as { embedding?: number[] }
+    return response.embedding ?? []
+  }
+
   sendRequest(request: object): void {
     if (!this.process || !this.ready) {
       throw new Error('Python process not ready')
     }
 
-    const json = JSON.stringify(request) + '\n'
+    const json = `${JSON.stringify(request)}\n`
     this.process.stdin!.write(json)
   }
 

@@ -182,7 +182,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Acceptance**: Can send requests and receive responses
 - **Commit**: `feat: implement Python IPC protocol with request/response correlation`
 
-### Task 2.5: PythonManager Model Management
+### Task 2.5: PythonManager Model Management ✅
 - **Time**: 1 hora
 - **Files**: `src/services/face-recognition/python-manager.ts`
 - **Actions**:
