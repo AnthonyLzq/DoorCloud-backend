@@ -265,7 +265,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - ✅ README.md con documentación completa
   - Nota: Datasets pre-procesados a 96x96, investigación y descarga manual
 
-### Task 4.2: Implement Dataset Loader
+### Task 4.2: Implement Dataset Loader ✅
 - **Time**: 2 horas
 - **Files**: `src/services/benchmark/dataset-loader.ts`
 - **Actions**:
@@ -277,6 +277,13 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Unit tests
 - **Acceptance**: Can load and parse datasets
 - **Commit**: `feat: implement dataset loader for LFW, CFP-FP, and AgeDB`
+- **Status**: Completado
+  - ✅ `loadDataset(name)` implementado para lfw, cfp-fp, agedb-30, calfw
+  - ✅ Parseo de LFW (formato complejo con same/different intercalados por folder)
+  - ✅ Parseo de formato simple (CFP-FP, AgeDB-30, CALFW) con soporte para label -1
+  - ✅ Validación opcional de imágenes existentes
+  - ✅ 18 unit tests pasando
+  - ✅ Lint y typecheck pasan
 
 ### Task 4.3: Implement Metrics Calculation
 - **Time**: 3 horas
