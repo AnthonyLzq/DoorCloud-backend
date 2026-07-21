@@ -227,7 +227,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
 - **Commit**: `feat: implement face comparison and embedding generation`
 - **Status**: Completado
 
-### Task 3.3: Implement FaceRecognitionService (Metrics)
+### Task 3.3: Implement FaceRecognitionService (Metrics) ✅
 - **Time**: 1 hora
 - **Files**: `src/services/face-recognition/index.ts`
 - **Actions**:
@@ -236,6 +236,7 @@ Desglose de tareas para implementar el sistema híbrido de benchmarking de face 
   - Unit tests
 - **Acceptance**: Metrics exposed correctly
 - **Commit**: `feat: expose unified metrics from ONNX and Python providers`
+- **Status**: Completado
 
 ---
 

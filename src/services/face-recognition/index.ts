@@ -23,6 +23,12 @@ export interface EmbeddingResult {
   latency: number
 }
 
+export interface ModelMetrics {
+  avgLatency: number
+  requestCount: number
+  approach: 'onnx' | 'python'
+}
+
 export class FaceRecognitionService {
   private onnxProvider: ONNXProvider
   private pythonManager: PythonManager
@@ -245,6 +251,40 @@ export class FaceRecognitionService {
     }
 
     return dotProduct / magnitude
+  }
+
+  /**
+   * Gets performance metrics for a specific model
+   *
+   * Combines metrics from both ONNX and Python providers.
+   *
+   * @param modelName - Model name
+   * @returns Model metrics or null if no data available
+   */
+  getMetrics(modelName: string): ModelMetrics | null {
+    this.ensureInitialized()
+
+    const approach = this.determineApproach(modelName)
+
+    if (approach === 'onnx') {
+      const metrics = this.onnxProvider.getMetrics(modelName)
+      if (!metrics) return null
+
+      return {
+        avgLatency: metrics.avgLatency,
+        requestCount: metrics.requestCount,
+        approach: 'onnx'
+      }
+    } else {
+      const metrics = this.pythonManager.getMetrics(modelName)
+      if (!metrics) return null
+
+      return {
+        avgLatency: metrics.avgLatency,
+        requestCount: metrics.requestCount,
+        approach: 'python'
+      }
+    }
   }
 
   /**

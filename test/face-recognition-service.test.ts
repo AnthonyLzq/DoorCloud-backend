@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { FaceRecognitionService } from '../src/services/face-recognition'
 
 describe('FaceRecognitionService', () => {
@@ -146,6 +146,58 @@ describe('FaceRecognitionService', () => {
       const embedding2 = new Float32Array([0, 0, 0])
       const similarity = service.calculateSimilarity(embedding1, embedding2)
       expect(similarity).toBe(0)
+    })
+  })
+
+  describe('getMetrics', () => {
+    it('should throw error if not initialized', () => {
+      expect(() => service.getMetrics('test-model')).toThrow(
+        'FaceRecognitionService not initialized. Call init() first.'
+      )
+    })
+
+    it('should return null for non-existent model', async () => {
+      await service.init()
+      const metrics = service.getMetrics('non-existent-model')
+      expect(metrics).toBeNull()
+    })
+
+    it('should return metrics with approach for ONNX model', async () => {
+      await service.init()
+
+      // Mock ONNX provider to return metrics
+      const mockMetrics = { avgLatency: 50, requestCount: 10 }
+      vi.spyOn(service['onnxProvider'], 'getMetrics').mockReturnValue(
+        mockMetrics
+      )
+      vi.spyOn(service['onnxProvider'], 'hasModel').mockReturnValue(true)
+
+      const metrics = service.getMetrics('onnx-model')
+
+      expect(metrics).toEqual({
+        avgLatency: 50,
+        requestCount: 10,
+        approach: 'onnx'
+      })
+    })
+
+    it('should return metrics with approach for Python model', async () => {
+      await service.init()
+
+      // Mock Python manager to return metrics
+      const mockMetrics = { avgLatency: 100, requestCount: 5 }
+      vi.spyOn(service['pythonManager'], 'getMetrics').mockReturnValue(
+        mockMetrics
+      )
+      vi.spyOn(service['onnxProvider'], 'hasModel').mockReturnValue(false)
+
+      const metrics = service.getMetrics('python-model')
+
+      expect(metrics).toEqual({
+        avgLatency: 100,
+        requestCount: 5,
+        approach: 'python'
+      })
     })
   })
 })
