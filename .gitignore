@@ -142,9 +142,14 @@ models/
 .opencode/goals/*.lock/
 .opencode/goals/**/*.lock/
 
+# Python cache
+__pycache__/
+scripts/__pycache__/
+
 # Metrics (runtime data, not code)
 metrics/*.csv
 metrics/*.png
+metrics/benchmark-results.md
 
 # Face recognition benchmark datasets (downloaded via scripts/download-datasets.sh)
 datasets/*

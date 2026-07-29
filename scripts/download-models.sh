@@ -75,6 +75,16 @@ if [ ! -f "$MODELS_DIR/dlib/dlib_face_recognition_resnet_model_v1.dat" ]; then
   echo "✓ dlib face recognition downloaded"
 fi
 
+# dlib shape predictor (68 face landmarks) - ~60MB
+if [ ! -f "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat" ]; then
+  echo "Downloading dlib shape predictor..."
+  curl -L --retry 3 -o "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat.bz2" \
+    "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
+  echo "Extracting dlib shape predictor..."
+  bunzip2 "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat.bz2"
+  echo "✓ dlib shape predictor downloaded"
+fi
+
 echo ""
 echo "✓ All models downloaded successfully"
 echo "Models saved to: $MODELS_DIR"

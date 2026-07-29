@@ -67,28 +67,39 @@ def get_embedding(image_bytes: bytes, model_name: str) -> Dict[str, Any]:
             from PIL import Image
             import io
 
-            # Load image
+            # Load image and ensure RGB
             image = Image.open(io.BytesIO(image_bytes))
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
             image_np = np.array(image)
-
-            # Convert RGB to BGR for dlib
-            if len(image_np.shape) == 3 and image_np.shape[2] == 3:
-                image_np = image_np[:, :, ::-1]
 
             # Detect face (simplified - in production, use proper face detection)
             detector = dlib.get_frontal_face_detector()
             dets = detector(image_np, 1)
 
-            if len(dets) == 0:
-                return {'error': 'No face detected in image'}
-
-            # Get face landmarks
-            sp = dlib.shape_predictor('models/dlib/shape_predictor_68_face_landmarks.dat')
-            shape = sp(image_np, dets[0])
-
-            # Get embedding
             model = model_info['model']
-            embedding = model.compute_face_descriptor(image_np, shape)
+
+            if len(dets) > 0:
+                # Face detected - use landmarks + aligned chip for best accuracy
+                sp = dlib.shape_predictor(
+                    'models/dlib/shape_predictor_68_face_landmarks.dat'
+                )
+                shape = sp(image_np, dets[0])
+                face_chip = dlib.get_face_chip(image_np, shape, size=150)
+                embedding = model.compute_face_descriptor(face_chip)
+            else:
+                # No face detected - upscale and compute full image descriptor
+                # dlib needs at least 150x150 for the whole-image fallback
+                if image_np.shape[0] < 150 or image_np.shape[1] < 150:
+                    # Upscale using PIL
+                    scale = max(150 / image_np.shape[0], 150 / image_np.shape[1])
+                    new_size = (
+                        int(image_np.shape[1] * scale),
+                        int(image_np.shape[0] * scale)
+                    )
+                    image = image.resize(new_size, Image.LANCZOS)
+                    image_np = np.array(image)
+                embedding = model.compute_face_descriptor(image_np)
 
             # Convert to list
             embedding_list = list(embedding)

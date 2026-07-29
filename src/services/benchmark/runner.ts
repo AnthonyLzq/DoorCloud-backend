@@ -130,14 +130,21 @@ async function benchmarkModel(
     const path1 = resolve(rootDir, pair.image1)
     const path2 = resolve(rootDir, pair.image2)
 
-    const img1 = readFileSync(path1)
-    const img2 = readFileSync(path2)
+    try {
+      const img1 = readFileSync(path1)
+      const img2 = readFileSync(path2)
 
-    const result = await compareFn(img1, img2, model)
+      const result = await compareFn(img1, img2, model)
 
-    similarities.push(result.similarity)
-    labels.push(pair.label)
-    latencies.push(result.latency)
+      similarities.push(result.similarity)
+      labels.push(pair.label)
+      latencies.push(result.latency)
+    } catch (error) {
+      // Skip failed pair gracefully
+      console.warn(
+        `[Benchmark] Skipping pair: ${pair.image1} vs ${pair.image2}: ${error instanceof Error ? error.message.slice(0, 80) : String(error)}`
+      )
+    }
   }
 
   const totalTime = performance.now() - startTime

@@ -131,6 +131,46 @@ export class FaceRecognitionService {
   }
 
   /**
+   * Loads a face recognition model
+   *
+   * Routes to the correct provider based on the approach type.
+   *
+   * @param name - Unique model name
+   * @param approach - Provider type ('onnx' or 'python')
+   * @param config - Model configuration
+   *   For ONNX: { path: string, embeddingSize: number, landmarks?: number }
+   *   For Python: { type: string, path: string }
+   */
+  async loadModel(
+    name: string,
+    approach: 'onnx' | 'python',
+    config: {
+      path: string
+      embeddingSize?: number
+      landmarks?: number
+      type?: string
+    }
+  ): Promise<void> {
+    this.ensureInitialized()
+
+    if (approach === 'onnx') {
+      await this.onnxProvider.loadModel(name, config.path, {
+        name,
+        embeddingSize: config.embeddingSize ?? 512,
+        landmarks: config.landmarks ?? 0,
+        speed: 0
+      })
+    } else {
+      await this.pythonManager.loadModel(name, {
+        type: config.type ?? 'dlib',
+        path: config.path
+      })
+    }
+
+    this.modelRegistry.set(name, approach)
+  }
+
+  /**
    * Checks if the service is initialized
    */
   isInitialized(): boolean {

@@ -5,7 +5,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "onnxruntime-node",
-      "sharp"
+      "sharp",
+      "@tensorflow/tfjs-node"
     ]
   },
   "main": "src/index.ts",
@@ -49,6 +50,7 @@
     "@fastify/multipart": "^10.1.0",
     "@supabase/postgrest-js": "^1.1.1",
     "@supabase/supabase-js": "^2.2.3",
+    "@tensorflow/tfjs-node": "4.10.0",
     "@vladmandic/human": "^3.0.3",
     "debug": "^4.3.4",
     "fastify": "^5.10.0",
