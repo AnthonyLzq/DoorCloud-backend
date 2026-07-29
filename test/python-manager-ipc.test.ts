@@ -1,4 +1,4 @@
-import {  afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { PythonManager } from '../src/services/face-recognition/python-manager'
 
@@ -81,10 +81,15 @@ describe('PythonManager IPC Protocol', () => {
       const testImageBase64 =
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 
-      // This will fail because no face is detected, but it tests the protocol
-      await expect(
-        manager.call('get_embedding', testImageBase64, 'test-model')
-      ).rejects.toThrow()
+      // Now succeeds because dlib falls back to whole-image embedding
+      // when no face is detected (upscales small images automatically)
+      const result = await manager.call(
+        'get_embedding',
+        testImageBase64,
+        'test-model'
+      )
+      expect(result).toHaveProperty('embedding')
+      expect((result as { embedding: number[] }).embedding.length).toBe(128)
     })
   })
 

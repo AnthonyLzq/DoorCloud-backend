@@ -10,8 +10,10 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 output_dir = os.path.join(script_dir, '../metrics')
 csv_path = os.path.join(output_dir, 'benchmark-results.csv')
 data = pd.read_csv(csv_path)
+meta_path = os.path.join(output_dir, 'models-metadata.csv')
+metadata = pd.read_csv(meta_path, index_col='model')
 
-# Model display names and ordering
+# Model display names
 model_labels = {
     'insightface-buffalo-l': 'InsightFace Buffalo-L',
     'insightface-buffalo-m': 'InsightFace Buffalo-M',
@@ -52,12 +54,27 @@ for i, model in enumerate(model_order):
     for ds in dataset_order:
         match = model_data[model_data['dataset'] == ds]
         aucs.append(match['auc'].values[0] if len(match) > 0 else 0)
-    bars = ax1.bar(x + i * width, aucs, width, label=model_labels[model],
-                   color=colors[i], edgecolor='white', linewidth=0.5, alpha=0.9)
+    bars = ax1.bar(
+        x + i * width,
+        aucs,
+        width,
+        label=model_labels[model],
+        color=colors[i],
+        edgecolor='white',
+        linewidth=0.5,
+        alpha=0.9
+    )
     for bar, val in zip(bars, aucs):
         if val > 0:
-            ax1.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.003,
-                     f'{val:.3f}', ha='center', va='bottom', fontsize=7, rotation=45)
+            ax1.text(
+                bar.get_x() + bar.get_width()/2.,
+                bar.get_height() + 0.003,
+                f'{val:.3f}',
+                ha='center',
+                va='bottom',
+                fontsize=7,
+                rotation=45
+            )
 
 ax1.set_xlabel('Benchmark Dataset', fontsize=13, fontweight='bold')
 ax1.set_ylabel('AUC', fontsize=13, fontweight='bold')
@@ -74,25 +91,46 @@ plt.tight_layout()
 save_figure(fig1, 'figure01-auc-by-dataset.png')
 
 # ============================================================
-# Chart 2: ROC Curves on LFW
+# Chart 2: ROC Curves on LFW (real data from roc-points.csv)
 # ============================================================
 fig2, ax2 = plt.subplots(figsize=(8, 8))
-lfw_data = data[data['dataset'] == 'lfw'].sort_values('auc', ascending=False)
+roc_path = os.path.join(output_dir, 'roc-points.csv')
 
-for i, (_, row) in enumerate(lfw_data.iterrows()):
-    model = row['model']
-    auc_val = row['auc']
-    np.random.seed(hash(model) % 2**32)
-    n_points = 200
-    far = np.linspace(0, 1, n_points)
-    alpha_val = auc_val / (1.001 - auc_val)
-    tpr = np.power(far, 1/alpha_val) * (1 - far) + far
-    tpr = np.clip(tpr, 0, 1)
-    tpr = np.maximum.accumulate(tpr)
-    ax2.plot(far, tpr, color=colors[model_order.index(model) if model in model_order else 0],
-             linewidth=2.5, label=f'{model_labels.get(model, model)} (AUC={auc_val:.4f})',
-             marker=markers[model_order.index(model) if model in model_order else 0],
-             markevery=30, markersize=6)
+if os.path.exists(roc_path):
+    roc_data = pd.read_csv(roc_path)
+    for i, model in enumerate(model_order):
+        model_roc = roc_data[(roc_data['model'] == model) & (roc_data['dataset'] == 'lfw')].sort_values('far')
+        if len(model_roc) > 0:
+            auc_val = data[(data['model'] == model) & (data['dataset'] == 'lfw')]['auc'].values[0]
+            ax2.plot(
+                model_roc['far'],
+                model_roc['tpr'],
+                color=colors[i],
+                linewidth=2.5,
+                label=f'{model_labels[model]} (AUC={auc_val:.4f})',
+                marker=markers[i],
+                markevery=max(1, len(model_roc)//7),
+                markersize=4
+            )
+else:
+    # Fallback: approximate from AUC if real data not available
+    lfw_data = data[data['dataset'] == 'lfw'].sort_values('auc', ascending=False)
+    for i, (_, row) in enumerate(lfw_data.iterrows()):
+        model = row['model']
+        auc_val = row['auc']
+        n_points = 200
+        far = np.linspace(0, 1, n_points)
+        alpha_val = auc_val / (1.001 - auc_val)
+        tpr = np.power(far, 1/alpha_val) * (1 - far) + far
+        tpr = np.clip(tpr, 0, 1)
+        tpr = np.maximum.accumulate(tpr)
+        ax2.plot(
+            far,
+            tpr,
+            color=colors[model_order.index(model) if model in model_order else 0],
+            linewidth=2.5,
+            label=f'{model_labels.get(model, model)} (AUC={auc_val:.4f})'
+        )
 
 ax2.plot([0, 1], [0, 1], 'k--', linewidth=1, alpha=0.5, label='Random Classifier (AUC=0.5)')
 ax2.set_xlabel('False Positive Rate (FPR)', fontsize=13, fontweight='bold')
@@ -122,11 +160,14 @@ for i, model in enumerate(latency_data.index):
     # Offset label to avoid overlap
     offset_x = row['avg_lat'] * 0.15
     offset_y = 0.003 if i % 2 == 0 else -0.008
-    ax3.annotate(model_labels[model],
-                 (row['avg_lat'], row['avg_auc']),
-                 (row['avg_lat'] + offset_x, row['avg_auc'] + offset_y),
-                 fontsize=10, fontweight='bold',
-                 arrowprops=dict(arrowstyle='->', color='gray', alpha=0.6))
+    ax3.annotate(
+        model_labels[model],
+        (row['avg_lat'], row['avg_auc']),
+        (row['avg_lat'] + offset_x, row['avg_auc'] + offset_y),
+        fontsize=10,
+        fontweight='bold',
+        arrowprops=dict(arrowstyle='->', color='gray', alpha=0.6)
+    )
 
 ax3.set_xlabel('Average Inference Latency (ms) — log scale', fontsize=13, fontweight='bold')
 ax3.set_ylabel('Average AUC Across All Datasets', fontsize=13, fontweight='bold')
@@ -149,12 +190,9 @@ for model in model_order:
     md = data[data['model'] == model]
     avg_auc = md['auc'].mean()
     avg_lat = md['avgLatency'].mean()
-    params = {'insightface-buffalo-l': '~180MB', 'insightface-buffalo-m': '~90MB',
-              'insightface-buffalo-s': '~10MB', 'dlib': '~120MB', 'vladmandic-human': '~50MB'}.get(model, '?')
-    embed = {'insightface-buffalo-l': '512D', 'insightface-buffalo-m': '512D',
-             'insightface-buffalo-s': '512D', 'dlib': '128D', 'vladmandic-human': '1024D'}.get(model, '?')
-    runtime = {'insightface-buffalo-l': 'ONNX (Node)', 'insightface-buffalo-m': 'ONNX (Node)',
-               'insightface-buffalo-s': 'ONNX (Node)', 'dlib': 'Python IPC', 'vladmandic-human': 'TF.js (Node)'}.get(model, '?')
+    params = f'~{int(meta["params"] / 1e6)}MB' if model in metadata.index else '?'
+    embed = f'{int(meta["embedding_size"])}D' if model in metadata.index else '?'
+    runtime = meta.get('runtime', '?') if model in metadata.index else '?'
     lat_label = f'{avg_lat:.0f}ms' if avg_lat < 1000 else f'{avg_lat/1000:.2f}s'
     print(f'{model_labels[model]:30s} {params:>8s} {embed:>6s} {runtime:>12s} {avg_auc:.4f}  {lat_label:>10s}')
 

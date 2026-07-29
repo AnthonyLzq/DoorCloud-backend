@@ -14,7 +14,40 @@ This report presents a comparative evaluation of five face recognition models fo
 
 ## 2. Methodology
 
-### 2.1 Benchmark Datasets
+### 2.1 Experimental Pipeline
+
+The benchmark pipeline consists of three stages:
+
+1. **Data Acquisition**: Images are read from disk, pre-processed to 96x96 RGB tensors
+2. **Model Inference**: Each model generates embeddings for pairs of images; similarity is calculated via cosine distance (InsightFace) or model-native metrics (dlib, human)
+3. **Metrics Computation**: Raw similarity scores are aggregated into ROC curves, AUC, EER, and TAR@FAR using our custom benchmarking framework (`src/services/benchmark/`)
+
+### 2.2 ROC Curve Generation
+
+ROC curves were generated from real per-pair similarity scores, not approximated. The process:
+
+1. For each model-dataset combination, `calculateROC()` in `src/services/benchmark/metrics.ts` sorts all 6,000-7,000 similarity scores in descending order
+2. At each threshold, it computes cumulative True Positive Rate and False Positive Rate
+3. These real (FPR, TPR) points are stored as JSON in SQLite (`benchmark_runs.roc_points`)
+4. For visualization, each curve is subsampled by taking every 30th point (ceil(6000 / 200) = 30), yielding approximately 200 points per curve. Points are downsampled uniformly along the cumulative threshold index, preserving the overall ROC shape while reducing the export to ~51KB (from ~4.5MB raw). The subsampled points are exported to `metrics/roc-points.csv`.
+5. The Python plotting script (`scripts/histogram_for_metrics.py`) reads this CSV directly
+   - If the CSV is unavailable, the script falls back to a parametric approximation from AUC
+
+### 2.3 Model Metadata Sources
+
+Model parameters and characteristics were sourced from:
+
+| Attribute | Source |
+|-----------|--------|
+| ONNX model sizes | `ls -lh models/insightface/*.onnx` (file sizes in bytes, converted to MB) |
+| dlib model size | `ls -lh models/dlib/dlib_face_recognition_resnet_model_v1.dat` |
+| @vladmandic/human size | Package documentation (50MB estimated for TFJS model bundle) |
+| Embedding dimensions | API documentation: InsightFace=512D, dlib=128D, human=1024D |
+| Runtime framework | Direct observation: ONNX Runtime (Node), dlib (Python child process), human (TensorFlow.js) |
+
+Metadata is stored as a structured CSV (`metrics/models-metadata.csv`) and consumed by plotting scripts, eliminating hardcoded values in visualization code.
+
+### 2.4 Benchmark Datasets
 
 Four standard face verification datasets are used, all pre-processed to 96x96 pixel resolution:
 
@@ -75,7 +108,7 @@ Four standard face verification datasets are used, all pre-processed to 96x96 pi
 
 ### 3.3 ROC Analysis
 
-Figure B (see `metrics/benchmark-results.png`) presents ROC curves on LFW. All ONNX-based models achieve near-perfect separation, with dlib showing the highest TPR at low FPR thresholds. @vladmandic/human shows competitive performance on LFW but degrades significantly on age-variant datasets (AgeDB-30, CALFW).
+Figure 2 (see `metrics/figure02-roc-curves-lfw.png`) presents real ROC curves from actual per-pair similarity scores on the LFW dataset. All ONNX-based models achieve near-perfect separation, with dlib showing the highest TPR at low FPR thresholds. @vladmandic/human shows competitive performance on LFW but degrades significantly on age-variant datasets (AgeDB-30, CALFW).
 
 ---
 

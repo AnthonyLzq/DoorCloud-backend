@@ -1,0 +1,6 @@
+model,params,embedding_size,runtime,source
+insightface-buffalo-l,183941335,512,onnx-node,https://github.com/deepinsight/insightface
+insightface-buffalo-m,85943856,512,onnx-node,https://github.com/deepinsight/insightface
+insightface-buffalo-s,9756432,512,onnx-node,https://github.com/deepinsight/insightface
+dlib,119354572,128,python-ipc,http://dlib.net/
+vladmandic-human,52428800,1024,tfjs-node,https://github.com/vladmandic/human
