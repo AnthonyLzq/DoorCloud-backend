@@ -22,6 +22,18 @@ export interface HistoryQuery {
   limit?: number
 }
 
+export interface ModelStats {
+  model: string
+  dataset: string
+  aucMean: number
+  aucStd: number
+  eerMean: number
+  eerStd: number
+  latMean: number
+  latStd: number
+  n: number
+}
+
 /**
  * SQLite-backed storage for benchmark results
  */
@@ -53,14 +65,15 @@ export class BenchmarkStorage {
    * Stores the run summary with accuracy and performance metrics.
    *
    * @param result - Benchmark result from runBenchmark()
+   * @param repeatIndex - Repeat number for confidence intervals (default: 0)
    * @returns The run ID
    */
-  saveResult(result: BenchmarkResult): number {
+  saveResult(result: BenchmarkResult, repeatIndex = 0): number {
     const stmt = this.db.prepare(`
       INSERT INTO benchmark_runs
         (dataset, model, timestamp, avg_latency, total_time, pairs_processed,
-         tar_at_far_001, tar_at_far_01, tar_at_far_1, eer, auc, roc_points)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         tar_at_far_001, tar_at_far_01, tar_at_far_1, eer, auc, roc_points, repeat_index)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     const info = stmt.run(
@@ -75,7 +88,8 @@ export class BenchmarkStorage {
       result.accuracy.tarAtFar1,
       result.accuracy.eer,
       result.accuracy.auc,
-      JSON.stringify(result.accuracy.rocPoints)
+      JSON.stringify(result.accuracy.rocPoints),
+      repeatIndex
     )
 
     return Number(info.lastInsertRowid)
@@ -158,6 +172,94 @@ export class BenchmarkStorage {
     return this.db.prepare(query).all() as unknown as LeaderboardEntry[]
   }
 
+  /**
+   * Gets mean and standard deviation statistics for repeated runs
+   *
+   * @param model - Model name to filter (optional)
+   * @param dataset - Dataset name to filter (optional)
+   * @returns Array of per-model stats with mean and std
+   */
+  getStats(model?: string, dataset?: string): ModelStats[] {
+    let query = `
+      SELECT model, dataset,
+             AVG(auc) AS auc_mean,
+             AVG(eer) AS eer_mean,
+             AVG(avg_latency) AS lat_mean,
+             COUNT(*) AS n
+      FROM benchmark_runs
+      WHERE 1=1
+    `
+    const params: (string | number)[] = []
+
+    if (model) {
+      query += ' AND model = ?'
+      params.push(model)
+    }
+    if (dataset) {
+      query += ' AND dataset = ?'
+      params.push(dataset)
+    }
+
+    query += ' GROUP BY model, dataset ORDER BY auc_mean DESC'
+
+    const agg = this.db.prepare(query).all(...params) as {
+      model: string
+      dataset: string
+      auc_mean: number
+      eer_mean: number
+      lat_mean: number
+      n: number
+    }[]
+
+    // Compute std for each group
+    const result: ModelStats[] = []
+    for (const row of agg) {
+      let aucStd = 0
+      let eerStd = 0
+      let latStd = 0
+
+      if (row.n > 1) {
+        const details = this.db
+          .prepare(
+            'SELECT auc, eer, avg_latency FROM benchmark_runs WHERE model = ? AND dataset = ?'
+          )
+          .all(row.model, row.dataset) as {
+          auc: number
+          eer: number
+          avg_latency: number
+        }[]
+
+        const aucs = details.map(d => d.auc)
+        const eers = details.map(d => d.eer)
+        const lats = details.map(d => d.avg_latency)
+
+        aucStd = Math.sqrt(
+          aucs.reduce((s, v) => s + (v - row.auc_mean) ** 2, 0) / row.n
+        )
+        eerStd = Math.sqrt(
+          eers.reduce((s, v) => s + (v - row.eer_mean) ** 2, 0) / row.n
+        )
+        latStd = Math.sqrt(
+          lats.reduce((s, v) => s + (v - row.lat_mean) ** 2, 0) / row.n
+        )
+      }
+
+      result.push({
+        model: row.model,
+        dataset: row.dataset,
+        aucMean: row.auc_mean,
+        aucStd,
+        eerMean: row.eer_mean,
+        eerStd,
+        latMean: row.lat_mean,
+        latStd,
+        n: row.n
+      })
+    }
+
+    return result
+  }
+
   private migrate(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS benchmark_runs (
@@ -174,9 +276,19 @@ export class BenchmarkStorage {
         eer           REAL NOT NULL,
         auc           REAL NOT NULL,
         roc_points    TEXT NOT NULL,
+        repeat_index  INTEGER DEFAULT 0,
         created_at    TEXT DEFAULT (datetime('now'))
       )
     `)
+
+    // Add repeat_index column to existing databases (idempotent)
+    try {
+      this.db.exec(
+        'ALTER TABLE benchmark_runs ADD COLUMN repeat_index INTEGER DEFAULT 0'
+      )
+    } catch {
+      // Column already exists - ignore
+    }
 
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_runs_model

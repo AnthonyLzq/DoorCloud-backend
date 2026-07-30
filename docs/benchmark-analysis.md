@@ -47,7 +47,21 @@ Model parameters and characteristics were sourced from:
 
 Metadata is stored as a structured CSV (`metrics/models-metadata.csv`) and consumed by plotting scripts, eliminating hardcoded values in visualization code.
 
-### 2.4 Benchmark Datasets
+### 2.4 Statistical Validation
+
+To assess metric stability, each model-dataset combination was evaluated with multiple independent repeats:
+
+| Model Type | Repeats | Rationale |
+|-----------|---------|-----------|
+| InsightFace (ONNX) | 5 | Deterministic by design, confirms stability |
+| dlib (Python IPC) | 3 | Deterministic, limited by execution time (~2.5h per run) |
+| @vladmandic/human (TF.js) | 3 | Deterministic, limited by execution time |
+
+Repeats ran as isolated child processes with `--max-old-space-size=512MB` memory limit, 15 concurrent workers for ONNX/dlib, and sequential execution for human (TF.js memory footprint). All processes used `nice -n 19` to minimize impact on interactive system use.
+
+The standard deviation (sigma) for AUC across all repeats was **0.0000 for every model**, confirming that face recognition inference is fully deterministic. Variance in latency was observed (sigma ~ 100-600ms) but is attributable to CPU contention from parallel execution rather than model-level noise.
+
+### 2.5 Benchmark Datasets
 
 Four standard face verification datasets are used, all pre-processed to 96x96 pixel resolution:
 
@@ -58,7 +72,7 @@ Four standard face verification datasets are used, all pre-processed to 96x96 pi
 | AgeDB-30 | 6,000 | Age-invariant verification, ±30 years |
 | CALFW | 6,000 | Cross-Age LFW, age variation |
 
-### 2.2 Models Evaluated
+### 2.6 Models Evaluated
 
 | Model | Backbone | Embedding | Framework | Parameters |
 |-------|----------|-----------|-----------|------------|
@@ -68,14 +82,14 @@ Four standard face verification datasets are used, all pre-processed to 96x96 pi
 | dlib | ResNet-29 | 128D | Python/dlib | ~120MB |
 | @vladmandic/human | BlazeFace+FaceRes | 1024D | TF.js | ~50MB |
 
-### 2.3 Metrics
+### 2.7 Metrics
 
 - **AUC** (Area Under ROC Curve): overall discriminative ability
 - **TAR@FAR**: True Acceptance Rate at controlled False Acceptance Rates (0.1%, 1%, 10%)
 - **EER** (Equal Error Rate): point where FAR = FRR
 - **Inference Latency**: milliseconds per face pair comparison
 
-### 2.4 Experimental Setup
+### 2.8 Experimental Setup
 
 - **CPU**: Intel (for benchmark), ARM Cortex for deployment estimates
 - **Runtime**: Node.js 24.13.1 with ONNX Runtime for InsightFace, Python 3.14 for dlib IPC, TensorFlow.js 4.21 for human

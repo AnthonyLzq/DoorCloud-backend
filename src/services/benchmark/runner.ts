@@ -16,6 +16,11 @@ export interface BenchmarkOptions {
    * @default all pairs in the dataset
    */
   maxPairs?: number
+  /**
+   * Number of times to repeat the benchmark for confidence intervals
+   * @default 1
+   */
+  repeats?: number
 }
 
 /**
@@ -77,7 +82,7 @@ export async function runBenchmark(
   options: BenchmarkOptions,
   compareFn: CompareFn
 ): Promise<BenchmarkResult[]> {
-  const { dataset: datasetName, models, maxPairs } = options
+  const { dataset: datasetName, models, maxPairs, repeats } = options
 
   if (models.length === 0) {
     throw new Error('At least one model must be specified')
@@ -92,16 +97,33 @@ export async function runBenchmark(
   }
 
   const results: BenchmarkResult[] = []
+  const numRepeats = repeats ?? 1
 
   for (const model of models) {
-    const modelResult = await benchmarkModel(
-      datasetName,
-      model,
-      dataset.rootDir,
-      pairs,
-      compareFn
-    )
-    results.push(modelResult)
+    for (let r = 1; r <= numRepeats; r++) {
+      if (numRepeats > 1) {
+        console.log(
+          `[Benchmark] ${model} on ${datasetName} (repeat ${r}/${numRepeats})...`
+        )
+      }
+
+      const modelResult = await benchmarkModel(
+        datasetName,
+        model,
+        dataset.rootDir,
+        pairs,
+        compareFn
+      )
+
+      if (numRepeats > 1) {
+        // Tag result with repeat info for storage
+        ;(
+          modelResult as BenchmarkResult & { repeatIndex?: number }
+        ).repeatIndex = r
+      }
+
+      results.push(modelResult)
+    }
   }
 
   return results

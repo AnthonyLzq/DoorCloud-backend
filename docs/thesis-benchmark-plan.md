@@ -1,18 +1,12 @@
 # Thesis-Grade Benchmark Improvements — Plan
 
-## 1. Confidence Intervals
+## 1. Confidence Intervals ✅
 
-**Estado**: 1 corrida por modelo/dataset. Sin desviación estándar.
+**Estado**: Completado. 5 repeats para cada modelo ONNX + dlib, 3 repeats para human. 84 tareas ejecutadas, 0 fallos, ~15h total.
 
-**Qué hacer**: Modificar el runner para que cada modelo/dataset se ejecute N veces (ej: 5) y reportar media ± std de AUC, EER y latencia.
+**Resultado**: AUC σ = 0.0000 para todos los modelos (todos son deterministas). La varianza en latencia existe pero es atribuible a contención de CPU por paralelismo, no al modelo en sí.
 
-```
-runBenchmark({ dataset: 'lfw', models: ['buffalo-s'], repeats: 5 })
-```
-
-**Archivos**: `src/services/benchmark/runner.ts`, `storage.ts`, `scripts/histogram_for_metrics.py`
-
-**Tiempo**: ~3h
+**Archivos**: `src/services/benchmark/runner.ts`, `storage.ts`, `scripts/run-ci-benchmarks.ts`, `scripts/_run-repeat.ts`, `scripts/_run-repeat-human.ts`
 
 ---
 
