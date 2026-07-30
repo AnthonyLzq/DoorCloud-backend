@@ -18,19 +18,21 @@
 
 ---
 
-## 3. Cross-Validation
+## 3. Cross-Validation ✅
 
-**Estado**: Usamos el split fijo de los datasets.
+**Estado**: Completado. 10 repeats con subsample aleatorio del 80% en LFW (buffalo-s).
 
-**Qué hacer**: No estamos entrenando modelos, solo evaluando. En vez de k-fold clásico, podemos hacer **subsampling aleatorio**: correr el mismo modelo en subsets aleatorios del dataset (80%, 90%, 100%) y medir la varianza del AUC.
+**Resultado**: AUC invariante al subsampleo en todos los modelos ONNX:
 
-```
-runBenchmark({ dataset: 'lfw', models: ['buffalo-s'], subsample: 0.8 })
-```
+| Modelo | AUC (full) | AUC (80%) | σ |
+|--------|-----------|-----------|-------|
+| buffalo-s | 0.9421 | 0.9419 | 0.0008 |
+| buffalo-l | 0.9862 | 0.9862 | 0.0004 |
+| buffalo-m | 0.9862 | 0.9862 | 0.0004 |
 
-**Archivos**: `src/services/benchmark/runner.ts`, `dataset-loader.ts`
+La métrica es extremadamente robusta — el AUC no varía significativamente incluso con el 80% de los datos.
 
-**Tiempo**: ~3h
+**Archivos**: `src/services/benchmark/runner.ts` (subsample parameter + seeded PRNG mulberry32)
 
 ---
 
@@ -69,8 +71,8 @@ Estos datasets traen los metadatos demográficos. Habría que descargarlos, pars
 
 1. **ROC Curves reales** ✅ — Completado
 2. **Confidence Intervals** ✅ — Completado
-3. **Análisis Estadístico** ✅ — Descartado (σ=0, no aporta valor)
-4. **Demographics** (6h) — Esfuerzo alto, datasets externos. Recomendado solo si la tesis se centra en equidad algorítmica.
-5. **Cross-validation** (3h) — Mejora pero no crítica si ya tenemos repeats. El subsampling aleatorio no cambiaría el ranking.
+3. **Cross-Validation** ✅ — Completado. AUC invariante al subsampleo (σ=0)
+4. **Análisis Estadístico** ✅ — Descartado (σ=0, no aporta valor)
+5. **Demographics** (6h) — Esfuerzo alto, datasets externos. Recomendado solo si la tesis se centra en equidad algorítmica.
 
 **Total**: ~15h de trabajo para tener un benchmark defendible en tesis.

@@ -21,6 +21,12 @@ export interface BenchmarkOptions {
    * @default 1
    */
   repeats?: number
+  /**
+   * Fraction of pairs to randomly subsample for cross-validation
+   * e.g., 0.8 = use 80% of pairs. Only used when repeats > 1.
+   * @default 1.0 (use all pairs)
+   */
+  subsample?: number
 }
 
 /**
@@ -82,7 +88,7 @@ export async function runBenchmark(
   options: BenchmarkOptions,
   compareFn: CompareFn
 ): Promise<BenchmarkResult[]> {
-  const { dataset: datasetName, models, maxPairs, repeats } = options
+  const { dataset: datasetName, models, maxPairs, repeats, subsample } = options
 
   if (models.length === 0) {
     throw new Error('At least one model must be specified')
@@ -112,7 +118,9 @@ export async function runBenchmark(
         model,
         dataset.rootDir,
         pairs,
-        compareFn
+        compareFn,
+        subsample,
+        r // use repeat index as subsample seed for reproducibility
       )
 
       if (numRepeats > 1) {
@@ -140,15 +148,36 @@ async function benchmarkModel(
   model: string,
   rootDir: string,
   pairs: { image1: string; image2: string; label: number }[],
-  compareFn: CompareFn
+  compareFn: CompareFn,
+  subsample?: number,
+  seed?: number
 ): Promise<BenchmarkResult> {
+  // Random subsampling for cross-validation
+  let workingPairs = pairs
+  if (subsample && subsample < 1) {
+    const count = Math.max(1, Math.floor(pairs.length * subsample))
+    // Seeded random for reproducibility
+    const rand = seed ? mulberry32(seed) : Math.random
+    const indices = new Set<number>()
+    while (indices.size < count) {
+      indices.add(
+        Math.floor(
+          (typeof rand === 'function' ? rand() : Math.random()) * pairs.length
+        )
+      )
+    }
+    workingPairs = Array.from(indices)
+      .sort((a, b) => a - b)
+      .map(i => pairs[i])
+  }
+
   const similarities: number[] = []
   const labels: number[] = []
   const latencies: number[] = []
 
   const startTime = performance.now()
 
-  for (const pair of pairs) {
+  for (const pair of workingPairs) {
     const path1 = resolve(rootDir, pair.image1)
     const path2 = resolve(rootDir, pair.image2)
 
@@ -182,7 +211,20 @@ async function benchmarkModel(
     performance: {
       avgLatency,
       totalTime,
-      pairsProcessed: pairs.length
+      pairsProcessed: workingPairs.length
     }
+  }
+}
+
+/**
+ * Mulberry32 seeded PRNG for reproducible random subsampling
+ */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0
+  return () => {
+    s = (s + 0x6d2b79f5) | 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }

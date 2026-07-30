@@ -154,3 +154,4 @@ metrics/benchmark-results.md
 # Face recognition benchmark datasets (downloaded via scripts/download-datasets.sh)
 datasets/*
 !datasets/README.md
+tmp/

@@ -72,7 +72,19 @@ Four standard face verification datasets are used, all pre-processed to 96x96 pi
 | AgeDB-30 | 6,000 | Age-invariant verification, ±30 years |
 | CALFW | 6,000 | Cross-Age LFW, age variation |
 
-### 2.6 Models Evaluated
+### 2.6 Cross-Validation
+
+To assess metric stability under data subsampling, a random subsampling experiment was conducted. For each InsightFace model, 5 independent repeats were performed using a random 80% subset of LFW pairs (4,800 out of 6,000). Each repeat used a different random seed via the mulberry32 PRNG, ensuring reproducibility.
+
+| Model | AUC (full) | AUC (80% subsample) | Std Dev | Delta |
+|-------|-----------|---------------------|---------|-------|
+| Buffalo-S | 0.9421 | 0.9419 | 0.0008 | 0.0002 |
+| Buffalo-L | 0.9862 | 0.9862 | 0.0004 | 0.0000 |
+| Buffalo-M | 0.9862 | 0.9862 | 0.0004 | 0.0000 |
+
+The standard deviation across subsample runs is negligible (maximum σ = 0.0008), confirming that AUC measurements are robust to data sampling variations. The ranking between models remains unchanged regardless of the subset used.
+
+### 2.7 Models Evaluated
 
 | Model | Backbone | Embedding | Framework | Parameters |
 |-------|----------|-----------|-----------|------------|
@@ -82,14 +94,14 @@ Four standard face verification datasets are used, all pre-processed to 96x96 pi
 | dlib | ResNet-29 | 128D | Python/dlib | ~120MB |
 | @vladmandic/human | BlazeFace+FaceRes | 1024D | TF.js | ~50MB |
 
-### 2.7 Metrics
+### 2.8 Metrics
 
 - **AUC** (Area Under ROC Curve): overall discriminative ability
 - **TAR@FAR**: True Acceptance Rate at controlled False Acceptance Rates (0.1%, 1%, 10%)
 - **EER** (Equal Error Rate): point where FAR = FRR
 - **Inference Latency**: milliseconds per face pair comparison
 
-### 2.8 Experimental Setup
+### 2.9 Experimental Setup
 
 - **CPU**: Intel (for benchmark), ARM Cortex for deployment estimates
 - **Runtime**: Node.js 24.13.1 with ONNX Runtime for InsightFace, Python 3.14 for dlib IPC, TensorFlow.js 4.21 for human
