@@ -154,6 +154,10 @@ The human baseline for face verification is 97.53% (LFW benchmark). All InsightF
 | Pi 2 (900MHz) | 1GB | Buffalo-S, Buffalo-M | Buffalo-S |
 | Pi 4B (1.8GHz) | 2-8GB | All ONNX models | Buffalo-S or Buffalo-M |
 
+### 4.5 Statistical Significance
+
+Due to the deterministic nature of all evaluated models (AUC sigma = 0 across multiple repeats, section 2.4), traditional statistical significance tests (Wilcoxon signed-rank, McNemar) are not applicable. When a model consistently produces identical AUC values across independent runs, any observed difference between models is a true effect rather than a statistical fluctuation. The ranking presented in section 3.1 is therefore definitive for the evaluated datasets and hardware configuration.
+
 ---
 
 ## 5. Conclusion

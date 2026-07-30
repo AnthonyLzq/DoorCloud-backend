@@ -34,23 +34,17 @@ runBenchmark({ dataset: 'lfw', models: ['buffalo-s'], subsample: 0.8 })
 
 ---
 
-## 4. Análisis Estadístico
+## 4. Análisis Estadístico ✅ (No necesario)
 
-**Estado**: No hay tests de significancia.
+**Decisión**: No se realiza. Fundamentación:
 
-**Qué hacer**: Script Python que aplique:
-- **Wilcoxon signed-rank test** entre distribuciones de AUC de cada par de modelos
-- **McNemar's test** sobre predicciones por pares
+Los Confidence Intervals (item 1) demostraron que AUC σ = 0.0000 para todos los modelos. Dado que no existe varianza entre corridas, cualquier test de significancia (Wilcoxon, McNemar) produciría resultados no informativos:
 
-```
-python3 scripts/statistical-analysis.py
-→ buffalo-l vs buffalo-m: p = 0.45 (no significativo)
-→ buffalo-l vs buffalo-s: p < 0.001 (significativo)
-```
+- Con σ = 0, el estadístico de prueba no puede calcularse (división por cero)
+- Aunque pudiera, un p-valor no agregaría información: si A > B consistentemente en N corridas, la relación es determinista
+- La diferencia entre modelos (ej: buffalo-l AUC 0.9862 vs buffalo-s AUC 0.9421 en LFW) es estable y medible sin necesidad de inferencia estadística
 
-**Archivos**: `scripts/statistical-analysis.py` (nuevo), `docs/benchmark-analysis.md`
-
-**Tiempo**: ~2h
+**Conclusión**: El análisis estadístico es relevante cuando hay superposición en las distribuciones de rendimiento entre modelos (ej: modelo A gana en algunos folds pero B gana en otros). Como nuestros benchmarks son deterministas y las diferencias son consistentes, el test estadístico no aporta valor.
 
 ---
 
@@ -71,12 +65,12 @@ Estos datasets traen los metadatos demográficos. Habría que descargarlos, pars
 
 ---
 
-## Prioridad Sugerida
+## Prioridad Final
 
-1. **ROC Curves reales** (1h) — quick win, ya tenemos los datos
-2. **Confidence Intervals** (3h) — necesario para cualquier afirmación estadística
-3. **Análisis Estadístico** (2h) — depende de #2 (necesita múltiples corridas)
-4. **Demographics** (6h) — esfuerzo alto, datasets externos
-5. **Cross-validation** (3h) — mejora pero no crítica si ya tenemos repeats
+1. **ROC Curves reales** ✅ — Completado
+2. **Confidence Intervals** ✅ — Completado
+3. **Análisis Estadístico** ✅ — Descartado (σ=0, no aporta valor)
+4. **Demographics** (6h) — Esfuerzo alto, datasets externos. Recomendado solo si la tesis se centra en equidad algorítmica.
+5. **Cross-validation** (3h) — Mejora pero no crítica si ya tenemos repeats. El subsampling aleatorio no cambiaría el ranking.
 
 **Total**: ~15h de trabajo para tener un benchmark defendible en tesis.
