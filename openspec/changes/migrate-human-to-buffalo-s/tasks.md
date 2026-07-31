@@ -44,11 +44,11 @@ Acceptance (Phase 1): `pnpm test:local` face-detection tests green; no provider 
 
 ## Phase 2: Provider detection + alignment
 
-- [ ] 2.1 Write RED test `detectFaces()` in `test/onnx-provider.test.ts`: mock session → 9 outputs named 443/446/449, 468/471/474, 493/496/499 (scores/bboxes/kpss per stride); input `[1,3,640,640]` RGB letterbox normalized `(v-127.5)/128`
-- [ ] 2.2 Implement `detectFaces(image, opts?)` in `onnx-provider.ts`: letterbox (aspect-preserve, zero-pad, NOT fit:fill) → `det_500m` inference → `decodeOutputs` + `nms` → scale back by `det_scale` to original coords → `FaceDetection[]` (`{bbox,score,landmarks}`)
-- [ ] 2.3 Write RED test `getAlignedEmbedding()`: warp via `warpAffine` to 112x112 then existing `preprocess` `(v/127.5-1.0)`; assert `[1,3,112,112]` output feed
-- [ ] 2.4 Implement `getAlignedEmbedding(image, landmarks, modelName)` in `onnx-provider.ts` (uses `w600k_mbf` session)
-- [ ] 2.5 Write integration test (skip unless `models/` present): real LFW image → `detectFaces` yields 1 face + landmarks; re-embed warped crop returns 512-dim embedding
+- [x] 2.1 Write RED test `detectFaces()` in `test/onnx-provider.test.ts`: mock session → 9 outputs named 443/446/449, 468/471/474, 493/496/499 (scores/bboxes/kpss per stride); input `[1,3,640,640]` RGB letterbox normalized `(v-127.5)/128`
+- [x] 2.2 Implement `detectFaces(image, opts?)` in `onnx-provider.ts`: letterbox (aspect-preserve, zero-pad, NOT fit:fill) → `det_500m` inference → `decodeOutputs` + `nonMaximumSuppression` → scale back by `det_scale` to original coords → `FaceDetection[]` (`{bbox,score,landmarks}`)
+- [x] 2.3 Write RED test `getAlignedEmbedding()`: warp via `warpAffine` to 112x112 then existing `preprocess` `(v/127.5-1.0)`; assert `[1,3,112,112]` output feed
+- [x] 2.4 Implement `getAlignedEmbedding(image, landmarks, modelName)` in `onnx-provider.ts` (uses `w600k_mbf` session)
+- [x] 2.5 Write integration test (skip unless `models/` present): real LFW image → `detectFaces` yields 1 face + landmarks; re-embed warped crop returns 512-dim embedding
 
 Acceptance (Phase 2): provider tests green with mocked sessions; integration test skips gracefully without models.
 

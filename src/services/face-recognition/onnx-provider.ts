@@ -2,6 +2,16 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as ort from 'onnxruntime-node'
 import sharp from 'sharp'
+import type { DecodedFace } from './face-detection'
+import {
+  ARC_FACE_DESTINATION_LANDMARKS,
+  DEFAULT_DETECTION_THRESHOLD,
+  DEFAULT_NMS_THRESHOLD,
+  decodeOutputs,
+  estimateSimilarityTransform,
+  nonMaximumSuppression,
+  warpAffine
+} from './face-detection'
 
 export interface ONNXModelMetadata {
   name: string
@@ -9,6 +19,82 @@ export interface ONNXModelMetadata {
   landmarks: number
   approach: 'onnx'
   speed: number
+}
+
+export const DETECTOR_MODEL_NAME = 'det_500m'
+export const RECOGNITION_MODEL_NAME = 'w600k_mbf'
+
+export const DETECTOR_INPUT_SIZE = { width: 640, height: 640 } as const
+
+export const DETECTOR_OUTPUT_NAMES: ReadonlyArray<{
+  stride: number
+  scores: string
+  boxes: string
+  landmarks: string
+}> = [
+  { stride: 8, scores: '443', boxes: '446', landmarks: '449' },
+  { stride: 16, scores: '468', boxes: '471', landmarks: '474' },
+  { stride: 32, scores: '493', boxes: '496', landmarks: '499' }
+]
+
+export type FaceDetection = DecodedFace
+
+const WARP_OUTPUT_WIDTH = 112
+const WARP_OUTPUT_HEIGHT = 112
+
+function computeLetterboxDimensions(
+  width: number,
+  height: number,
+  targetWidth: number,
+  targetHeight: number
+): { resizedWidth: number; resizedHeight: number; detScale: number } {
+  const imageRatio = height / width
+  const targetRatio = targetHeight / targetWidth
+
+  if (imageRatio > targetRatio) {
+    const resizedHeight = targetHeight
+    const resizedWidth = Math.round(resizedHeight / imageRatio)
+    return { resizedWidth, resizedHeight, detScale: resizedHeight / height }
+  }
+
+  const resizedWidth = targetWidth
+  const resizedHeight = Math.round(resizedWidth * imageRatio)
+  return { resizedWidth, resizedHeight, detScale: resizedHeight / height }
+}
+
+function buildDetectorInput(
+  paddedRgb: Uint8Array,
+  targetWidth: number,
+  targetHeight: number
+): ort.Tensor {
+  const channelSize = targetWidth * targetHeight
+  const float32Data = new Float32Array(3 * channelSize)
+
+  for (let i = 0; i < channelSize; i++) {
+    float32Data[i] = (paddedRgb[i * 3] - 127.5) / 128
+    float32Data[channelSize + i] = (paddedRgb[i * 3 + 1] - 127.5) / 128
+    float32Data[2 * channelSize + i] = (paddedRgb[i * 3 + 2] - 127.5) / 128
+  }
+
+  return new ort.Tensor('float32', float32Data, [
+    1,
+    3,
+    targetWidth,
+    targetHeight
+  ])
+}
+
+function buildRecognitionInput(rgb112: Uint8Array): ort.Tensor {
+  const channelSize = WARP_OUTPUT_WIDTH * WARP_OUTPUT_HEIGHT
+  const float32Data = new Float32Array(3 * channelSize)
+
+  for (let i = 0; i < channelSize; i++) {
+    float32Data[i] = rgb112[i * 3] / 127.5 - 1.0
+    float32Data[channelSize + i] = rgb112[i * 3 + 1] / 127.5 - 1.0
+    float32Data[2 * channelSize + i] = rgb112[i * 3 + 2] / 127.5 - 1.0
+  }
+
+  return new ort.Tensor('float32', float32Data, [1, 3, 112, 112])
 }
 
 export class ONNXProvider {
@@ -88,6 +174,129 @@ export class ONNXProvider {
         `Inference failed: ${error instanceof Error ? error.message : String(error)}`
       )
     }
+  }
+
+  async detectFaces(
+    image: Buffer,
+    opts: { detThresh?: number; nmsThresh?: number } = {}
+  ): Promise<FaceDetection[]> {
+    const session = this.models.get(DETECTOR_MODEL_NAME)
+    if (!session) {
+      throw new Error(`Model not loaded: ${DETECTOR_MODEL_NAME}`)
+    }
+
+    const detThresh = opts.detThresh ?? DEFAULT_DETECTION_THRESHOLD
+    const nmsThresh = opts.nmsThresh ?? DEFAULT_NMS_THRESHOLD
+    const targetWidth = DETECTOR_INPUT_SIZE.width
+    const targetHeight = DETECTOR_INPUT_SIZE.height
+
+    const { data, info } = await sharp(image)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    const { width, height } = info
+
+    const { resizedWidth, resizedHeight, detScale } =
+      computeLetterboxDimensions(width, height, targetWidth, targetHeight)
+
+    const resized = await sharp(data, {
+      raw: { width, height, channels: 3 }
+    })
+      .resize(resizedWidth, resizedHeight, { fit: 'fill' })
+      .removeAlpha()
+      .raw()
+      .toBuffer()
+
+    const padded = new Uint8Array(targetWidth * targetHeight * 3)
+    for (let y = 0; y < resizedHeight; y++) {
+      padded.set(
+        resized.subarray(y * resizedWidth * 3, (y + 1) * resizedWidth * 3),
+        y * targetWidth * 3
+      )
+    }
+
+    const inputName = session.inputNames[0]
+    const feeds: Record<string, ort.Tensor> = {}
+    feeds[inputName] = buildDetectorInput(padded, targetWidth, targetHeight)
+    const results = await session.run(feeds)
+
+    let decodedFaces: DecodedFace[] = []
+    for (const outputGroup of DETECTOR_OUTPUT_NAMES) {
+      const scoresData = results[outputGroup.scores].data as Float32Array
+      const boxesData = results[outputGroup.boxes].data as Float32Array
+      const landmarksData = results[outputGroup.landmarks].data as Float32Array
+      decodedFaces = decodedFaces.concat(
+        decodeOutputs(
+          scoresData,
+          boxesData,
+          landmarksData,
+          outputGroup.stride,
+          DETECTOR_INPUT_SIZE,
+          detThresh
+        )
+      )
+    }
+
+    return nonMaximumSuppression(decodedFaces, nmsThresh).map(face => ({
+      bbox: [
+        face.bbox[0] / detScale,
+        face.bbox[1] / detScale,
+        face.bbox[2] / detScale,
+        face.bbox[3] / detScale
+      ] as [number, number, number, number],
+      score: face.score,
+      landmarks: face.landmarks.map(([x, y]): [number, number] => [
+        x / detScale,
+        y / detScale
+      ])
+    }))
+  }
+
+  async getAlignedEmbedding(
+    image: Buffer,
+    landmarks: ReadonlyArray<readonly [number, number]>,
+    modelName: string
+  ): Promise<Float32Array> {
+    const session = this.models.get(modelName)
+    if (!session) {
+      throw new Error(`Model not loaded: ${modelName}`)
+    }
+
+    const { data, info } = await sharp(image)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    const { width, height } = info
+
+    const matrix = estimateSimilarityTransform(
+      landmarks,
+      ARC_FACE_DESTINATION_LANDMARKS
+    )
+    if (!matrix) {
+      throw new Error('Failed to estimate similarity transform from landmarks')
+    }
+
+    const warped = warpAffine(
+      data,
+      width,
+      height,
+      matrix,
+      WARP_OUTPUT_WIDTH,
+      WARP_OUTPUT_HEIGHT
+    )
+
+    const inputName = session.inputNames[0]
+    const feeds: Record<string, ort.Tensor> = {}
+    feeds[inputName] = buildRecognitionInput(warped)
+    const results = await session.run(feeds)
+
+    const outputName = session.outputNames[0]
+    const output = results[outputName]
+    if (!output?.data) {
+      throw new Error('No output from model inference')
+    }
+
+    return output.data as Float32Array
   }
 
   async preprocess(image: Buffer): Promise<ort.Tensor> {
