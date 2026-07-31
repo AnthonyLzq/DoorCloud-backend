@@ -1,6 +1,21 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+// Deterministic PRNG (mulberry32) for reproducible sampling — same algorithm
+// used in the benchmark cross-validation (section 2.6)
+const SEED = 42
+function mulberry32(seed: number): () => number {
+  let a = seed
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+const rng = mulberry32(SEED)
+
 const MODELS = [
   'dlib',
   'insightface-buffalo-s',
@@ -140,7 +155,7 @@ function computePCA(
   function powerIterate(G: number[][], n: number): number[][] {
     const vecs: number[][] = []
     for (let comp = 0; comp < n; comp++) {
-      let v = new Array(k).fill(0).map(() => Math.random() - 0.5)
+      let v = new Array(k).fill(0).map(() => rng() - 0.5)
       for (let iter = 0; iter < 200; iter++) {
         // Orthogonalize against previous components
         for (const prev of vecs) {
@@ -257,7 +272,7 @@ function analyzeNN(
     const n = Math.min(sampleSize, embs.length)
     const indices = new Set<number>()
     while (indices.size < n) {
-      indices.add(Math.floor(Math.random() * embs.length))
+      indices.add(Math.floor(rng() * embs.length))
     }
     for (const idx of indices) {
       const query = embs[idx]
@@ -385,53 +400,51 @@ function analyzeModel(
   }
 }
 
-// ---------- report ----------
-function generateReport(results: ModelResult[]): string {
-  const lines: string[] = []
-  const pad = (s: string, w: number) => s.padEnd(w)
+// ---------- appendix ----------
+const GROUP_DISPLAY = (g: string) => g.replace(/_/g, ' ')
 
-  lines.push('# Demographic Bias Analysis — BFW Dataset')
+function generateAppendix(results: ModelResult[]): string {
+  const lines: string[] = []
+
+  lines.push('## Appendix A: Detailed Demographic Bias Results')
   lines.push('')
   lines.push(
-    `Analysis of **${results.length} models** across **${GROUPS.length} demographic groups** ` +
-      `using the BFW (Balanced Faces in the Wild) dataset.`
+    'Per-model results from the BFW analysis. LaTeX equivalents of these tables are in `metrics/tables/` for direct inclusion in a thesis document.'
   )
   lines.push('')
-  lines.push('## Summary')
+
+  // A.1 Cross-model comparison
+  lines.push('### A.1 Cross-Model Comparison')
   lines.push('')
-  lines.push('| Model | Dim | Total | NN Acc | Groups balanced? |')
-  lines.push('|-------|-----|-------|--------|-----------------|')
+  lines.push(
+    '| Model | Dim | NN Acc | Intra-range (Δ) | Best group | Worst group |'
+  )
+  lines.push(
+    '|-------|-----|--------|-----------------|-----------|-------------|'
+  )
   for (const r of results) {
-    const minCount = Math.min(...GROUPS.map(g => r.groups[g]?.count ?? 0))
-    const maxCount = Math.max(...GROUPS.map(g => r.groups[g]?.count ?? 0))
-    const balanced =
-      minCount === maxCount ? '✅ Yes' : `⚠️ ${minCount}–${maxCount}`
+    const sims = GROUPS.map(g => r.groups[g]?.meanIntraSimilarity ?? 0)
+    const mn = Math.min(...sims)
+    const mx = Math.max(...sims)
+    const bestG = GROUP_DISPLAY(GROUPS[sims.indexOf(mx)])
+    const worstG = GROUP_DISPLAY(GROUPS[sims.indexOf(mn)])
     lines.push(
-      `| ${r.model} | ${r.dim}d | ${r.total} | ${(r.nnAccuracy * 100).toFixed(1)}% | ${balanced} |`
+      `| ${r.model} | ${r.dim}d | ${(r.nnAccuracy * 100).toFixed(1)}% | ` +
+        `${(mn * 100).toFixed(1)}%–${(mx * 100).toFixed(1)}% (Δ=${((mx - mn) * 100).toFixed(2)}%) | ` +
+        `${bestG} | ${worstG} |`
     )
   }
   lines.push('')
 
-  // Best overall model
-  const best = [...results].sort((a, b) => b.nnAccuracy - a.nnAccuracy)[0]
-  lines.push(
-    `**Best performing (highest NN accuracy):** ${best.model} (${(best.nnAccuracy * 100).toFixed(1)}%)`
-  )
-  lines.push('')
-
-  // Per-model detail
-  for (const r of results) {
-    lines.push(`## ${r.model}`)
+  // A.2..A.6 Per-model detail
+  const sectionLabels = ['A.2', 'A.3', 'A.4', 'A.5', 'A.6']
+  for (let mi = 0; mi < results.length; mi++) {
+    const r = results[mi]
+    lines.push(`### ${sectionLabels[mi]} ${r.model} (${r.dim}D)`)
     lines.push('')
-    lines.push(`- **Dimensions:** ${r.dim}d`)
-    lines.push(`- **Total embeddings:** ${r.total}`)
     lines.push(
-      `- **NN classification accuracy:** ${(r.nnAccuracy * 100).toFixed(1)}%`
+      `- **Total embeddings:** ${r.total.toLocaleString()} | **NN accuracy:** ${(r.nnAccuracy * 100).toFixed(1)}%`
     )
-    lines.push('')
-
-    // Intra-group similarity table
-    lines.push('### Intra-group Similarity (cohesion)')
     lines.push('')
     lines.push(
       '| Group | Count | Mean Intra-Sim | Std Intra-Sim | Mean Magnitude | Variance (mean) |'
@@ -454,46 +467,10 @@ function generateReport(results: ModelResult[]): string {
     }
     lines.push('')
 
-    // Inter-group similarity matrix
-    lines.push('### Inter-group Similarity (centroid cosine, %)')
-    lines.push('')
-    const header =
-      '| | ' +
-      GROUPS.map(g => g.replace('_', ' ').replace('_', ' ')).join(' | ') +
-      ' |'
-    lines.push(header)
-    const sep = '|' + new Array(GROUPS.length + 1).fill('---').join('|') + '|'
-    lines.push(sep)
-    for (let i = 0; i < GROUPS.length; i++) {
-      const row =
-        '| ' +
-        GROUPS[i].replace('_', ' ').replace('_', ' ') +
-        ' | ' +
-        r.interGroupSimilarity[i].map(v => (v * 100).toFixed(1)).join(' | ') +
-        ' |'
-      lines.push(row)
-    }
-    lines.push('')
-
-    // Intra-group bias indicator
-    lines.push('### Bias Indicators')
-    lines.push('')
+    // Bias indicators for this model
     const sims = GROUPS.map(g => r.groups[g]?.meanIntraSimilarity ?? 0)
     const minSim = Math.min(...sims)
     const maxSim = Math.max(...sims)
-    const rangeSim = maxSim - minSim
-    const meanSim = mean(sims)
-    lines.push(
-      `- **Intra-similarity range:** ${(minSim * 100).toFixed(2)}% – ${(maxSim * 100).toFixed(2)}% (Δ = ${(rangeSim * 100).toFixed(2)}%)`
-    )
-    lines.push(
-      `- **Group with highest cohesion:** ${GROUPS[sims.indexOf(maxSim)].replace('_', ' ').replace('_', ' ')} (${(maxSim * 100).toFixed(2)}%)`
-    )
-    lines.push(
-      `- **Group with lowest cohesion:** ${GROUPS[sims.indexOf(minSim)].replace('_', ' ').replace('_', ' ')} (${(minSim * 100).toFixed(2)}%)`
-    )
-
-    // Which groups are closest/farthest
     let maxInter = -Infinity
     let minInter = Infinity
     let maxPair = ''
@@ -503,64 +480,46 @@ function generateReport(results: ModelResult[]): string {
         const s = r.interGroupSimilarity[i][j]
         if (s > maxInter) {
           maxInter = s
-          maxPair = `${GROUPS[i]} ↔ ${GROUPS[j]}`
+          maxPair = `${GROUP_DISPLAY(GROUPS[i])}↔${GROUP_DISPLAY(GROUPS[j])}`
         }
         if (s < minInter) {
           minInter = s
-          minPair = `${GROUPS[i]} ↔ ${GROUPS[j]}`
+          minPair = `${GROUP_DISPLAY(GROUPS[i])}↔${GROUP_DISPLAY(GROUPS[j])}`
         }
       }
     }
     lines.push(
-      `- **Closest groups:** ${maxPair} (${(maxInter * 100).toFixed(1)}%)`
-    )
-    lines.push(
-      `- **Farthest groups:** ${minPair} (${(minInter * 100).toFixed(1)}%)`
+      `**Bias indicators:** Intra-range Δ=${((maxSim - minSim) * 100).toFixed(2)}% (${(minSim * 100).toFixed(2)}%–${(maxSim * 100).toFixed(2)}%). Highest cohesion: ${GROUP_DISPLAY(GROUPS[sims.indexOf(maxSim)])}. Lowest: ${GROUP_DISPLAY(GROUPS[sims.indexOf(minSim)])}. Closest groups: ${maxPair} (${(maxInter * 100).toFixed(1)}%). Farthest: ${minPair} (${(minInter * 100).toFixed(1)}%).`
     )
     lines.push('')
+  }
 
-    // NN accuracy by group
-    lines.push('### Nearest-Neighbor Accuracy by Group')
-    lines.push('')
-    lines.push('| Group | Same-group NN | Other-group NN | Accuracy |')
-    lines.push('|-------|---------------|---------------|----------|')
-    for (const g of GROUPS) {
+  // A.7 NN accuracy by group (consolidated)
+  lines.push('### A.7 NN Accuracy by Group')
+  lines.push('')
+  lines.push('| Group | ' + results.map(r => r.model).join(' | ') + ' |')
+  lines.push('|-------|' + results.map(() => '-------').join('|') + '|')
+  for (const g of GROUPS) {
+    const row = results.map(r => {
       const nn = r.nnByGroup[g]
-      if (!nn || nn.same + nn.other === 0) continue
-      const acc = ((nn.same / Math.max(nn.same + nn.other, 1)) * 100).toFixed(1)
-      lines.push(`| ${g} | ${nn.same} | ${nn.other} | ${acc}% |`)
-    }
-    lines.push('')
-  }
-
-  // Cross-model comparison
-  lines.push('## Cross-Model Comparison')
-  lines.push('')
-  lines.push(
-    '| Model | Dim | NN Acc | Intra-range (Δ) | Best group | Worst group |'
-  )
-  lines.push(
-    '|-------|-----|--------|-----------------|-----------|-------------|'
-  )
-  for (const r of results) {
-    const sims = GROUPS.map(g => r.groups[g]?.meanIntraSimilarity ?? 0)
-    const mn = Math.min(...sims)
-    const mx = Math.max(...sims)
-    const bestG = GROUPS[sims.indexOf(mx)].replace('_', ' ').replace('_', ' ')
-    const worstG = GROUPS[sims.indexOf(mn)].replace('_', ' ').replace('_', ' ')
-    lines.push(
-      `| ${r.model} | ${r.dim}d | ${(r.nnAccuracy * 100).toFixed(1)}% | ` +
-        `${(mn * 100).toFixed(1)}% – ${(mx * 100).toFixed(1)}% (Δ=${((mx - mn) * 100).toFixed(2)}%) | ` +
-        `${bestG} | ${worstG} |`
-    )
+      if (!nn || nn.same + nn.other === 0) return '—'
+      return (
+        ((nn.same / Math.max(nn.same + nn.other, 1)) * 100).toFixed(1) + '%'
+      )
+    })
+    lines.push(`| ${g} | ${row.join(' | ')} |`)
   }
   lines.push('')
 
-  // PCA by group means
-  lines.push('## PCA of Group Centroids')
+  // A.8 PCA of group centroids
+  lines.push('### A.8 PCA of Group Centroids')
+  lines.push('')
+  lines.push(
+    'Figure 6 (`metrics/figures/figure06-pca-centroids.png`) shows the PCA projection of the 8 group centroids for each model.'
+  )
   lines.push('')
   for (const r of results) {
-    lines.push(`### ${r.model}`)
+    lines.push(`**${r.model}**`)
     lines.push('')
     const centroids: Record<string, Embedding> = {}
     for (const g of GROUPS) {
@@ -578,7 +537,6 @@ function generateReport(results: ModelResult[]): string {
     lines.push('|-------|-----|-----|-----------|')
     for (const g of GROUPS) {
       if (!centroids[g]) continue
-      // Project centroid onto PCs
       const c = centroids[g]
       let p1 = 0,
         p2 = 0
@@ -591,49 +549,9 @@ function generateReport(results: ModelResult[]): string {
     lines.push('')
   }
 
-  // Conclusions
-  lines.push('## Conclusions')
-  lines.push('')
-  const minRange = Math.min(
-    ...results.map(r => {
-      const sims = GROUPS.map(g => r.groups[g]?.meanIntraSimilarity ?? 0)
-      return Math.max(...sims) - Math.min(...sims)
-    })
-  )
-  const maxRange = Math.max(
-    ...results.map(r => {
-      const sims = GROUPS.map(g => r.groups[g]?.meanIntraSimilarity ?? 0)
-      return Math.max(...sims) - Math.min(...sims)
-    })
-  )
-  lines.push(
-    `- **Intra-group similarity range** varies by model: ` +
-      `${(minRange * 100).toFixed(2)}% – ${(maxRange * 100).toFixed(2)}% across models. ` +
-      `A lower range means more uniform treatment of demographic groups.`
-  )
-  lines.push(
-    `- **Nearest-neighbor accuracy** ranges from ` +
-      `${(Math.min(...results.map(r => r.nnAccuracy)) * 100).toFixed(1)}% to ` +
-      `${(Math.max(...results.map(r => r.nnAccuracy)) * 100).toFixed(1)}%. ` +
-      `Higher values suggest the model finds demographic features more discriminative.`
-  )
-  const worstModel = [...results]
-    .sort(
-      (a, b) =>
-        Math.max(...GROUPS.map(g => a.groups[g]?.meanIntraSimilarity ?? 0)) -
-        Math.min(...GROUPS.map(g => a.groups[g]?.meanIntraSimilarity ?? 0)) -
-        (Math.max(...GROUPS.map(g => b.groups[g]?.meanIntraSimilarity ?? 0)) -
-          Math.min(...GROUPS.map(g => b.groups[g]?.meanIntraSimilarity ?? 0)))
-    )
-    .pop()!
-  lines.push(
-    `- **Model with most demographic bias (highest intra-range):** ${worstModel.model}`
-  )
-
-  lines.push('')
   lines.push('---')
   lines.push(
-    `_Generated by metrics/analyze-bias.ts — ${new Date().toISOString()}_`
+    `_Appendix A generated by metrics/analyze-bias.ts — ${new Date().toISOString()}_`
   )
   lines.push('')
 
@@ -667,12 +585,23 @@ async function main() {
     )
   }
 
-  console.error('[analyze] Generating report...')
-  const report = generateReport(results)
-  const reportPath = resolve(process.cwd(), 'metrics/bias-analysis-report.md')
-  writeFileSync(reportPath, report, 'utf-8')
-  console.error(`[analyze] Report saved to ${reportPath}`)
-  console.log(report)
+  console.error('[analyze] Generating Appendix A...')
+  const appendix = generateAppendix(results)
+
+  const docPath = resolve(process.cwd(), 'docs/benchmark-analysis.md')
+  const doc = readFileSync(docPath, 'utf-8')
+  const appendixStart = doc.indexOf('## Appendix A')
+  const refsStart = doc.indexOf('## References', appendixStart)
+  if (appendixStart === -1 || refsStart === -1) {
+    console.error(
+      'FATAL: Could not find "## Appendix A" or "## References" markers in docs/benchmark-analysis.md'
+    )
+    process.exit(1)
+  }
+  const newDoc =
+    doc.slice(0, appendixStart) + appendix + '\n' + doc.slice(refsStart)
+  writeFileSync(docPath, newDoc, 'utf-8')
+  console.error(`[analyze] Appendix A updated in ${docPath}`)
 }
 
 main().catch(e => {

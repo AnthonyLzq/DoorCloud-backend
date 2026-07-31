@@ -30,10 +30,16 @@ src/
 scripts/
 ├── face_recognition_server.py    # Servidor Python para modelos no-ONNX
 ├── download-models.sh            # Descarga de modelos ONNX
-└── install-python-deps.sh        # Instalación de dependencias Python
+├── install-python-deps.sh        # Instalación de dependencias Python
+├── embed-bfw.ts                  # Genera embeddings BFW para 5 modelos (2 workers, dlib lento ~4h)
+├── embed-one-model.ts            # Worker de embedding para un modelo
+├── analyze-demographics.ts       # Análisis demográfico por grupo (usa calculateAllMetrics)
+├── plot-bias-analysis.py         # Figuras 300 DPI + tablas LaTeX del análisis de bias
+└── histogram_for_metrics.py      # Figuras benchmark (AUC, ROC, latency)
 
 docs/
-└── adr/             # Architecture Decision Records
+├── adr/             # Architecture Decision Records
+└── benchmark-analysis.md   # Documento thesis-like: benchmark + bias + Appendix A (auto-generado)
 ```
 
 ## Convenciones de Código
@@ -58,6 +64,26 @@ docs/
 - **Sin emojis** en mensajes de commit
 - **Descriptivos** pero concisos
 - **Referenciar issues** si aplica
+
+## Análisis de Benchmark y Bias Demográfico
+
+El documento `docs/benchmark-analysis.md` es el **documento thesis-like** que unifica benchmark + bias. **IMPORTANTE: el Appendix A es AUTO-GENERADO** por `metrics/analyze-bias.ts` — no editarlo a mano, se regenera con:
+
+```bash
+pnpm benchmark:analyze    # Regenera Appendix A en docs/benchmark-analysis.md (seed fijo 42, reproducible)
+pnpm benchmark:plots      # Figuras 300 DPI (metrics/figures/) + tablas LaTeX (metrics/tables/)
+```
+
+Pipeline completo y detalles en `README.md` (sección "Benchmark and Demographic Bias Analysis").
+
+### Datos clave
+
+- **Embeddings** (`metrics/embeddings/`, ~883MB): runtime data, gitignored, regenerables con `pnpm benchmark:embeddings` (dlib tarda ~4h)
+- **Figuras**: `metrics/figures/figure01..09.png` (01-03 benchmark, 04-09 bias)
+- **Tablas LaTeX**: `metrics/tables/tab01..03-*.tex` listas para `\input{}` en la tesis
+- **Dataset BFW**: `datasets/tmp/BFW-Release/bfw-faces-cropped/...` (20K imágenes, 8 grupos)
+- **Python**: `.venv` con numpy, pandas, matplotlib, seaborn (matplotlib 3.11.1, numpy 2.5.1)
+- **Hallazgo clave**: Buffalo-S es el modelo recomendado pero tiene el mayor bias demográfico (Δ=14.31% intra-range vs Δ=7.19% Buffalo-L/M); para DoorCloud 1:1 verification el bias no impacta
 
 ## Sistema de Face Recognition
 
