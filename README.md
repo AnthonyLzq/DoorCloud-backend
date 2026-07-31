@@ -53,6 +53,19 @@ This script downloads:
 
 Models are saved to the `models/` directory (gitignored). The application validates model existence on startup and will fail with a clear error message if any required model is missing.
 
+### Face Verification Pipeline (Buffalo-S, ONNX-only)
+
+Photo verification runs through the **Buffalo-S ONNX pipeline** in production: SCRFD `det_500m` detects the face and returns 5 landmarks, the aligned crop is warped and embedded by `w600k_mbf`, and the probe embedding is compared against the stored user photos (sequential, capped at `FACE_VERIFY_MAX_PHOTOS`, default 10).
+
+The verification threshold is derived from the real production pipeline on the BFW pair dataset (920,936 pairs) at a target FAR of 1e-4 — see `docs/benchmark-analysis.md` section 4.7. The default `FACE_VERIFY_THRESHOLD` is 0.3435; do not substitute the older center-crop benchmark value (0.3719), which does not correspond to this pipeline.
+
+Optional environment variables (see `.env.example`):
+
+- `FACE_VERIFY_THRESHOLD` — cosine similarity threshold (default `0.3435`)
+- `FACE_VERIFY_MAX_PHOTOS` — max stored photos compared per verification (default `10`)
+
+**Rollback**: the previous `@vladmandic/human` implementation is preserved in the git history. To roll back the face recognition migration, revert the migration commits (`lib/human` was left untouched). There is no runtime mode flag; the pipeline is ONNX-only.
+
 ## Setup
 
 Use the pinned runtime and package manager before installing dependencies:

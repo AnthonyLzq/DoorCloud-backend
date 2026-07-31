@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. See [commit
 
 ## [Unreleased]
 
+### Features
+
+* **face-recognition:** migrate photo verification from `@vladmandic/human` to the ONNX-only Buffalo-S pipeline (SCRFD `det_500m` detection + landmark alignment + `w600k_mbf` embedding). `FaceRecognitionService.verify()` replaces `compareFaces` in the MQTT photo flow; the server lifecycle initializes ONNX models on startup and releases them on shutdown, with fatal error handlers for `uncaughtException`/`unhandledRejection`. The verification threshold is derived from the production pipeline on BFW at FAR 1e-4 (0.3435, see `docs/benchmark-analysis.md` section 4.7) and is configurable via `FACE_VERIFY_THRESHOLD`. Rollback: revert the migration commits; `lib/human` was left untouched.
+
 ### BREAKING CHANGES
 
 * **mqtt:** remove legacy `DoorCloud/photo/#` topic support. All publishers must migrate to versioned `doorcloud/v1/photo/*` topics. The `MQTT_LEGACY_TOPICS_ENABLED` environment variable has been removed. Legacy delimiter-based payloads (`userID----format----photo`) are no longer supported; use JSON payloads instead.
