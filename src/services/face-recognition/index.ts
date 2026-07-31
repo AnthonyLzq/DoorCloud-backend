@@ -1,3 +1,4 @@
+import { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS } from 'config/constants'
 import type { FaceDetection } from './onnx-provider'
 import {
   DETECTOR_MODEL_NAME,
@@ -6,8 +7,7 @@ import {
 } from './onnx-provider'
 import { PythonManager } from './python-manager'
 
-export const DEFAULT_VERIFY_THRESHOLD = 0.37
-export const MAX_STORED_PHOTOS = 10
+export { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS }
 
 const DETECTOR_MODEL_PATH = 'models/insightface/det_500m.onnx'
 const RECOGNITION_MODEL_PATH = 'models/insightface/w600k_mbf.onnx'

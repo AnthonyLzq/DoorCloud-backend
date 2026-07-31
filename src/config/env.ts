@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS } from './constants'
 
 const requiredString = (name: string) =>
   z
@@ -139,14 +140,23 @@ const envSchema = z
     MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
       'MODELS_CDN_URL must be a URL'
     ),
-    FACE_VERIFY_THRESHOLD: optionalFloat('FACE_VERIFY_THRESHOLD', 0.37, 0, 1),
+    FACE_VERIFY_THRESHOLD: optionalFloat(
+      'FACE_VERIFY_THRESHOLD',
+      DEFAULT_VERIFY_THRESHOLD,
+      0,
+      1
+    ),
     FACE_VERIFY_MODE: z
       .preprocess(
         value => (value === '' || value === undefined ? undefined : value),
         z.enum(['onnx', 'human'])
       )
       .default('human'),
-    FACE_VERIFY_MAX_PHOTOS: optionalInteger('FACE_VERIFY_MAX_PHOTOS', 10, 1)
+    FACE_VERIFY_MAX_PHOTOS: optionalInteger(
+      'FACE_VERIFY_MAX_PHOTOS',
+      MAX_STORED_PHOTOS,
+      1
+    )
   })
   .refine(
     data => {

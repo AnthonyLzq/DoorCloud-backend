@@ -1,6 +1,8 @@
 import { fromPartial } from '@total-typescript/shoehorn'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { DEFAULT_VERIFY_THRESHOLD } from '../src/config/constants'
+
 const mocks = vi.hoisted(() => ({
   getEnv: vi.fn(),
   getUserByUserID: vi.fn(),
@@ -56,7 +58,7 @@ const logMock = {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.getEnv.mockReturnValue({
-    FACE_VERIFY_THRESHOLD: 0.37
+    FACE_VERIFY_THRESHOLD: DEFAULT_VERIFY_THRESHOLD
   })
   mocks.verify.mockResolvedValue({
     match: false,
@@ -85,7 +87,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
     expect(mocks.verify).toHaveBeenCalledWith(
       Buffer.from('photo'),
       [{ name: 'selfie', url: 'https://example.com/John-1/selfie-abc123.jpg' }],
-      { threshold: 0.37 }
+      { threshold: DEFAULT_VERIFY_THRESHOLD }
     )
   })
 

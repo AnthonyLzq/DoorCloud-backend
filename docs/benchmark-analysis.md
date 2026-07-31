@@ -247,6 +247,28 @@ DoorCloud is an **access control system** that authenticates **known, enrolled u
 
 Due to the deterministic nature of all evaluated models (AUC sigma = 0 across multiple repeats, section 2.4), traditional statistical significance tests (Wilcoxon signed-rank, McNemar) are not applicable. When a model consistently produces identical AUC values across independent runs, any observed difference between models is a true effect rather than a statistical fluctuation. The ranking presented in section 3.1 is therefore definitive for the evaluated datasets and hardware configuration.
 
+### 4.7 Pipeline Alignment Impact (Production vs Benchmark)
+
+The benchmark embeddings in this document were computed with a **center-crop 112x112** preprocessing on the already-aligned BFW crops. The production verification pipeline for DoorCloud uses **face detection (SCRFD `det_500m`) + landmark-based alignment (affine warp) + `w600k_mbf` embedding** instead. Because the alignment pipeline raises genuine similarity scores, the operating threshold must be re-derived on the production pipeline before deployment (see the migration design for Buffalo-S).
+
+To quantify the impact, we re-embedded all 20,000 BFW images through the production pipeline (19,968 embeddings after excluding 32 images with no detected face, 0.16%) and recomputed the verification ROC on the full BFW pair dataset (920,936 pairs, 156MB `bfw-datatable.csv`):
+
+| Metric | Benchmark (center-crop) | Production (det + align) |
+|--------|------------------------:|-------------------------:|
+| AUC | 0.9659 | **0.9781** |
+| EER | 0.0859 | **0.0630** |
+| TAR @ FAR = 1e-3 | 0.715 | **0.8297** |
+| **Threshold @ FAR = 1e-4** | 0.3719 | **0.3435** |
+| TAR @ FAR = 1e-4 | 0.587 | **0.7400** |
+
+Figure 11 (`metrics/figures/figure11-pipeline-roc.png`) overlays both ROC curves on a log-FAR axis. The production curve dominates the benchmark curve across the full FAR range, with the largest gap in the low-FAR region most relevant for access control.
+
+**Interpretation:**
+
+- **Detection + alignment materially improves verification**: at the same security level (FAR = 1e-4, roughly 1 impostor accepted per 10,000 comparisons), the production pipeline accepts **74.0%** of genuine pairs versus **58.7%** for the center-crop benchmark — an absolute improvement of **15.3 percentage points** (26.1% relative). The same Buffalo-S model is substantially more usable when faces are properly detected and aligned.
+- **The benchmark threshold is not the production threshold**: the correct operating threshold at FAR = 1e-4 on the production pipeline is **0.3435**, not the 0.3719 derived from the center-crop embeddings. Configuring the old value would push the system to a lower FAR than targeted (stricter than intended), rejecting additional genuine users with no security gain. DoorCloud's `FACE_VERIFY_THRESHOLD` default must follow the production derivation.
+- **Reproducibility**: the aligned embeddings live at `metrics/embeddings/insightface-buffalo-s-aligned.json` and the ROC derivation is driven by `scripts/derive-verify-threshold.ts` (orchestrator, spawns the worker with `nice -n 19` and a 512MB heap cap), `scripts/reembed-bfw-worker.ts` (production-pipeline embedding worker), and `scripts/plot_pipeline_roc.py` (Figure 11). The 32 missed faces are expected noise in the BFW dataset.
+
 ---
 
 ## 5. Conclusion
@@ -258,6 +280,7 @@ Due to the deterministic nature of all evaluated models (AUC sigma = 0 across mu
 3. **Cross-age Robustness**: ArcFace-based models significantly outperform @vladmandic/human on age-variant datasets, suggesting better suitability for long-term identity verification.
 4. **Edge Compatibility**: Buffalo-S is the only model viable across all Raspberry Pi variants, making it the optimal choice for edge deployment.
 5. **Demographic Bias**: The per-group verification analysis (BFW pair dataset, ~115K pairs per group) shows Buffalo-S has a **moderate AUC range across groups (Δ=0.0439)** — slightly above Buffalo-L/M (Δ=0.0379) but below dlib (Δ=0.0480) and @vladmandic/human (Δ=0.0545). The worst-performing group (asian_females) still achieves AUC=0.9386, so the bias does not materially impact 1:1 verification accuracy for known enrolled users.
+6. **Pipeline Alignment Impact**: Re-embedding BFW through the production pipeline (detection + landmark alignment) raises Buffalo-S verification AUC from 0.9659 to 0.9781 and TAR at FAR = 1e-4 from 0.587 to 0.740, with a re-derived operating threshold of **0.3435** (section 4.7). Preprocessing quality matters as much as model choice for access control.
 
 ### 5.2 Recommendation
 

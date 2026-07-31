@@ -5,6 +5,7 @@ import { join } from 'path'
 import mqtt from 'mqtt'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
+import { DEFAULT_VERIFY_THRESHOLD } from '../src/config/constants'
 import { parseEnv } from '../src/config/env'
 import {
   getOpenWaSetupQr,
@@ -192,8 +193,10 @@ describe('DoorCloud backend tests', () => {
       })
     })
 
-    test('defaults FACE_VERIFY_THRESHOLD to 0.37 when unset', () => {
-      expect(parseEnv(validEnv).FACE_VERIFY_THRESHOLD).toBe(0.37)
+    test('defaults FACE_VERIFY_THRESHOLD to DEFAULT_VERIFY_THRESHOLD when unset', () => {
+      expect(parseEnv(validEnv).FACE_VERIFY_THRESHOLD).toBe(
+        DEFAULT_VERIFY_THRESHOLD
+      )
     })
 
     test('rejects non-numeric FACE_VERIFY_THRESHOLD', () => {
