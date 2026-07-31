@@ -75,8 +75,8 @@ Acceptance (Phase 4): `parseEnv` scenarios green; invalid value throws `Invalid 
 
 ## Phase 5: Server lifecycle (RF-5)
 
-- [ ] 5.1 Replace `await init(this.#app.log)` (human) in `src/network/server.ts` `start()` with `FaceRecognitionService.init({mode:'onnx'})`; keep `lib/human` import untouched for benchmark scripts
-- [ ] 5.2 Call `frs.shutdown()` in `Server.stop()` (session release; no-op on Python)
+- [x] 5.1 Replace `await init(this.#app.log)` (human) in `src/network/server.ts` `start()` with `FaceRecognitionService.init({mode:'onnx'})`; keep `lib/human` import untouched for benchmark scripts
+- [x] 5.2 Call `frs.shutdown()` in `Server.stop()` (session release; no-op on Python)
 
 Acceptance (Phase 5): server starts with both ONNX models loaded, no Python process, human not initialized; stop releases sessions.
 

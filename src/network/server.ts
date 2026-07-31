@@ -8,7 +8,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider
 } from 'fastify-type-provider-zod'
-import { init } from 'lib'
+import { FaceRecognitionService } from 'services/face-recognition'
 import { applyRoutes } from './http'
 import { mqttConnection } from './mqtt'
 
@@ -17,10 +17,12 @@ const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
 class Server {
   #app: FastifyInstance
   #mqqtConnection: Awaited<ReturnType<typeof mqttConnection>> | undefined
+  #faceRecognitionService: FaceRecognitionService
 
   constructor() {
     const { NODE_ENV } = getEnv()
 
+    this.#faceRecognitionService = new FaceRecognitionService()
     this.#app = fastify({
       logger: ENVIRONMENTS_WITHOUT_PRETTY_PRINT.includes(NODE_ENV)
         ? true
@@ -62,21 +64,33 @@ class Server {
   public async start(): Promise<void> {
     const { PORT } = getEnv()
 
-    supabaseConnection(this.#app.log)
-    this.#startMqtt()
-    await this.#mqqtConnection?.start()
-    await this.#app.listen({
-      port: PORT
-    })
-    await init(this.#app.log)
+    try {
+      supabaseConnection(this.#app.log)
+      // Fail fast: if face recognition cannot start, do not open ports or MQTT
+      await this.#faceRecognitionService.init({ mode: 'onnx' })
+      this.#startMqtt()
+      await this.#mqqtConnection?.start()
+      await this.#app.listen({
+        port: PORT
+      })
+    } catch (error) {
+      this.#app.log.error({ error }, 'Fatal error during server startup')
+      await this.#stopInternal()
+      throw error
+    }
   }
 
   public async stop(): Promise<void> {
+    await this.#stopInternal()
+  }
+
+  async #stopInternal(): Promise<void> {
     try {
       await this.#mqqtConnection?.stop()
+      await this.#faceRecognitionService.shutdown()
       await this.#app.close()
-    } catch (e) {
-      console.error(e)
+    } catch (error) {
+      console.error(error)
     }
   }
 }
