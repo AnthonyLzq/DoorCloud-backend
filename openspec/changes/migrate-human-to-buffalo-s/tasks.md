@@ -91,7 +91,7 @@ Acceptance (Phase 6): no-face → `success:false` + `0,seconds` row; match → `
 
 - [x] 7.1 Create `scripts/derive-verify-threshold.ts`: re-run BFW pairs through detect+align+embed (`verify` pipeline), output ROC threshold at FAR 1e-4 (design: 0.3719 → 0.37 baseline). Result: threshold 0.3435 @ FAR 1e-4 on production pipeline; default updated in `config/constants.ts` (0.3435). Figure 11 + docs/benchmark-analysis.md 4.7.
 - [x] 7.2 Document rollout in README/CHANGELOG. DEVIATION: no `FACE_VERIFY_MODE` flag wired (decision: ONNX-only runtime; flag would add dead complexity). Documented real state: Buffalo-S pipeline, threshold derivation, `FACE_VERIFY_THRESHOLD`/`FACE_VERIFY_MAX_PHOTOS`, rollback = git revert (lib/human untouched).
-- [ ] 7.3 Add `FACE_VERIFY_THRESHOLD`, `FACE_VERIFY_MODE`, `FACE_VERIFY_MAX_PHOTOS` to `.env.example`
-- [ ] 7.4 Regression: `pnpm test:local`, `pnpm typecheck`, `pnpm lint` all pass
+- [x] 7.3 Add `FACE_VERIFY_THRESHOLD`, `FACE_VERIFY_MAX_PHOTOS` to `.env.example`. DEVIATION: `FACE_VERIFY_MODE` NOT added — flag is unwired (ONNX-only decision from 7.2); listing it would document a dead variable.
+- [x] 7.4 Regression: `pnpm test:local` (187/187), `pnpm typecheck`, `pnpm lint` (55 files) all pass
 
 Acceptance (Phase 7): script produces threshold table on aligned pipeline; quality gates green.
