@@ -1,3 +1,4 @@
+import { fromPartial } from '@total-typescript/shoehorn'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -76,7 +77,7 @@ beforeEach(() => {
 describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
   it('routes photos through FaceRecognitionService.verify', async () => {
     const { UserServices } = await import('../src/services/index.js')
-    us = new UserServices(logMock as never)
+    us = new UserServices(fromPartial(logMock))
 
     await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
 
@@ -96,7 +97,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
       reason: 'match'
     })
     const { UserServices } = await import('../src/services/index.js')
-    us = new UserServices(logMock as never)
+    us = new UserServices(fromPartial(logMock))
 
     await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
 
@@ -113,7 +114,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
   it('keeps the WhatsApp and CSV contract when no face is detected', async () => {
     mocks.verify.mockResolvedValue({ match: false, reason: 'no-face' })
     const { UserServices } = await import('../src/services/index.js')
-    us = new UserServices(logMock as never)
+    us = new UserServices(fromPartial(logMock))
 
     await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
 
