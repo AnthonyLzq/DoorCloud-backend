@@ -159,5 +159,8 @@ tmp/
 # BFW embeddings (runtime data, regenerable via scripts/embed-*.ts)
 metrics/embeddings/
 
+# BFW pipeline similarity CSVs (runtime data, regenerable via scripts/export-pipeline-similarities.ts)
+metrics/roc-pipeline/
+
 # Local skill registry cache (gentle-ai tool state, not part of the repo)
 .atl/
