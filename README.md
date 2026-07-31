@@ -193,7 +193,7 @@ pnpm benchmark:plots-benchmark   # Regenerate benchmark figures (AUC, ROC, laten
 
 ### Reproducibility
 
-All sampling in the bias analysis uses a fixed seed (mulberry32, seed 42), so repeated runs produce identical numbers. The analysis script (`metrics/analyze-bias.ts`) regenerates Appendix A in-place in `docs/benchmark-analysis.md` between the `## Appendix A` and `## References` markers; the rest of the document is hand-authored and preserved.
+All sampling in the bias analysis uses a fixed seed (mulberry32, seed 42), so repeated runs produce identical numbers. The analysis script (`scripts/analyze-bias.ts`) regenerates Appendix A in-place in `docs/benchmark-analysis.md` between the `## Appendix A` and `## References` markers; the rest of the document is hand-authored and preserved.
 
 ## Testing
 

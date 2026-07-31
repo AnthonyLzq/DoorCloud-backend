@@ -1,168 +1,139 @@
-import {
-  createReadStream,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs'
+import { spawn } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { createInterface } from 'node:readline'
-import { calculateAllMetrics } from '../src/services/benchmark/metrics'
 
 const EMBED_DIR = resolve(process.cwd(), 'metrics/embeddings')
-const BFW_CSV = resolve(
-  process.cwd(),
-  'datasets/tmp/BFW-Release/bfw-datatable.csv'
-)
 const OUTPUT_DIR = resolve(process.cwd(), 'metrics/demographics')
 
-interface Result {
+interface ModelJob {
   model: string
-  group: string
-  auc: number
-  eer: number
-  tarAtFar001: number
-  pairs: number
+  worker: number
 }
 
-async function analyzeModel(model: string): Promise<Result[]> {
-  const embedPath = join(EMBED_DIR, `${model}.json`)
-  if (!existsSync(embedPath)) {
-    console.error(`[analyze] ${model}: no embeddings found, skipping`)
-    return []
-  }
+const MODEL_JOBS: ModelJob[] = [
+  { model: 'insightface-buffalo-s', worker: 1 },
+  { model: 'insightface-buffalo-l', worker: 1 },
+  { model: 'insightface-buffalo-m', worker: 1 },
+  { model: 'vladmandic-human', worker: 1 },
+  { model: 'dlib', worker: 2 }
+]
 
-  const embeddings: Record<string, number[]> = JSON.parse(
-    readFileSync(embedPath, 'utf-8')
-  )
-  console.error(
-    `[analyze] ${model}: ${Object.keys(embeddings).length} embeddings loaded`
-  )
+async function runJob(modelJob: ModelJob): Promise<void> {
+  return new Promise(finishJob => {
+    const workerScript = resolve(
+      process.cwd(),
+      'scripts/analyze-demographics-worker.ts'
+    )
+    const args = ['tsx', workerScript, '--model', modelJob.model]
+    // Low CPU priority (nice -n 19) to minimize impact on interactive use
+    const childProcess = spawn('nice', ['-n', '19', 'npx', ...args], {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        NODE_OPTIONS: '--max-old-space-size=512'
+      }
+    })
 
-  // Group accumulators: group_key -> { similarities, labels }
-  const groups: Record<string, { sims: number[]; labels: number[] }> = {}
+    childProcess.stdout?.on('data', (chunk: Buffer) =>
+      process.stdout.write(chunk)
+    )
+    childProcess.stderr?.on('data', (chunk: Buffer) =>
+      process.stderr.write(chunk)
+    )
 
-  // Stream CSV line by line (163MB)
-  const rl = createInterface({
-    input: createReadStream(BFW_CSV),
-    crlfDelay: Infinity
+    childProcess.on('close', exitCode => {
+      if (exitCode === 0) finishJob()
+      else {
+        console.error(
+          `[orchestrator] ${modelJob.model} failed (exit ${exitCode})`
+        )
+        finishJob() // continue with next job
+      }
+    })
   })
-  let header = true
-  let lineCount = 0
+}
 
-  for await (const line of rl) {
-    if (header) {
-      header = false
+async function mergeResults(): Promise<void> {
+  if (!existsSync(OUTPUT_DIR)) mkdirSync(OUTPUT_DIR, { recursive: true })
+
+  const csvLines = ['model,group,auc,eer,tarAtFar001,pairs']
+  for (const modelJob of MODEL_JOBS) {
+    const resultPath = join(OUTPUT_DIR, `${modelJob.model}.json`)
+    if (!existsSync(resultPath)) {
+      console.error(
+        `[orchestrator] ${modelJob.model}: no results, skipping merge`
+      )
       continue
     }
-
-    const cols = line.split(',')
-    if (cols.length < 17) continue
-
-    const p1 = cols[1]
-    const p2 = cols[2]
-    const label = parseInt(cols[3], 10)
-    const e1 = cols[15]
-    const g1 = cols[13] // ethnicity, gender
-
-    const emb1 = embeddings[p1]
-    const emb2 = embeddings[p2]
-
-    if (!emb1 || !emb2) continue
-
-    // Cosine similarity
-    let dot = 0,
-      n1 = 0,
-      n2 = 0
-    for (let i = 0; i < emb1.length; i++) {
-      dot += emb1[i] * emb2[i]
-      n1 += emb1[i] * emb1[i]
-      n2 += emb2[i] * emb2[i]
+    const groupResults: Record<
+      string,
+      { auc: number; eer: number; tarAtFar001: number; pairs: number }
+    > = JSON.parse(readFileSync(resultPath, 'utf-8'))
+    for (const [group, groupResult] of Object.entries(groupResults)) {
+      csvLines.push(
+        `${modelJob.model},${group},${groupResult.auc.toFixed(6)},${groupResult.eer.toFixed(6)},${groupResult.tarAtFar001.toFixed(6)},${groupResult.pairs}`
+      )
     }
-    const sim = dot / (Math.sqrt(n1) * Math.sqrt(n2) || 1)
-
-    // Group key: ethnicity+gender (e.g., "A_F", "W_M")
-    const groupKey = `${e1}_${g1}`
-
-    if (!groups[groupKey]) groups[groupKey] = { sims: [], labels: [] }
-    groups[groupKey].sims.push(sim)
-    groups[groupKey].labels.push(label)
-
-    lineCount++
-    if (lineCount % 100000 === 0)
-      console.error(`[analyze] ${model}: ${lineCount} pairs processed`)
   }
 
-  console.error(
-    `[analyze] ${model}: ${lineCount} total pairs, ${Object.keys(groups).length} groups`
-  )
-
-  // Compute metrics per group
-  const results: Result[] = []
-  for (const [group, data] of Object.entries(groups)) {
-    if (data.labels.length < 100) continue // skip tiny groups
-    const metrics = calculateAllMetrics(data.sims, data.labels)
-    results.push({
-      model,
-      group,
-      auc: metrics.auc,
-      eer: metrics.eer,
-      tarAtFar001: metrics.tarAtFar001,
-      pairs: data.labels.length
-    })
-  }
-
-  return results
+  const csvPath = join(OUTPUT_DIR, 'demographics-results.csv')
+  writeFileSync(csvPath, csvLines.join('\n'), 'utf-8')
+  console.error(`[orchestrator] Merged results saved to ${csvPath}`)
 }
 
 async function main() {
   if (!existsSync(OUTPUT_DIR)) mkdirSync(OUTPUT_DIR, { recursive: true })
 
-  const models = [
-    'insightface-buffalo-s',
-    'insightface-buffalo-l',
-    'insightface-buffalo-m',
-    'dlib',
-    'vladmandic-human'
-  ]
-  const allResults: Result[] = []
-
-  for (const model of models) {
-    const results = await analyzeModel(model)
-    allResults.push(...results)
-  }
-
-  // Export CSV
-  const header = 'model,group,auc,eer,tarAtFar001,pairs'
-  const csvLines = [header]
-  for (const r of allResults) {
-    csvLines.push(
-      `${r.model},${r.group},${r.auc.toFixed(6)},${r.eer.toFixed(6)},${r.tarAtFar001.toFixed(6)},${r.pairs}`
-    )
-  }
-  writeFileSync(
-    join(OUTPUT_DIR, 'demographics-results.csv'),
-    csvLines.join('\n'),
-    'utf-8'
+  // Skip models with existing results
+  const pendingJobs = MODEL_JOBS.filter(
+    job => !existsSync(join(OUTPUT_DIR, `${job.model}.json`))
   )
 
-  // Print summary
-  console.log('\n=== Demographic Analysis Results ===')
-  console.log(
-    `${'Model'.padEnd(25)} ${'Group'.padEnd(10)} ${'AUC'.padEnd(10)} ${'EER'.padEnd(10)} ${'Pairs'.padEnd(8)}`
-  )
-  console.log('-'.repeat(65))
-  for (const r of allResults) {
+  if (pendingJobs.length === 0) {
+    console.log('[orchestrator] All models already analyzed')
+  } else {
+    const worker1Jobs = pendingJobs.filter(job => job.worker === 1)
+    const worker2Jobs = pendingJobs.filter(job => job.worker === 2)
+
     console.log(
-      `${r.model.padEnd(25)} ${r.group.padEnd(10)} ${r.auc.toFixed(4).padEnd(10)} ${r.eer.toFixed(4).padEnd(10)} ${r.pairs.toString().padEnd(8)}`
+      `[orchestrator] Worker 1: ${worker1Jobs.map(job => job.model).join(', ')}`
     )
+    console.log(
+      `[orchestrator] Worker 2: ${worker2Jobs.map(job => job.model).join(', ')}`
+    )
+
+    const worker1 = (async () => {
+      for (const job of worker1Jobs) {
+        console.log(`[worker1] Starting ${job.model}...`)
+        const startTime = Date.now()
+        await runJob(job)
+        console.log(
+          `[worker1] ${job.model} done in ${((Date.now() - startTime) / 1000 / 60).toFixed(1)}min`
+        )
+      }
+    })()
+
+    const worker2 = (async () => {
+      for (const job of worker2Jobs) {
+        console.log(`[worker2] Starting ${job.model}...`)
+        const startTime = Date.now()
+        await runJob(job)
+        console.log(
+          `[worker2] ${job.model} done in ${((Date.now() - startTime) / 1000 / 60).toFixed(1)}min`
+        )
+      }
+    })()
+
+    await Promise.all([worker1, worker2])
+    console.log('[orchestrator] All demographic analysis done')
   }
-  console.log(
-    `\nResults saved to ${join(OUTPUT_DIR, 'demographics-results.csv')}`
-  )
+
+  await mergeResults()
+  console.log('[orchestrator] Finished')
 }
 
-main().catch((e: Error) => {
-  console.error(`FATAL: ${e.message}`)
+main().catch((error: Error) => {
+  console.error(error.message)
   process.exit(1)
 })

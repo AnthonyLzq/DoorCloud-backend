@@ -2,13 +2,13 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-interface Job {
+interface ModelJob {
   model: string
   approach: string
   config: string
 }
 
-const JOBS: Job[] = [
+const MODEL_JOBS: ModelJob[] = [
   {
     model: 'insightface-buffalo-s',
     approach: 'onnx',
@@ -34,20 +34,20 @@ const JOBS: Job[] = [
   { model: 'vladmandic-human', approach: 'python', config: '{}' }
 ]
 
-async function runJob(job: Job): Promise<void> {
-  return new Promise(resolvePromise => {
-    const script = resolve(process.cwd(), 'scripts/embed-one-model.ts')
+async function runJob(modelJob: ModelJob): Promise<void> {
+  return new Promise(finishJob => {
+    const workerScript = resolve(process.cwd(), 'scripts/embed-one-model.ts')
     const args = [
       'tsx',
-      script,
+      workerScript,
       '--model',
-      job.model,
+      modelJob.model,
       '--approach',
-      job.approach,
+      modelJob.approach,
       '--config',
-      job.config
+      modelJob.config
     ]
-    const proc = spawn('npx', args, {
+    const childProcess = spawn('npx', args, {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
@@ -56,57 +56,63 @@ async function runJob(job: Job): Promise<void> {
       }
     })
 
-    proc.stdout?.on('data', (d: Buffer) => process.stdout.write(d))
-    proc.stderr?.on('data', (d: Buffer) => process.stderr.write(d))
+    childProcess.stdout?.on('data', (chunk: Buffer) =>
+      process.stdout.write(chunk)
+    )
+    childProcess.stderr?.on('data', (chunk: Buffer) =>
+      process.stderr.write(chunk)
+    )
 
-    proc.on('close', code => {
-      if (code === 0) resolvePromise()
+    childProcess.on('close', exitCode => {
+      if (exitCode === 0) finishJob()
       else {
-        console.error(`[orchestrator] ${job.model} failed (exit ${code})`)
-        resolvePromise() // continue with next job
+        console.error(
+          `[orchestrator] ${modelJob.model} failed (exit ${exitCode})`
+        )
+        finishJob() // continue with next job
       }
     })
   })
 }
 
 async function main() {
-  const out = resolve(process.cwd(), 'metrics/embeddings')
-  if (!existsSync(out)) mkdirSync(out, { recursive: true })
+  const outputDir = resolve(process.cwd(), 'metrics/embeddings')
+  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
 
   // Worker 1: fast models (buffalo-s, buffalo-l, buffalo-m, human) — sequential
-  const fastModels = JOBS.filter(j => j.model !== 'dlib')
+  const fastModelJobs = MODEL_JOBS.filter(job => job.model !== 'dlib')
 
-  // Worker 2: dlib alone (bottleneck, ~19min)
-  const dlibJob = JOBS.find(j => j.model === 'dlib')!
+  // Worker 2: dlib alone (bottleneck, ~4h)
+  const dlibJob = MODEL_JOBS.find(job => job.model === 'dlib')!
 
   // Start both workers in parallel
   const worker1 = (async () => {
-    for (const job of fastModels) {
-      const dest = resolve(out, `${job.model}.json`)
-      if (existsSync(dest)) {
-        console.log(`[worker1] ${job.model} already done`)
+    for (const modelJob of fastModelJobs) {
+      const outputPath = resolve(outputDir, `${modelJob.model}.json`)
+      if (existsSync(outputPath)) {
+        console.log(`[worker1] ${modelJob.model} already done`)
         continue
       }
-      console.log(`[worker1] Starting ${job.model}...`)
-      const start = Date.now()
-      await runJob(job)
+      console.log(`[worker1] Starting ${modelJob.model}...`)
+      const startTime = Date.now()
+      await runJob(modelJob)
       console.log(
-        `[worker1] ${job.model} done in ${((Date.now() - start) / 1000 / 60).toFixed(1)}min`
+        `[worker1] ${modelJob.model} done in ${((Date.now() - startTime) / 1000 / 60).toFixed(1)}min`
       )
     }
   })()
 
   const worker2 = (async () => {
-    const dest = resolve(out, `${dlibJob.model}.json`)
-    if (existsSync(dest)) {
+    const outputPath = resolve(outputDir, `${dlibJob.model}.json`)
+    if (existsSync(outputPath)) {
       console.log(`[worker2] ${dlibJob.model} already done`)
       return
     }
     console.log(`[worker2] Starting ${dlibJob.model}...`)
-    const start = Date.now()
+    const startTime = Date.now()
     await runJob(dlibJob)
     console.log(
-      `[worker2] ${dlibJob.model} done in ${((Date.now() - start) / 1000 / 60).toFixed(1)}min`
+      `[worker2] ${dlibJob.model} done in ${((Date.now() - startTime) / 1000 / 60).toFixed(1)}min`
     )
   })()
 
@@ -114,7 +120,7 @@ async function main() {
   console.log('[orchestrator] All embeddings generated')
 }
 
-main().catch((e: Error) => {
-  console.error(e.message)
+main().catch((error: Error) => {
+  console.error(error.message)
   process.exit(1)
 })

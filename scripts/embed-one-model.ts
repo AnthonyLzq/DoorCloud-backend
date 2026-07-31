@@ -16,14 +16,15 @@ function getArg(name: string): string {
 
 async function main() {
   const model = getArg('model')
-  const outputDir = resolve(process.cwd(), 'metrics/embeddings')
-  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
+  const outputDirectory = resolve(process.cwd(), 'metrics/embeddings')
+  if (!existsSync(outputDirectory))
+    mkdirSync(outputDirectory, { recursive: true })
 
-  const bfwRoot = resolve(
+  const bfwDatasetRoot = resolve(
     process.cwd(),
     'datasets/tmp/BFW-Release/bfw-faces-cropped/jrobby/bfw/bfw-cropped-aligned'
   )
-  const groups = [
+  const demographicGroups = [
     'asian_females',
     'asian_males',
     'black_females',
@@ -34,29 +35,29 @@ async function main() {
     'white_males'
   ]
 
-  const imageKeys: string[] = []
-  const imageBuffers: Buffer[] = []
-  for (const group of groups) {
-    const dir = join(bfwRoot, group)
-    const personDirs = readdirSync(dir)
-    for (const personDir of personDirs) {
-      const personPath = join(dir, personDir)
+  const imagePaths: string[] = []
+  const imageDataBuffers: Buffer[] = []
+  for (const group of demographicGroups) {
+    const groupDir = join(bfwDatasetRoot, group)
+    const personDirectories = readdirSync(groupDir)
+    for (const personDirectory of personDirectories) {
+      const personPath = join(groupDir, personDirectory)
       try {
-        const files = readdirSync(personPath).filter((f: string) =>
-          f.endsWith('.jpg')
+        const files = readdirSync(personPath).filter((file: string) =>
+          file.endsWith('.jpg')
         )
-        for (const f of files) {
-          imageKeys.push(`${group}/${personDir}/${f}`)
-          imageBuffers.push(readFileSync(join(personPath, f)))
+        for (const file of files) {
+          imagePaths.push(`${group}/${personDirectory}/${file}`)
+          imageDataBuffers.push(readFileSync(join(personPath, file)))
         }
       } catch {
         /* skip non-directories */
       }
     }
   }
-  console.error(`[embed] ${model}: ${imageKeys.length} images`)
+  console.error(`[embed] ${model}: ${imagePaths.length} images`)
 
-  const outputPath = join(outputDir, `${model}.json`)
+  const outputFilePath = join(outputDirectory, `${model}.json`)
 
   if (model === 'vladmandic-human') {
     const { Human } = require('@vladmandic/human')
@@ -75,22 +76,24 @@ async function main() {
     await human.load()
     console.error(`[embed] ${model} ready`)
 
-    const embs: Record<string, number[]> = {}
-    for (let i = 0; i < imageKeys.length; i++) {
+    const embeddings: Record<string, number[]> = {}
+    for (let i = 0; i < imagePaths.length; i++) {
       try {
-        const t = human.tf.node.decodeImage(imageBuffers[i], 3)
-        const det = await human.detect(t)
-        t.dispose()
-        if (det.face?.[0]?.embedding)
-          embs[imageKeys[i]] = Array.from(det.face[0].embedding)
+        const tensor = human.tf.node.decodeImage(imageDataBuffers[i], 3)
+        const detection = await human.detect(tensor)
+        tensor.dispose()
+        if (detection.face?.[0]?.embedding)
+          embeddings[imagePaths[i]] = Array.from(detection.face[0].embedding)
       } catch {
         /* skip */
       }
       if (i % 100 === 0)
-        console.error(`[embed] ${model}: ${i}/${imageKeys.length}`)
+        console.error(`[embed] ${model}: ${i}/${imagePaths.length}`)
     }
-    writeFileSync(outputPath, JSON.stringify(embs), 'utf-8')
-    console.error(`[embed] ${model}: ${Object.keys(embs).length} embeddings`)
+    writeFileSync(outputFilePath, JSON.stringify(embeddings), 'utf-8')
+    console.error(
+      `[embed] ${model}: ${Object.keys(embeddings).length} embeddings`
+    )
     return
   }
 
@@ -102,23 +105,28 @@ async function main() {
   await service.loadModel(model, approach, config)
   console.error(`[embed] ${model} ready`)
 
-  const embs: Record<string, number[]> = {}
-  for (let i = 0; i < imageKeys.length; i++) {
+  const embeddings: Record<string, number[]> = {}
+  for (let i = 0; i < imagePaths.length; i++) {
     try {
-      const r = await service.getEmbedding(imageBuffers[i], model)
-      embs[imageKeys[i]] = Array.from(r.embedding)
+      const comparisonResult = await service.getEmbedding(
+        imageDataBuffers[i],
+        model
+      )
+      embeddings[imagePaths[i]] = Array.from(comparisonResult.embedding)
     } catch {
       /* skip */
     }
     if (i % 100 === 0)
-      console.error(`[embed] ${model}: ${i}/${imageKeys.length}`)
+      console.error(`[embed] ${model}: ${i}/${imagePaths.length}`)
   }
-  writeFileSync(outputPath, JSON.stringify(embs), 'utf-8')
+  writeFileSync(outputFilePath, JSON.stringify(embeddings), 'utf-8')
   await service.shutdown()
-  console.error(`[embed] ${model}: ${Object.keys(embs).length} embeddings`)
+  console.error(
+    `[embed] ${model}: ${Object.keys(embeddings).length} embeddings`
+  )
 }
 
-main().catch((e: Error) => {
-  console.error(`FATAL: ${e.message}`)
+main().catch((error: Error) => {
+  console.error(`FATAL: ${error.message}`)
   process.exit(1)
 })

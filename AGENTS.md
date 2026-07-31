@@ -67,7 +67,7 @@ docs/
 
 ## Análisis de Benchmark y Bias Demográfico
 
-El documento `docs/benchmark-analysis.md` es el **documento thesis-like** que unifica benchmark + bias. **IMPORTANTE: el Appendix A es AUTO-GENERADO** por `metrics/analyze-bias.ts` — no editarlo a mano, se regenera con:
+El documento `docs/benchmark-analysis.md` es el **documento thesis-like** que unifica benchmark + bias. **IMPORTANTE: el Appendix A es AUTO-GENERADO** por `scripts/analyze-bias.ts` — no editarlo a mano, se regenera con:
 
 ```bash
 pnpm benchmark:analyze    # Regenera Appendix A en docs/benchmark-analysis.md (seed fijo 42, reproducible)

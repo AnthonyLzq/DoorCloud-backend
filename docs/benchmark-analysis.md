@@ -196,41 +196,44 @@ The human baseline for face verification is 97.53% (LFW benchmark). All InsightF
 
 ### 4.4 Demographic Bias Analysis (BFW Dataset)
 
-A demographic bias analysis was conducted using the **BFW (Balanced Faces in the Wild)** dataset (20,000 images, 8 demographic groups, 2,500 per group) to evaluate whether model accuracy varies systematically across demographic groups. Full per-model tables are in **Appendix A**.
+A demographic bias analysis was conducted using the **BFW (Balanced Faces in the Wild)** dataset (20,000 images, 8 demographic groups, 2,500 per group) to evaluate whether model accuracy varies systematically across demographic groups. Full per-model tables are in **Appendix A**. The embedding-space analysis processed all images that each model could detect (20,000 for the InsightFace models, 19,349 for @vladmandic/human, 17,809 for dlib); the verification analysis used the full BFW pair dataset.
 
-**Methodology:** For each model, we computed:
-- **Intra-group similarity**: mean cosine similarity of each embedding to its group centroid (cohesion)
-- **Inter-group similarity**: centroid-to-centroid cosine similarity between groups
-- **Nearest-Neighbor accuracy**: % of embeddings whose nearest neighbor belongs to the same demographic group
+**Methodology:** Two complementary analyses were performed on the BFW dataset:
+
+1. **Embedding-space analysis** (`scripts/analyze-bias.ts`): For each model, we computed:
+   - **Intra-group similarity**: mean cosine similarity of each embedding to its group centroid (cohesion)
+   - **Inter-group similarity**: centroid-to-centroid cosine similarity between groups
+   - **Nearest-Neighbor accuracy**: % of embeddings whose nearest neighbor belongs to the same demographic group
+2. **Verification analysis** (`scripts/analyze-demographics.ts`, canonical): Using the full BFW pair dataset (923,898 pairs, ~115K per group), we computed **per-group AUC, EER, and TAR@FAR** from real verification similarities. This measures how evenly the model verifies identities across demographics — the standard bias metric in face recognition research.
 
 #### Bias Summary
 
-| Model | Dim | NN Acc | Intra-range (Δ) | Best group | Worst group |
-|-------|-----|--------|-----------------|-----------|-------------|
-| dlib | 128d | 98.9% | 92.3%–95.8% (Δ=3.53%) | asian_females | white_males |
-| Buffalo-S | 512d | 97.9% | 18.2%–32.5% (**Δ=14.31%**) | indian_females | white_males |
-| Buffalo-L | 512d | 99.0% | 15.4%–22.6% (Δ=7.19%) | indian_females | black_males |
-| Buffalo-M | 512d | 99.0% | 15.4%–22.6% (Δ=7.19%) | indian_females | black_males |
-| @vladmandic/human | 1024d | 92.8% | 64.5%–71.2% (Δ=6.69%) | asian_females | white_males |
+| Model | Dim | NN Acc | Intra-range (Δ) | **Verification AUC range (Δ)** | Best group | Worst group |
+|-------|-----|--------|-----------------|-------------------------------|-----------|-------------|
+| dlib | 128d | 98.1% | 92.3%–95.8% (Δ=3.53%) | 0.9468–0.9948 (**0.0480**) | White males | Asian females |
+| Buffalo-S | 512d | 97.8% | 18.2%–32.5% (Δ=14.31%) | 0.9386–0.9824 (**0.0439**) | White males | Asian females |
+| Buffalo-L | 512d | 98.5% | 15.4%–22.6% (Δ=7.19%) | 0.9485–0.9864 (**0.0379**) | White females | Asian females |
+| Buffalo-M | 512d | 98.7% | 15.4%–22.6% (Δ=7.19%) | 0.9485–0.9864 (**0.0379**) | White females | Asian females |
+| @vladmandic/human | 1024d | 93.4% | 64.5%–71.2% (Δ=6.69%) | 0.8946–0.9491 (**0.0545**) | White males | Asian females |
 
-Figures 4 (`figure04-intra-similarity.png`), 5 (`figure05-inter-heatmaps.png`), 7 (`figure07-nn-accuracy.png`), 8 (`figure08-bias-comparison.png`) and 9 (`figure09-inter-distance.png`) visualize these results. LaTeX tables are available in `metrics/tables/` (`tab01-intra-similarity.tex`, `tab02-inter-*.tex`, `tab03-model-comparison.tex`).
+Figures 4 (`metrics/figures/figure04-intra-similarity.png`), 5 (`metrics/figures/figure05-inter-heatmaps.png`), 6 (`metrics/figures/figure06-pca-centroids.png`), 7 (`metrics/figures/figure07-nn-accuracy.png`), 8 (`metrics/figures/figure08-bias-comparison.png`), 9 (`metrics/figures/figure09-inter-distance.png`) and 10 (`metrics/figures/figure10-verification-auc.png`) visualize these results. LaTeX tables are available in `metrics/tables/` (`tab01-intra-similarity.tex`, `tab02-inter-*.tex`, `tab03-model-comparison.tex`).
 
 #### Key Findings
 
-1. **Buffalo-S exhibits the highest demographic bias** — the intra-similarity range (Δ=14.31%) is nearly **2x wider** than Buffalo-L/M (Δ=7.19%). Indian females (32.5% intra-sim) are 79% more cohesive than white males (18.2%).
-2. **A consistent pattern across all models**: females of any ethnicity consistently show higher intra-group cohesion than males of the same ethnicity, suggesting gender has a stronger influence on embedding structure than ethnicity alone.
-3. **dlib shows the lowest bias** (Δ=3.53%) but at much higher absolute similarity levels (92–96%), which reflects its 128D embedding space compressing all faces into a tighter cluster — less bias but also less discriminative power overall.
-4. **NN accuracy remains high across groups** — even Buffalo-S achieves 97.0–99.5% NN accuracy across all demographic groups, meaning individual identities are still well-separated regardless of group.
+1. **The cohesion proxy overestimates Buffalo-S's bias.** The intra-embedding cohesion analysis (Δ=14.31%) suggested Buffalo-S was the most biased model. However, the canonical verification metric — per-group AUC computed on the full BFW pair dataset (923,898 pairs, ~115K per group) — tells a different story: Buffalo-S has the **second-lowest verification AUC range (Δ=0.0439)**, well below dlib (Δ=0.0480) and @vladmandic/human (Δ=0.0545), and only slightly above Buffalo-L/M (Δ=0.0379). See Figure 10 and Appendix A.9.
+2. **A consistent pattern across all models**: **Asian females** is consistently the group with the lowest verification AUC, while **White males** — or **White females** for Buffalo-L/M — have the highest. This holds across every model evaluated, for both the cohesion proxy and the verification metric.
+3. **Females of every ethnicity show higher intra-group cohesion than males** of the same ethnicity, suggesting the embedding space treats gender as a strong structural feature. However, this cohesion advantage does not translate into a consistent verification advantage: female groups have higher or lower AUC than their male counterparts depending on ethnicity and model (e.g., Black females outperform Black males in most models, while Asian females underperform Asian males in all).
+4. **NN accuracy remains high across groups** — even Buffalo-S achieves 94.0–99.0% NN accuracy across all demographic groups, meaning individual identities are still well-separated regardless of group.
 
 #### Practical Impact on DoorCloud
 
 DoorCloud is an **access control system** that authenticates **known, enrolled users** via 1:1 verification or small-scale 1:N identification. The key question is whether demographic bias translates to real-world accuracy disparities:
 
-- **1:1 verification (compare against enrolled embedding)**: The intra-group cohesion difference has **minimal impact**. What matters is inter-person separability — whether two different people can be distinguished — which remains excellent (97.9% NN accuracy across all groups).
+- **1:1 verification (compare against enrolled embedding)**: The intra-group cohesion difference has **minimal impact**. What matters is inter-person separability — whether two different people can be distinguished — which remains excellent (97.8% NN accuracy across all groups).
 - **False Acceptance / False Rejection**: A more cohesive group means their embeddings cluster tighter, which can slightly lower false acceptance rates within that group. A less cohesive group has wider spread, potentially increasing false rejection for outlier members. This effect exists but is small relative to overall accuracy.
-- **Threshold uniformity**: A single global threshold works adequately across groups because the NN accuracy floor (97.0% for asian_males in Buffalo-S) is still high. No group-specific threshold tuning is required for DoorCloud's use case.
+- **Threshold uniformity**: A single global threshold works adequately across groups because the NN accuracy floor (94.0% for asian_males in Buffalo-S) is still high. No group-specific threshold tuning is required for DoorCloud's use case.
 
-**Verdict**: The demographic bias of Buffalo-S is a **documented ethical consideration** but **not a practical blocker** for DoorCloud's access control use case. The model remains deployable with a single global threshold.
+**Verdict**: The demographic bias of Buffalo-S — measured by the canonical per-group verification AUC — is **moderate (Δ=0.0439) and comparable to or better than dlib and @vladmandic/human**. The worst-case group (asian_females, AUC=0.9386) still achieves excellent verification accuracy, and the model remains deployable with a single global threshold for DoorCloud's access control use case.
 
 ### 4.5 Suitability for Edge Deployment
 
@@ -254,7 +257,7 @@ Due to the deterministic nature of all evaluated models (AUC sigma = 0 across mu
 2. **Efficiency**: Buffalo-S (MobileFaceNet) is the most efficient model, delivering 4x faster inference than Buffalo-L/M with only 1.2% average AUC degradation.
 3. **Cross-age Robustness**: ArcFace-based models significantly outperform @vladmandic/human on age-variant datasets, suggesting better suitability for long-term identity verification.
 4. **Edge Compatibility**: Buffalo-S is the only model viable across all Raspberry Pi variants, making it the optimal choice for edge deployment.
-5. **Demographic Bias**: Buffalo-S exhibits the highest demographic bias of all evaluated models (intra-similarity range Δ=14.31%, vs Δ=7.19% for Buffalo-L/M). However, this bias does not materially impact 1:1 verification accuracy for known enrolled users — the model remains practically unbiased for DoorCloud's access control use case.
+5. **Demographic Bias**: The per-group verification analysis (BFW pair dataset, ~115K pairs per group) shows Buffalo-S has a **moderate AUC range across groups (Δ=0.0439)** — slightly above Buffalo-L/M (Δ=0.0379) but below dlib (Δ=0.0480) and @vladmandic/human (Δ=0.0545). The worst-performing group (asian_females) still achieves AUC=0.9386, so the bias does not materially impact 1:1 verification accuracy for known enrolled users.
 
 ### 5.2 Recommendation
 
@@ -265,9 +268,9 @@ Due to the deterministic nature of all evaluated models (AUC sigma = 0 across mu
 - Model size of ~10MB (fits all storage constraints)
 - Native ONNX Runtime support (no Python dependency)
 - Viability across all target edge devices
-- NN accuracy of 97.9% across all demographic groups (no practical bias impact for 1:1 verification)
+- NN accuracy of 97.8% across all demographic groups (no practical bias impact for 1:1 verification)
 
-**If edge hardware budget allows** (Pi 4B+ with 2GB+ RAM), **Buffalo-M** is a reasonable upgrade path: it halves the bias range (Δ=7.19% vs 14.31%) while maintaining the same ONNX Runtime stack, at the cost of 4x slower inference (~56ms) and 9x larger model (~90MB). The accuracy gain is marginal (AUC 0.9887 vs 0.9772) and unlikely to be noticeable in production, but the bias reduction may be preferable for deployments with demographic diversity requirements.
+**If edge hardware budget allows** (Pi 4B+ with 2GB+ RAM), **Buffalo-M** is a reasonable upgrade path: it has the lowest verification bias (Δ=0.0379 vs 0.0439) while maintaining the same ONNX Runtime stack, at the cost of 4x slower inference (~56ms) and 9x larger model (~90MB). The accuracy gain is marginal (AUC 0.9887 vs 0.9772) and unlikely to be noticeable in production, but the bias reduction may be preferable for deployments with demographic diversity requirements.
 
 ### 5.3 Future Work
 
@@ -285,13 +288,13 @@ Per-model results from the BFW analysis. LaTeX equivalents of these tables are i
 
 ### A.1 Cross-Model Comparison
 
-| Model | Dim | NN Acc | Intra-range (Δ) | Best group | Worst group |
-|-------|-----|--------|-----------------|-----------|-------------|
-| dlib | 128d | 98.1% | 92.3%–95.8% (Δ=3.53%) | asian females | white males |
-| insightface-buffalo-s | 512d | 97.8% | 18.2%–32.5% (Δ=14.31%) | indian females | white males |
-| insightface-buffalo-l | 512d | 98.5% | 15.4%–22.6% (Δ=7.19%) | indian females | black males |
-| insightface-buffalo-m | 512d | 98.7% | 15.4%–22.6% (Δ=7.19%) | indian females | black males |
-| vladmandic-human | 1024d | 93.4% | 64.5%–71.2% (Δ=6.69%) | asian females | white males |
+| Model | Dim | NN Acc | Intra-range (Δ) | Verification AUC range (Δ) | Best group | Worst group |
+|-------|-----|--------|-----------------|---------------------------|-----------|-------------|
+| dlib | 128d | 98.1% | 92.3%–95.8% (Δ=3.53%) | 0.9468–0.9948 (**0.0480**) | White males | Asian females |
+| insightface-buffalo-s | 512d | 97.8% | 18.2%–32.5% (Δ=14.31%) | 0.9386–0.9824 (**0.0439**) | White males | Asian females |
+| insightface-buffalo-l | 512d | 98.5% | 15.4%–22.6% (Δ=7.19%) | 0.9485–0.9864 (**0.0379**) | White females | Asian females |
+| insightface-buffalo-m | 512d | 98.7% | 15.4%–22.6% (Δ=7.19%) | 0.9485–0.9864 (**0.0379**) | White females | Asian females |
+| vladmandic-human | 1024d | 93.4% | 64.5%–71.2% (Δ=6.69%) | 0.8946–0.9491 (**0.0545**) | White males | Asian females |
 
 ### A.2 dlib (128D)
 
@@ -308,7 +311,7 @@ Per-model results from the BFW analysis. LaTeX equivalents of these tables are i
 | white_females | 2325 | 93.37% | 1.06% | 1.5174 | 2.327e-3 |
 | white_males | 2146 | 92.30% | 1.26% | 1.4341 | 2.397e-3 |
 
-**Bias indicators:** Intra-range Δ=3.53% (92.30%–95.83%). Highest cohesion: asian females. Lowest: white males. Closest groups: asian females↔asian males (97.4%). Farthest: asian females↔black males (82.8%).
+**Bias indicators:** Intra-range Δ=3.53% (92.30%–95.83%). Highest cohesion: Asian females. Lowest: White males. Closest groups: Asian females↔Asian males (97.4%). Farthest: Asian females↔Black males (82.8%).
 
 ### A.3 insightface-buffalo-s (512D)
 
@@ -325,7 +328,7 @@ Per-model results from the BFW analysis. LaTeX equivalents of these tables are i
 | white_females | 2500 | 23.62% | 9.24% | 19.9443 | 7.406e-1 |
 | white_males | 2500 | 18.15% | 8.64% | 20.9390 | 8.385e-1 |
 
-**Bias indicators:** Intra-range Δ=14.31% (18.15%–32.46%). Highest cohesion: indian females. Lowest: white males. Closest groups: white females↔white males (66.6%). Farthest: asian females↔indian females (29.2%).
+**Bias indicators:** Intra-range Δ=14.31% (18.15%–32.46%). Highest cohesion: Indian females. Lowest: White males. Closest groups: White females↔White males (66.6%). Farthest: Asian females↔Indian females (29.2%).
 
 ### A.4 insightface-buffalo-l (512D)
 
@@ -342,7 +345,7 @@ Per-model results from the BFW analysis. LaTeX equivalents of these tables are i
 | white_females | 2500 | 17.96% | 7.87% | 22.7601 | 9.850e-1 |
 | white_males | 2500 | 15.51% | 7.40% | 23.0491 | 1.019e+0 |
 
-**Bias indicators:** Intra-range Δ=7.19% (15.39%–22.58%). Highest cohesion: indian females. Lowest: black males. Closest groups: white females↔white males (64.2%). Farthest: asian females↔indian males (33.8%).
+**Bias indicators:** Intra-range Δ=7.19% (15.39%–22.58%). Highest cohesion: Indian females. Lowest: Black males. Closest groups: White females↔White males (64.2%). Farthest: Asian females↔Indian males (33.8%).
 
 ### A.5 insightface-buffalo-m (512D)
 
@@ -359,7 +362,7 @@ Per-model results from the BFW analysis. LaTeX equivalents of these tables are i
 | white_females | 2500 | 17.96% | 7.87% | 22.7601 | 9.850e-1 |
 | white_males | 2500 | 15.51% | 7.40% | 23.0491 | 1.019e+0 |
 
-**Bias indicators:** Intra-range Δ=7.19% (15.39%–22.58%). Highest cohesion: indian females. Lowest: black males. Closest groups: white females↔white males (64.2%). Farthest: asian females↔indian males (33.8%).
+**Bias indicators:** Intra-range Δ=7.19% (15.39%–22.58%). Highest cohesion: Indian females. Lowest: Black males. Closest groups: White females↔White males (64.2%). Farthest: Asian females↔Indian males (33.8%).
 
 ### A.6 vladmandic-human (1024D)
 
@@ -376,7 +379,7 @@ Per-model results from the BFW analysis. LaTeX equivalents of these tables are i
 | white_females | 2464 | 66.12% | 5.26% | 11.1443 | 6.983e-2 |
 | white_males | 2391 | 64.51% | 5.11% | 11.5332 | 7.782e-2 |
 
-**Bias indicators:** Intra-range Δ=6.69% (64.51%–71.20%). Highest cohesion: asian females. Lowest: white males. Closest groups: asian females↔asian males (91.9%). Farthest: asian females↔black males (67.3%).
+**Bias indicators:** Intra-range Δ=6.69% (64.51%–71.20%). Highest cohesion: Asian females. Lowest: White males. Closest groups: Asian females↔Asian males (91.9%). Farthest: Asian females↔Black males (67.3%).
 
 ### A.7 NN Accuracy by Group
 
@@ -460,8 +463,25 @@ Figure 6 (`metrics/figures/figure06-pca-centroids.png`) shows the PCA projection
 | white_females | -5.2545e-1 | 1.4301e+0 | |
 | white_males | 1.4786e+0 | -5.0292e-1 | |
 
+### A.9 Verification Accuracy by Group (AUC)
+
+Per-group verification metrics computed from the BFW pair dataset (923,898 pairs) by `scripts/analyze-demographics.ts`. AUC is the canonical bias metric: the range across groups measures how evenly the model verifies identities across demographics.
+
+| Group | dlib | insightface-buffalo-s | insightface-buffalo-l | insightface-buffalo-m | vladmandic-human |
+|-------|-------|-------|-------|-------|-------|
+| asian_females | 0.9468 | 0.9386 | 0.9485 | 0.9485 | 0.8946 |
+| asian_males | 0.9622 | 0.9502 | 0.9563 | 0.9563 | 0.9138 |
+| black_females | 0.9860 | 0.9749 | 0.9801 | 0.9801 | 0.9234 |
+| black_males | 0.9690 | 0.9667 | 0.9660 | 0.9660 | 0.9276 |
+| indian_females | 0.9708 | 0.9631 | 0.9696 | 0.9696 | 0.9155 |
+| indian_males | 0.9844 | 0.9683 | 0.9716 | 0.9716 | 0.9373 |
+| white_females | 0.9926 | 0.9798 | 0.9864 | 0.9864 | 0.9329 |
+| white_males | 0.9948 | 0.9824 | 0.9861 | 0.9861 | 0.9491 |
+
+| **Range (Δ)** | 0.0480 | 0.0439 | 0.0379 | 0.0379 | 0.0545 |
+
 ---
-_Appendix A generated by metrics/analyze-bias.ts — 2026-07-31T05:24:15.728Z_
+_Appendix A generated by scripts/analyze-bias.ts — 2026-07-31T14:19:01.814Z_
 
 ## References
 

@@ -19,7 +19,7 @@
     "models:download": "./scripts/download-models.sh",
     "models:test": "tsx scripts/test-onnx-inference.ts",
     "benchmark:embeddings": "npx tsx scripts/embed-bfw.ts",
-    "benchmark:analyze": "NODE_OPTIONS=--max-old-space-size=4096 npx tsx metrics/analyze-bias.ts",
+    "benchmark:analyze": "NODE_OPTIONS=--max-old-space-size=4096 npx tsx scripts/analyze-bias.ts",
     "benchmark:plots": ".venv/bin/python3 scripts/plot-bias-analysis.py",
     "benchmark:plots-benchmark": ".venv/bin/python3 scripts/histogram_for_metrics.py",
     "preservice": "node scripts/openwa/sync-api-key.mjs --optional",
