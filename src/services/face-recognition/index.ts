@@ -544,3 +544,11 @@ export class FaceRecognitionService {
     }
   }
 }
+
+/**
+ * Shared FaceRecognitionService instance
+ *
+ * The server owns the lifecycle (init in start, shutdown in stop) and
+ * consumers such as UserServices use this same initialized instance.
+ */
+export const faceRecognitionService = new FaceRecognitionService()

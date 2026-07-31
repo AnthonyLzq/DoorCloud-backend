@@ -29,6 +29,10 @@ vi.mock('../src/services/face-recognition', () => ({
   FaceRecognitionService: class {
     init = mocks.frsInit
     shutdown = mocks.frsShutdown
+  },
+  faceRecognitionService: {
+    init: mocks.frsInit,
+    shutdown: mocks.frsShutdown
   }
 }))
 

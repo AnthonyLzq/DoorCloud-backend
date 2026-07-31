@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { MultipartFile } from '@fastify/multipart'
+import { getEnv } from 'config/env'
 import {
   createUser,
   getAllFilesFromBucket,
@@ -15,8 +16,8 @@ import {
   sayHelloThroughWhatsapp,
   sendPhotoDetectionResultThroughWhatsapp
 } from 'integrations'
-import { compareFaces } from 'lib'
 import { CustomError } from 'network/http'
+import { faceRecognitionService } from 'services/face-recognition'
 import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
 
 const MAX_HOUR_DIFFERENCE = 16
@@ -125,21 +126,25 @@ class UserServices {
       this.#log
     )
     const timeBefore = getTimestamp()
-    const foundMatch = (
-      await Promise.all(
-        urlPhotosFromUser.map((url, index) => {
-          return compareFaces(
-            bufferPhoto,
-            url,
-            photosFromUser[index].split('/')[1].split('-')[0],
-            this.#log
-          )
-        })
-      )
-    ).find(result => result.match)
+    const { FACE_VERIFY_THRESHOLD } = getEnv()
+    const verifyResult = await faceRecognitionService.verify(
+      bufferPhoto,
+      urlPhotosFromUser.map((url, index) => ({
+        name: photosFromUser[index].split('/')[1].split('-')[0],
+        url
+      })),
+      { threshold: FACE_VERIFY_THRESHOLD }
+    )
     const timeAfter = getTimestamp()
-    const foundName = foundMatch?.name
-    const matchResult = foundMatch?.match ?? false
+    const foundName = verifyResult.name
+    const matchResult = verifyResult.match
+
+    if (verifyResult.reason === 'no-face')
+      this.#log.warn(
+        { reason: verifyResult.reason },
+        'No face detected in photo'
+      )
+    else this.#log.info({ reason: verifyResult.reason }, 'Photo verification')
 
     appendFileSync(
       resolve(__dirname, '..', '..', 'metrics', 'matchPhoto.csv'),

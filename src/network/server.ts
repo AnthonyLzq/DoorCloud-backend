@@ -8,7 +8,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider
 } from 'fastify-type-provider-zod'
-import { FaceRecognitionService } from 'services/face-recognition'
+import { faceRecognitionService } from 'services/face-recognition'
 import { applyRoutes } from './http'
 import { mqttConnection } from './mqtt'
 
@@ -17,12 +17,12 @@ const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
 class Server {
   #app: FastifyInstance
   #mqqtConnection: Awaited<ReturnType<typeof mqttConnection>> | undefined
-  #faceRecognitionService: FaceRecognitionService
+  #faceRecognitionService: typeof faceRecognitionService
 
   constructor() {
     const { NODE_ENV } = getEnv()
 
-    this.#faceRecognitionService = new FaceRecognitionService()
+    this.#faceRecognitionService = faceRecognitionService
     this.#app = fastify({
       logger: ENVIRONMENTS_WITHOUT_PRETTY_PRINT.includes(NODE_ENV)
         ? true
