@@ -1,0 +1,17 @@
+\begin{table}[htbp]
+\centering
+\caption{Cross-Model Comparison of Accuracy and Demographic Bias}
+\label{tab:model-comparison}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Model & Dim & NN Acc (\%) & Intra-range ($\Delta$) & Most Biased Group \\
+\midrule
+Buffalo-S (512D) & 512 & $97.8$ & $14.31$ & White Males \\
+Buffalo-L (512D) & 512 & $98.6$ & $7.19$ & Black Males \\
+Buffalo-M (512D) & 512 & $98.6$ & $7.19$ & Black Males \\
+dlib (128D) & 128 & $97.8$ & $3.53$ & White Males \\
+Human (1024D) & 1024 & $92.9$ & $6.69$ & White Males \\
+\bottomrule
+\end{tabular}
+\end{table}

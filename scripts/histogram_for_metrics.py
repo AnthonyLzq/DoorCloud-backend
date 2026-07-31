@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 # Thesis-quality benchmark charts for face recognition model comparison
 script_dir = os.path.dirname(os.path.abspath(__file__))
 output_dir = os.path.join(script_dir, '../metrics')
+figures_dir = os.path.join(output_dir, 'figures')
+os.makedirs(figures_dir, exist_ok=True)
 csv_path = os.path.join(output_dir, 'benchmark-results.csv')
 data = pd.read_csv(csv_path)
 meta_path = os.path.join(output_dir, 'models-metadata.csv')
@@ -35,8 +37,8 @@ data['dataset'] = pd.Categorical(data['dataset'], categories=dataset_order, orde
 data = data.sort_values(['model', 'dataset'])
 
 def save_figure(fig, filename):
-    path = os.path.join(output_dir, filename)
-    fig.savefig(path, dpi=200, bbox_inches='tight')
+    path = os.path.join(figures_dir, filename)
+    fig.savefig(path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved: {path}')
 

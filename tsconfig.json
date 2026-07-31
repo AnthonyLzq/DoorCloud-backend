@@ -1,17 +1,8 @@
 {
   "compilerOptions": {
-    "rootDir": "src"
+    "rootDir": "."
   },
   "extends": "./tsconfig.base.json",
-  "exclude": [
-    "node_modules",
-    "test",
-    "tests",
-    "__test__",
-    "dist",
-    "src/tf.ts"
-  ],
-  "include": [
-    "src"
-  ]
+  "exclude": ["node_modules", "test", "tests", "__test__", "dist", "src/tf.ts"],
+  "include": ["src", "scripts"]
 }

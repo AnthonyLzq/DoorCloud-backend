@@ -155,3 +155,6 @@ metrics/benchmark-results.md
 datasets/*
 !datasets/README.md
 tmp/
+
+# BFW embeddings (runtime data, regenerable via scripts/embed-*.ts)
+metrics/embeddings/
