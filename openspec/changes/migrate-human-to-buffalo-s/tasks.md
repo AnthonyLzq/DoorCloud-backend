@@ -82,8 +82,8 @@ Acceptance (Phase 5): server starts with both ONNX models loaded, no Python proc
 
 ## Phase 6: user.ts wiring (RF-6)
 
-- [ ] 6.1 Replace `compareFaces` + `Promise.all` in `sendPhotoThroughWhatsapp` with `frs.verify(bufferPhoto, urlPhotosFromUser.map((url,i) => ({name: photosFromUser[i].split('/')[1].split('-')[0], url})), {threshold: env.FACE_VERIFY_THRESHOLD})`
-- [ ] 6.2 Keep matchPhoto.csv format `\n${match?1:0},${diffTimeInSeconds(timeBefore,timeAfter)}` and WhatsApp `{success, name}` contract; log `reason:'no-face'` distinctly
+- [x] 6.1 Replace `compareFaces` + `Promise.all` in `sendPhotoThroughWhatsapp` with `frs.verify(bufferPhoto, urlPhotosFromUser.map((url,i) => ({name: photosFromUser[i].split('/')[1].split('-')[0], url})), {threshold: env.FACE_VERIFY_THRESHOLD})`
+- [x] 6.2 Keep matchPhoto.csv format `\n${match?1:0},${diffTimeInSeconds(timeBefore,timeAfter)}` and WhatsApp `{success, name}` contract; log `reason:'no-face'` distinctly
 
 Acceptance (Phase 6): no-face → `success:false` + `0,seconds` row; match → `success:true` + name + `1,seconds` row; sequential early-exit cap applied.
 
