@@ -54,14 +54,14 @@ Acceptance (Phase 2): provider tests green with mocked sessions; integration tes
 
 ## Phase 3: FaceRecognitionService.verify()
 
-- [ ] 3.1 Write RED test (RF-2): `verify()` with `detectFaces → []` returns `{match:false, reason:'no-face'}` without throwing; distinct log
-- [ ] 3.2 Write RED test (RF-1): mock detect + embeddings, cosine ≥ threshold → `{match:true, name, similarity}`
-- [ ] 3.3 Write RED test (RF-1): best cosine < threshold → `{match:false, reason:'no-match'}`, no `name`, similarity = best
-- [ ] 3.4 Write RED test: sequential early-exit — fetch stops after first match; cap = 10 stored photos
-- [ ] 3.5 Implement `verify(image, storedPhotos, {threshold})` in `index.ts`: probe detect (no face → no-face), max-score face, fetch stored URL → detect → align → embed → cosine → early-exit on `sim >= threshold`; multi-face → max-score (D4)
-- [ ] 3.6 Write RED test: `init({mode:'onnx'})` loads det+rec once, does NOT spawn Python; `shutdown()` releases sessions and no-ops on Python
-- [ ] 3.7 Implement `init({mode?: 'onnx'|'hybrid'})` + `shutdown()` in `index.ts`; guard Python calls (`getEmbedding`/`listModels`) when Python not started; benchmark scripts keep `mode:'hybrid'`
-- [ ] 3.8 Refactor: add `verify()` reusing `calculateSimilarity`; keep `compare`/`getEmbedding` for scripts
+- [x] 3.1 Write RED test (RF-2): `verify()` with `detectFaces → []` returns `{match:false, reason:'no-face'}` without throwing; distinct log
+- [x] 3.2 Write RED test (RF-1): mock detect + embeddings, cosine ≥ threshold → `{match:true, name, similarity}`
+- [x] 3.3 Write RED test (RF-1): best cosine < threshold → `{match:false, reason:'no-match'}`, no `name`, similarity = best
+- [x] 3.4 Write RED test: sequential early-exit — fetch stops after first match; cap = 10 stored photos
+- [x] 3.5 Implement `verify(image, storedPhotos, {threshold})` in `index.ts`: probe detect (no face → no-face), max-score face, fetch stored URL → detect → align → embed → cosine → early-exit on `sim >= threshold`; multi-face → max-score (D4)
+- [x] 3.6 Write RED test: `init({mode:'onnx'})` loads det+rec once, does NOT spawn Python; `shutdown()` releases sessions and no-ops on Python
+- [x] 3.7 Implement `init({mode?: 'onnx'|'hybrid'})` + `shutdown()` in `index.ts`; guard Python calls (`getEmbedding`/`listModels`) when Python not started; benchmark scripts keep `mode:'hybrid'`
+- [x] 3.8 Refactor: add `verify()` reusing `calculateSimilarity`; keep `compare`/`getEmbedding` for scripts
 
 Acceptance (Phase 3): `pnpm test:local` FRS tests green; `init('onnx')` loads `det_500m`+`w600k_mbf` once.
 

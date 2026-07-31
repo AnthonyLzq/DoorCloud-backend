@@ -19,6 +19,24 @@
 **Repo:** https://github.com/deepinsight/insightface
 **Package:** `insightface` (Python)
 
+#### Pack Buffalo-S (usado en DoorCloud)
+
+InsightFace publica sus modelos como **packs** (`buffalo_l`, `buffalo_m`, `buffalo_s`), no como un archivo único. El pack `buffalo_s` incluye:
+
+| Modelo | Rol | Qué produce |
+|--------|-----|-------------|
+| `det_500m.onnx` | Detector (SCRFD) | bbox + 5 landmarks faciales (ojos, nariz, boca). No genera embedding |
+| `w600k_mbf.onnx` | Reconocedor (MobileFaceNet) | Embedding ArcFace 512D. No genera landmarks |
+| `1k3d68.onnx`, `2d106det.onnx`, `genderage.onnx` | Opcionales | Landmarks 3D/2D, género/edad. No se usan en DoorCloud |
+
+**Pipeline de verificación (producción):**
+
+```
+foto cruda → det_500m (detectar cara + landmarks) → warp 112×112 → w600k_mbf (embedding 512D) → cosine
+```
+
+**Diferencia benchmark vs producción:** el benchmark (`docs/benchmark-analysis.md`) usaba solo `w600k_mbf` con center-crop porque sus datasets (LFW, CFP-FP, AgeDB-30, CALFW) vienen con caras pre-alineadas. Las fotos reales de DoorCloud no lo están, por eso producción necesita el pack completo: el detector localiza y alinea la cara antes de que el reconocedor genere el embedding. El detector `det_500m` siempre fue parte del pack; la migración a Buffalo-S es la primera vez que DoorCloud lo usa completo.
+
 ---
 
 ### 2. AdaFace (Adaptive Margin)

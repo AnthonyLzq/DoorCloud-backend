@@ -21,6 +21,16 @@ export interface ONNXModelMetadata {
   speed: number
 }
 
+/**
+ * InsightFace Buffalo-S is a model PACK, not a single file.
+ * Both models are required for the verification pipeline:
+ * - det_500m  : SCRFD detector — locates the face and returns 5 facial
+ *               landmarks used to align the crop (no embedding).
+ * - w600k_mbf : MobileFaceNet recognizer — ArcFace 512D embedding from the
+ *               aligned 112x112 crop.
+ * The benchmark used only the recognizer with center-crop because its
+ * datasets are pre-aligned; production photos are not, hence the detector.
+ */
 export const DETECTOR_MODEL_NAME = 'det_500m'
 export const RECOGNITION_MODEL_NAME = 'w600k_mbf'
 

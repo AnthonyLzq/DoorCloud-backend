@@ -200,4 +200,335 @@ describe('FaceRecognitionService', () => {
       })
     })
   })
+
+  describe('verify', () => {
+    const probeFace = {
+      bbox: [10, 10, 50, 50] as [number, number, number, number],
+      score: 0.9,
+      landmarks: [
+        [1, 1],
+        [2, 2],
+        [3, 3],
+        [4, 4],
+        [5, 5]
+      ] as [number, number][]
+    }
+
+    const photoBuffer = Buffer.from('stored-photo-bytes')
+
+    async function initOnnx(): Promise<void> {
+      vi.spyOn(service['onnxProvider'], 'loadModel').mockResolvedValue()
+      vi.spyOn(service['pythonManager'], 'start').mockResolvedValue()
+      await service.init({ mode: 'onnx' })
+    }
+
+    function fetchResponse(body: Buffer) {
+      return {
+        ok: true,
+        arrayBuffer: async () =>
+          body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength)
+      }
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+      vi.unstubAllGlobals()
+    })
+
+    it('returns no-face without throwing when the probe has no face (RF-2)', async () => {
+      await initOnnx()
+      const detectSpy = vi
+        .spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValue([])
+      const consoleSpy = vi.spyOn(console, 'log')
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(Buffer.from('probe-image'), [
+        { name: 'alice', url: 'http://photos.test/alice.jpg' }
+      ])
+
+      expect(result).toEqual({ match: false, reason: 'no-face' })
+      expect(detectSpy).toHaveBeenCalledTimes(1)
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      const logs = consoleSpy.mock.calls.map(call => String(call[0]))
+      expect(logs.some(log => log.includes('no face'))).toBe(true)
+    })
+
+    it('returns a match when cosine similarity reaches the threshold (RF-1)', async () => {
+      await initOnnx()
+      const detectSpy = vi
+        .spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([probeFace])
+      const embedSpy = vi
+        .spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({
+        match: true,
+        name: 'alice',
+        similarity: 1,
+        reason: 'match'
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(fetchSpy).toHaveBeenCalledWith('http://photos.test/alice.jpg')
+      expect(detectSpy).toHaveBeenCalledTimes(2)
+      expect(embedSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('returns no-match without a name when the best cosine is below threshold (RF-1)', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([probeFace])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([0, 1, 0]))
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => fetchResponse(photoBuffer))
+      )
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(result.match).toBe(false)
+      expect(result.reason).toBe('no-match')
+      expect(result.name).toBeUndefined()
+      expect(result.similarity).toBe(0)
+    })
+
+    it('stops fetching stored photos after the first match', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([probeFace])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [
+          { name: 'alice', url: 'http://photos.test/alice.jpg' },
+          { name: 'bob', url: 'http://photos.test/bob.jpg' },
+          { name: 'carol', url: 'http://photos.test/carol.jpg' }
+        ],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({
+        match: true,
+        name: 'alice',
+        similarity: 1,
+        reason: 'match'
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('caps the number of stored photos evaluated at 10', async () => {
+      await initOnnx()
+      const detectSpy = vi
+        .spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValue([probeFace])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValue(new Float32Array([0, 1, 0]))
+      const fetchSpy = vi.fn(async (_url: string) => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const photos = Array.from({ length: 12 }, (_, index) => ({
+        name: `user${index}`,
+        url: `http://photos.test/${index}.jpg`
+      }))
+
+      const result = await service.verify(Buffer.from('probe-image'), photos, {
+        threshold: 0.9
+      })
+
+      expect(result.match).toBe(false)
+      expect(result.reason).toBe('no-match')
+      expect(fetchSpy).toHaveBeenCalledTimes(10)
+      expect(fetchSpy.mock.calls[0][0]).toBe('http://photos.test/0.jpg')
+      expect(fetchSpy.mock.calls[9][0]).toBe('http://photos.test/9.jpg')
+      expect(detectSpy).toHaveBeenCalledTimes(11)
+    })
+
+    it('uses the highest-scoring face when the probe has multiple faces (D4)', async () => {
+      await initOnnx()
+      const lowScoreFace = { ...probeFace, score: 0.6 }
+      const highScoreFace = { ...probeFace, score: 0.95 }
+      const embedSpy = vi
+        .spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([lowScoreFace, highScoreFace])
+        .mockResolvedValueOnce([probeFace])
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => fetchResponse(photoBuffer))
+      )
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({
+        match: true,
+        name: 'alice',
+        similarity: 1,
+        reason: 'match'
+      })
+      expect(embedSpy.mock.calls[0][1]).toEqual(highScoreFace.landmarks)
+    })
+
+    it('skips a stored photo without a face and continues to the next', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([probeFace])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [
+          { name: 'alice', url: 'http://photos.test/alice.jpg' },
+          { name: 'bob', url: 'http://photos.test/bob.jpg' }
+        ],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({
+        match: true,
+        name: 'bob',
+        similarity: 1,
+        reason: 'match'
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('returns no-match without similarity when no stored photo had a face', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([])
+      vi.spyOn(
+        service['onnxProvider'],
+        'getAlignedEmbedding'
+      ).mockResolvedValue(new Float32Array([1, 0, 0]))
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => fetchResponse(photoBuffer))
+      )
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({ match: false, reason: 'no-match' })
+    })
+  })
+
+  describe('onnx lifecycle', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+      vi.unstubAllGlobals()
+    })
+
+    it('loads det_500m and w600k_mbf once without spawning Python', async () => {
+      const loadSpy = vi
+        .spyOn(service['onnxProvider'], 'loadModel')
+        .mockResolvedValue()
+      const pythonStartSpy = vi
+        .spyOn(service['pythonManager'], 'start')
+        .mockResolvedValue()
+
+      await service.init({ mode: 'onnx' })
+
+      expect(service.isInitialized()).toBe(true)
+      expect(loadSpy).toHaveBeenCalledTimes(2)
+      expect(loadSpy).toHaveBeenNthCalledWith(
+        1,
+        'det_500m',
+        'models/insightface/det_500m.onnx',
+        expect.any(Object)
+      )
+      expect(loadSpy).toHaveBeenNthCalledWith(
+        2,
+        'w600k_mbf',
+        'models/insightface/w600k_mbf.onnx',
+        expect.any(Object)
+      )
+      expect(pythonStartSpy).not.toHaveBeenCalled()
+    })
+
+    it('releases ONNX sessions on shutdown and no-ops on Python', async () => {
+      vi.spyOn(service['onnxProvider'], 'loadModel').mockResolvedValue()
+      vi.spyOn(service['pythonManager'], 'start').mockResolvedValue()
+      await service.init({ mode: 'onnx' })
+
+      const unloadSpy = vi
+        .spyOn(service['onnxProvider'], 'unloadModel')
+        .mockResolvedValue()
+      const pythonStopSpy = vi
+        .spyOn(service['pythonManager'], 'stop')
+        .mockResolvedValue()
+
+      await service.shutdown()
+
+      expect(unloadSpy).toHaveBeenCalledTimes(2)
+      expect(unloadSpy).toHaveBeenCalledWith('det_500m')
+      expect(unloadSpy).toHaveBeenCalledWith('w600k_mbf')
+      expect(pythonStopSpy).not.toHaveBeenCalled()
+      expect(service.isInitialized()).toBe(false)
+    })
+
+    it('skips Python model listing in onnx mode', async () => {
+      vi.spyOn(service['onnxProvider'], 'loadModel').mockResolvedValue()
+      await service.init({ mode: 'onnx' })
+      const pythonListSpy = vi
+        .spyOn(service['pythonManager'], 'listModels')
+        .mockResolvedValue(['dlib'])
+
+      const models = await service.listModels()
+
+      expect(pythonListSpy).not.toHaveBeenCalled()
+      expect(models.some(model => model.approach === 'python')).toBe(false)
+    })
+
+    it('rejects Python-backed getEmbedding when Python is not started', async () => {
+      vi.spyOn(service['onnxProvider'], 'loadModel').mockResolvedValue()
+      await service.init({ mode: 'onnx' })
+
+      await expect(
+        service.getEmbedding(Buffer.from('image'), 'dlib')
+      ).rejects.toThrow(/Python process not started/)
+    })
+  })
 })

@@ -1,5 +1,28 @@
-import { ONNXProvider } from './onnx-provider'
+import type { FaceDetection } from './onnx-provider'
+import {
+  DETECTOR_MODEL_NAME,
+  ONNXProvider,
+  RECOGNITION_MODEL_NAME
+} from './onnx-provider'
 import { PythonManager } from './python-manager'
+
+export const DEFAULT_VERIFY_THRESHOLD = 0.37
+export const MAX_STORED_PHOTOS = 10
+
+const DETECTOR_MODEL_PATH = 'models/insightface/det_500m.onnx'
+const RECOGNITION_MODEL_PATH = 'models/insightface/w600k_mbf.onnx'
+
+export interface VerifyStoredPhoto {
+  name: string
+  url: string
+}
+
+export interface VerifyResult {
+  match: boolean
+  name?: string
+  similarity?: number
+  reason?: 'no-face' | 'no-match' | 'match'
+}
 
 export interface ModelInfo {
   name: string
@@ -34,6 +57,7 @@ export class FaceRecognitionService {
   private pythonManager: PythonManager
   private modelRegistry: Map<string, 'onnx' | 'python'> = new Map()
   private initialized: boolean = false
+  private mode: 'onnx' | 'hybrid' = 'hybrid'
 
   constructor() {
     this.onnxProvider = new ONNXProvider()
@@ -43,15 +67,48 @@ export class FaceRecognitionService {
   /**
    * Initializes the face recognition service
    *
-   * Starts the Python process and prepares both providers for use.
+   * In 'hybrid' mode (default) starts the Python process and prepares both
+   * providers for use. In 'onnx' mode loads the detector and recognizer once
+   * without spawning Python, keeping Python available for benchmark scripts.
    * Must be called before any other operations.
    */
-  async init(): Promise<void> {
+  async init(opts: { mode?: 'onnx' | 'hybrid' } = {}): Promise<void> {
     if (this.initialized) {
       throw new Error('FaceRecognitionService already initialized')
     }
 
-    console.log('[FaceRecognitionService] Initializing service...')
+    this.mode = opts.mode ?? 'hybrid'
+    console.log(
+      `[FaceRecognitionService] Initializing service (mode: ${this.mode})...`
+    )
+
+    if (this.mode === 'onnx') {
+      await this.onnxProvider.loadModel(
+        DETECTOR_MODEL_NAME,
+        DETECTOR_MODEL_PATH,
+        {
+          name: DETECTOR_MODEL_NAME,
+          embeddingSize: 0,
+          landmarks: 5,
+          speed: 0
+        }
+      )
+      await this.onnxProvider.loadModel(
+        RECOGNITION_MODEL_NAME,
+        RECOGNITION_MODEL_PATH,
+        {
+          name: RECOGNITION_MODEL_NAME,
+          embeddingSize: 512,
+          landmarks: 0,
+          speed: 0
+        }
+      )
+      this.modelRegistry.set(DETECTOR_MODEL_NAME, 'onnx')
+      this.modelRegistry.set(RECOGNITION_MODEL_NAME, 'onnx')
+      this.initialized = true
+      console.log('[FaceRecognitionService] Service initialized (onnx mode)')
+      return
+    }
 
     // Start Python process
     try {
@@ -70,7 +127,8 @@ export class FaceRecognitionService {
   /**
    * Shuts down the face recognition service
    *
-   * Stops the Python process and releases all resources.
+   * Releases ONNX sessions in onnx mode. In hybrid mode stops the Python
+   * process. Always clears the model registry.
    */
   async shutdown(): Promise<void> {
     if (!this.initialized) {
@@ -79,13 +137,18 @@ export class FaceRecognitionService {
 
     console.log('[FaceRecognitionService] Shutting down service...')
 
-    try {
-      await this.pythonManager.stop()
-      console.log('[FaceRecognitionService] Python process stopped')
-    } catch (error) {
-      console.error(
-        `[FaceRecognitionService] Error stopping Python process: ${error instanceof Error ? error.message : String(error)}`
-      )
+    if (this.mode === 'onnx') {
+      await this.onnxProvider.unloadModel(DETECTOR_MODEL_NAME)
+      await this.onnxProvider.unloadModel(RECOGNITION_MODEL_NAME)
+    } else {
+      try {
+        await this.pythonManager.stop()
+        console.log('[FaceRecognitionService] Python process stopped')
+      } catch (error) {
+        console.error(
+          `[FaceRecognitionService] Error stopping Python process: ${error instanceof Error ? error.message : String(error)}`
+        )
+      }
     }
 
     this.modelRegistry.clear()
@@ -115,16 +178,18 @@ export class FaceRecognitionService {
       })
     }
 
-    // Get Python models
-    const pythonModelNames = await this.pythonManager.listModels()
-    for (const modelName of pythonModelNames) {
-      // Python models have embedding size 128 (dlib) by default
-      // TODO: Get actual metadata from Python process
-      models.push({
-        name: modelName,
-        approach: 'python',
-        embeddingSize: 128
-      })
+    // Get Python models (only when hybrid mode has a live Python process)
+    if (this.mode === 'hybrid' && this.pythonManager.isReady()) {
+      const pythonModelNames = await this.pythonManager.listModels()
+      for (const modelName of pythonModelNames) {
+        // Python models have embedding size 128 (dlib) by default
+        // TODO: Get actual metadata from Python process
+        models.push({
+          name: modelName,
+          approach: 'python',
+          embeddingSize: 128
+        })
+      }
     }
 
     return models
@@ -200,6 +265,11 @@ export class FaceRecognitionService {
     if (approach === 'onnx') {
       embedding = await this.onnxProvider.getEmbedding(image, modelName)
     } else {
+      if (!this.pythonManager.isReady()) {
+        throw new Error(
+          `Python process not started. Model '${modelName}' requires the hybrid backend; initialize with mode 'hybrid'.`
+        )
+      }
       // Convert buffer to base64 for Python
       const imageBase64 = image.toString('base64')
       const embeddingArray = await this.pythonManager.getEmbedding(
@@ -255,6 +325,118 @@ export class FaceRecognitionService {
       approach: result1.approach,
       latency
     }
+  }
+
+  /**
+   * Verifies a probe image against stored user photos
+   *
+   * Detects and embeds the highest-scoring probe face, then compares it
+   * against each stored photo (sequential, capped at MAX_STORED_PHOTOS),
+   * returning the first cosine similarity at or above the threshold.
+   *
+   * @param image - Probe image buffer
+   * @param storedPhotos - Stored user photos to compare against
+   * @param opts - Options with an optional similarity threshold
+   * @returns Verify result with match flag and reason
+   */
+  async verify(
+    image: Buffer,
+    storedPhotos: VerifyStoredPhoto[],
+    opts: { threshold?: number } = {}
+  ): Promise<VerifyResult> {
+    this.ensureInitialized()
+
+    const threshold = opts.threshold ?? DEFAULT_VERIFY_THRESHOLD
+
+    const probeFaces = await this.onnxProvider.detectFaces(image)
+    if (probeFaces.length === 0) {
+      console.log(
+        '[FaceRecognitionService] verify: no face detected in probe image'
+      )
+      return { match: false, reason: 'no-face' }
+    }
+
+    const probeFace = this.selectHighestScoringFace(probeFaces)
+    const probeEmbedding = await this.onnxProvider.getAlignedEmbedding(
+      image,
+      probeFace.landmarks,
+      RECOGNITION_MODEL_NAME
+    )
+
+    let bestSimilarity = -Infinity
+    let comparedAny = false
+
+    for (const photo of storedPhotos.slice(0, MAX_STORED_PHOTOS)) {
+      let storedImage: Buffer
+      try {
+        const response = await fetch(photo.url)
+        if (!response.ok) {
+          console.warn(
+            `[FaceRecognitionService] verify: failed to fetch stored photo ${photo.url} (status ${response.status})`
+          )
+          continue
+        }
+        storedImage = Buffer.from(await response.arrayBuffer())
+      } catch (error) {
+        console.warn(
+          `[FaceRecognitionService] verify: error fetching stored photo ${photo.url}: ${error instanceof Error ? error.message : String(error)}`
+        )
+        continue
+      }
+
+      const storedFaces = await this.onnxProvider.detectFaces(storedImage)
+      if (storedFaces.length === 0) {
+        console.log(
+          `[FaceRecognitionService] verify: no face detected in stored photo for ${photo.name}`
+        )
+        continue
+      }
+
+      const storedFace = this.selectHighestScoringFace(storedFaces)
+      const storedEmbedding = await this.onnxProvider.getAlignedEmbedding(
+        storedImage,
+        storedFace.landmarks,
+        RECOGNITION_MODEL_NAME
+      )
+
+      const similarity = this.calculateSimilarity(
+        probeEmbedding,
+        storedEmbedding
+      )
+      comparedAny = true
+      if (similarity > bestSimilarity) {
+        bestSimilarity = similarity
+      }
+
+      if (similarity >= threshold) {
+        console.log(
+          `[FaceRecognitionService] verify: match for ${photo.name} (similarity ${similarity.toFixed(4)})`
+        )
+        return {
+          match: true,
+          name: photo.name,
+          similarity,
+          reason: 'match'
+        }
+      }
+    }
+
+    console.log(
+      `[FaceRecognitionService] verify: no match (best similarity ${comparedAny ? bestSimilarity.toFixed(4) : 'none'})`
+    )
+    return comparedAny
+      ? { match: false, similarity: bestSimilarity, reason: 'no-match' }
+      : { match: false, reason: 'no-match' }
+  }
+
+  /**
+   * Picks the most confident face detection from a list
+   *
+   * @param faces - Detected faces, expected to be non-empty
+   * @returns The face with the highest score
+   */
+  private selectHighestScoringFace(faces: FaceDetection[]): FaceDetection {
+    return faces.reduce((best, face) => (face.score > best.score ? face : best))
   }
 
   /**
