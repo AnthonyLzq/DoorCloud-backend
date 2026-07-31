@@ -183,6 +183,50 @@ describe('DoorCloud backend tests', () => {
         CORS_ORIGINS: ['http://localhost:3000', 'https://app.doorcloud.com']
       })
     })
+
+    test('parses FACE_VERIFY_THRESHOLD as float in [0,1]', () => {
+      expect(
+        parseEnv({ ...validEnv, FACE_VERIFY_THRESHOLD: '0.55' })
+      ).toMatchObject({
+        FACE_VERIFY_THRESHOLD: 0.55
+      })
+    })
+
+    test('defaults FACE_VERIFY_THRESHOLD to 0.37 when unset', () => {
+      expect(parseEnv(validEnv).FACE_VERIFY_THRESHOLD).toBe(0.37)
+    })
+
+    test('rejects non-numeric FACE_VERIFY_THRESHOLD', () => {
+      expect(() =>
+        parseEnv({ ...validEnv, FACE_VERIFY_THRESHOLD: 'banana' })
+      ).toThrow('FACE_VERIFY_THRESHOLD')
+    })
+
+    test('rejects FACE_VERIFY_THRESHOLD outside [0,1]', () => {
+      expect(() =>
+        parseEnv({ ...validEnv, FACE_VERIFY_THRESHOLD: '1.5' })
+      ).toThrow('FACE_VERIFY_THRESHOLD')
+    })
+
+    test('parses FACE_VERIFY_MODE and defaults to human', () => {
+      expect(parseEnv({ ...validEnv, FACE_VERIFY_MODE: 'onnx' })).toMatchObject(
+        {
+          FACE_VERIFY_MODE: 'onnx'
+        }
+      )
+
+      expect(parseEnv(validEnv).FACE_VERIFY_MODE).toBe('human')
+    })
+
+    test('parses FACE_VERIFY_MAX_PHOTOS and defaults to 10', () => {
+      expect(
+        parseEnv({ ...validEnv, FACE_VERIFY_MAX_PHOTOS: '3' })
+      ).toMatchObject({
+        FACE_VERIFY_MAX_PHOTOS: 3
+      })
+
+      expect(parseEnv(validEnv).FACE_VERIFY_MAX_PHOTOS).toBe(10)
+    })
   })
 
   describe('MQTT photo topics and payloads', () => {

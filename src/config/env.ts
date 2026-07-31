@@ -35,6 +35,24 @@ const optionalInteger = (
     )
     .default(defaultValue)
 
+const optionalFloat = (
+  name: string,
+  defaultValue: number,
+  min = 0,
+  max = Number.MAX_SAFE_INTEGER
+) =>
+  z
+    .preprocess(
+      value =>
+        value === '' || value === undefined ? undefined : Number(value),
+      z
+        .number()
+        .min(min, `${name} must be greater than or equal to ${min}`)
+        .max(max, `${name} must be lower than or equal to ${max}`)
+        .optional()
+    )
+    .default(defaultValue)
+
 const optionalBoolean = (name: string, defaultValue: boolean) =>
   z
     .preprocess(value => {
@@ -120,7 +138,15 @@ const envSchema = z
     SETUP_TOKEN: optionalString('SETUP_TOKEN'),
     MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
       'MODELS_CDN_URL must be a URL'
-    )
+    ),
+    FACE_VERIFY_THRESHOLD: optionalFloat('FACE_VERIFY_THRESHOLD', 0.37, 0, 1),
+    FACE_VERIFY_MODE: z
+      .preprocess(
+        value => (value === '' || value === undefined ? undefined : value),
+        z.enum(['onnx', 'human'])
+      )
+      .default('human'),
+    FACE_VERIFY_MAX_PHOTOS: optionalInteger('FACE_VERIFY_MAX_PHOTOS', 10, 1)
   })
   .refine(
     data => {

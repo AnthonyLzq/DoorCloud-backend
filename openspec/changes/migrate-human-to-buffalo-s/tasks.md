@@ -67,9 +67,9 @@ Acceptance (Phase 3): `pnpm test:local` FRS tests green; `init('onnx')` loads `d
 
 ## Phase 4: Config env (RF-4)
 
-- [ ] 4.1 Write RED env test: `FACE_VERIFY_THRESHOLD=0.55` → 0.55; unset → 0.37; `=banana` → Zod startup error
-- [ ] 4.2 Add `optionalFloat` helper + `FACE_VERIFY_THRESHOLD` (float [0,1], default 0.37) to `src/config/env.ts`
-- [ ] 4.3 Add `FACE_VERIFY_MODE` (`onnx`|`human`, default `human` for rollout) + `FACE_VERIFY_MAX_PHOTOS` (default 10) to `env.ts`
+- [x] 4.1 Write RED env test: `FACE_VERIFY_THRESHOLD=0.55` → 0.55; unset → 0.37; `=banana` → Zod startup error
+- [x] 4.2 Add `optionalFloat` helper + `FACE_VERIFY_THRESHOLD` (float [0,1], default 0.37) to `src/config/env.ts`
+- [x] 4.3 Add `FACE_VERIFY_MODE` (`onnx`|`human`, default `human` for rollout) + `FACE_VERIFY_MAX_PHOTOS` (default 10) to `env.ts`
 
 Acceptance (Phase 4): `parseEnv` scenarios green; invalid value throws `Invalid environment variables`.
 
