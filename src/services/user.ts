@@ -119,7 +119,9 @@ class UserServices {
 
     const photosFromUser = (
       await getAllFilesFromBucket(`${name}-${id}`, this.#log)
-    ).map(file => `${name}-${id}/${file.name}`)
+    )
+      .filter(file => !/^\d/.test(file.name))
+      .map(file => `${name}-${id}/${file.name}`)
     const urlPhotosFromUser = await getPhotosUrls(
       photosFromUser,
       900,

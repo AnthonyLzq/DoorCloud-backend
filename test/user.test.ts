@@ -95,6 +95,27 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
     )
   })
 
+  it('filters out no-match photos (numeric timestamp prefix) before verify', async () => {
+    mocks.getAllFilesFromBucket.mockResolvedValue([
+      { name: '1785597387029-no-match-uuid.jpg' },
+      { name: 'selfie-abc123.jpg' },
+      { name: '1750000000000-another-no-match.jpg' }
+    ])
+    mocks.getPhotosUrls.mockResolvedValue([
+      'https://example.com/John-1/selfie-abc123.jpg'
+    ])
+    const { UserServices } = await import('../src/services/index.js')
+    us = new UserServices(fromPartial(logMock))
+
+    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+
+    expect(mocks.verify).toHaveBeenCalledWith(
+      Buffer.from('photo'),
+      [{ name: 'selfie', url: 'https://example.com/John-1/selfie-abc123.jpg' }],
+      { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
+    )
+  })
+
   it('keeps the WhatsApp and CSV contract when a photo matches', async () => {
     mocks.verify.mockResolvedValue({
       match: true,
