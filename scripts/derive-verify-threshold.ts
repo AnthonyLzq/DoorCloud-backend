@@ -3,6 +3,7 @@ import { createReadStream, existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { calculateAllMetrics } from '../src/services/benchmark/metrics'
+import { cosineSimilarity } from '../src/services/face-recognition/cosine-similarity'
 
 const EMBEDDINGS_PATH = resolve(
   process.cwd(),
@@ -119,15 +120,7 @@ async function deriveThreshold(): Promise<void> {
     const embedding2 = embeddings[imagePath2]
     if (!embedding1 || !embedding2) continue
 
-    let dotProduct = 0
-    let norm1 = 0
-    let norm2 = 0
-    for (let i = 0; i < embedding1.length; i++) {
-      dotProduct += embedding1[i] * embedding2[i]
-      norm1 += embedding1[i] * embedding1[i]
-      norm2 += embedding2[i] * embedding2[i]
-    }
-    similarities.push(dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2) || 1))
+    similarities.push(cosineSimilarity(embedding1, embedding2))
     labels.push(label)
     lineCount++
   }

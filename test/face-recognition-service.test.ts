@@ -267,7 +267,9 @@ describe('FaceRecognitionService', () => {
         .spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
-      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) =>
+        fetchResponse(photoBuffer)
+      )
       vi.stubGlobal('fetch', fetchSpy)
 
       const result = await service.verify(

@@ -3,6 +3,7 @@ import {
   MAX_STORED_PHOTOS,
   VERIFY_FETCH_TIMEOUT_MS
 } from 'config/constants'
+import { cosineSimilarity } from './cosine-similarity'
 import type { FaceDetection } from './onnx-provider'
 import {
   DETECTOR_MODEL_NAME,
@@ -492,29 +493,7 @@ export class FaceRecognitionService {
     embedding1: Float32Array,
     embedding2: Float32Array
   ): number {
-    if (embedding1.length !== embedding2.length) {
-      throw new Error(
-        `Embedding size mismatch: ${embedding1.length} vs ${embedding2.length}`
-      )
-    }
-
-    let dotProduct = 0
-    let norm1 = 0
-    let norm2 = 0
-
-    for (let i = 0; i < embedding1.length; i++) {
-      dotProduct += embedding1[i] * embedding2[i]
-      norm1 += embedding1[i] * embedding1[i]
-      norm2 += embedding2[i] * embedding2[i]
-    }
-
-    const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2)
-
-    if (magnitude === 0) {
-      return 0
-    }
-
-    return dotProduct / magnitude
+    return cosineSimilarity(embedding1, embedding2)
   }
 
   /**

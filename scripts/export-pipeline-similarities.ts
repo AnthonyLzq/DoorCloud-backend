@@ -7,6 +7,7 @@ import {
 import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
 import { existsSync } from 'node:fs'
+import { cosineSimilarity } from '../src/services/face-recognition/cosine-similarity'
 
 const BFW_CSV = resolve(
   process.cwd(),
@@ -30,18 +31,6 @@ const PIPELINES = [
     )
   }
 ]
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dotProduct = 0
-  let norm1 = 0
-  let norm2 = 0
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i]
-    norm1 += a[i] * a[i]
-    norm2 += b[i] * b[i]
-  }
-  return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2) || 1)
-}
 
 async function exportPipeline(pipeline: {
   name: string
