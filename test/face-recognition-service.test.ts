@@ -236,6 +236,21 @@ describe('FaceRecognitionService', () => {
       vi.unstubAllGlobals()
     })
 
+    it('throws an actionable error when verify is called in hybrid mode (R2)', async () => {
+      await service.init()
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(
+        service.verify(Buffer.from('probe-image'), [
+          { name: 'alice', url: 'http://photos.test/alice.jpg' }
+        ])
+      ).rejects.toThrow(
+        "verify() requires onnx mode: call init({ mode: 'onnx' })"
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
     it('returns no-face without throwing when the probe has no face (RF-2)', async () => {
       await initOnnx()
       const detectSpy = vi

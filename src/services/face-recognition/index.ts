@@ -335,6 +335,11 @@ export class FaceRecognitionService {
   /**
    * Verifies a probe image against stored user photos
    *
+   * Requires the service to be initialized in `onnx` mode, which loads the
+   * SCRFD detector and w600k_mbf recognizer needed by this method. Calling
+   * `init()` with the default `hybrid` mode and then `verify()` throws an
+   * actionable error.
+   *
    * Detects and embeds the highest-scoring probe face, then compares it
    * against each stored photo (downloaded in parallel with a per-fetch
    * timeout, capped at `maxPhotos`, default `MAX_STORED_PHOTOS`), returning
@@ -351,6 +356,12 @@ export class FaceRecognitionService {
     opts: { threshold?: number; maxPhotos?: number } = {}
   ): Promise<VerifyResult> {
     this.ensureInitialized()
+
+    if (this.mode !== 'onnx') {
+      throw new Error(
+        "[FaceRecognitionService] verify() requires onnx mode: call init({ mode: 'onnx' }) before verifying"
+      )
+    }
 
     const threshold = opts.threshold ?? DEFAULT_VERIFY_THRESHOLD
     const maxPhotos = opts.maxPhotos ?? MAX_STORED_PHOTOS
