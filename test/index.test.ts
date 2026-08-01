@@ -211,16 +211,6 @@ describe('DoorCloud backend tests', () => {
       ).toThrow('FACE_VERIFY_THRESHOLD')
     })
 
-    test('parses FACE_VERIFY_MODE and defaults to human', () => {
-      expect(parseEnv({ ...validEnv, FACE_VERIFY_MODE: 'onnx' })).toMatchObject(
-        {
-          FACE_VERIFY_MODE: 'onnx'
-        }
-      )
-
-      expect(parseEnv(validEnv).FACE_VERIFY_MODE).toBe('human')
-    })
-
     test('parses FACE_VERIFY_MAX_PHOTOS and defaults to 10', () => {
       expect(
         parseEnv({ ...validEnv, FACE_VERIFY_MAX_PHOTOS: '3' })

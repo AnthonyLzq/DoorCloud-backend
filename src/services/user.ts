@@ -126,14 +126,17 @@ class UserServices {
       this.#log
     )
     const timeBefore = getTimestamp()
-    const { FACE_VERIFY_THRESHOLD } = getEnv()
+    const { FACE_VERIFY_THRESHOLD, FACE_VERIFY_MAX_PHOTOS } = getEnv()
     const verifyResult = await faceRecognitionService.verify(
       bufferPhoto,
       urlPhotosFromUser.map((url, index) => ({
         name: photosFromUser[index].split('/')[1].split('-')[0],
         url
       })),
-      { threshold: FACE_VERIFY_THRESHOLD }
+      {
+        threshold: FACE_VERIFY_THRESHOLD,
+        maxPhotos: FACE_VERIFY_MAX_PHOTOS
+      }
     )
     const timeAfter = getTimestamp()
     const foundName = verifyResult.name

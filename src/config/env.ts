@@ -146,12 +146,6 @@ const envSchema = z
       0,
       1
     ),
-    FACE_VERIFY_MODE: z
-      .preprocess(
-        value => (value === '' || value === undefined ? undefined : value),
-        z.enum(['onnx', 'human'])
-      )
-      .default('human'),
     FACE_VERIFY_MAX_PHOTOS: optionalInteger(
       'FACE_VERIFY_MAX_PHOTOS',
       MAX_STORED_PHOTOS,

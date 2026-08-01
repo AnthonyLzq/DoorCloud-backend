@@ -331,22 +331,24 @@ export class FaceRecognitionService {
    * Verifies a probe image against stored user photos
    *
    * Detects and embeds the highest-scoring probe face, then compares it
-   * against each stored photo (sequential, capped at MAX_STORED_PHOTOS),
-   * returning the first cosine similarity at or above the threshold.
+   * against each stored photo (sequential, capped at `maxPhotos`, default
+   * `MAX_STORED_PHOTOS`), returning the first cosine similarity at or above
+   * the threshold.
    *
    * @param image - Probe image buffer
    * @param storedPhotos - Stored user photos to compare against
-   * @param opts - Options with an optional similarity threshold
+   * @param opts - Options with an optional similarity threshold and max photos
    * @returns Verify result with match flag and reason
    */
   async verify(
     image: Buffer,
     storedPhotos: VerifyStoredPhoto[],
-    opts: { threshold?: number } = {}
+    opts: { threshold?: number; maxPhotos?: number } = {}
   ): Promise<VerifyResult> {
     this.ensureInitialized()
 
     const threshold = opts.threshold ?? DEFAULT_VERIFY_THRESHOLD
+    const maxPhotos = opts.maxPhotos ?? MAX_STORED_PHOTOS
 
     const probeFaces = await this.onnxProvider.detectFaces(image)
     if (probeFaces.length === 0) {
@@ -366,7 +368,7 @@ export class FaceRecognitionService {
     let bestSimilarity = -Infinity
     let comparedAny = false
 
-    for (const photo of storedPhotos.slice(0, MAX_STORED_PHOTOS)) {
+    for (const photo of storedPhotos.slice(0, maxPhotos)) {
       let storedImage: Buffer
       try {
         const response = await fetch(photo.url)
