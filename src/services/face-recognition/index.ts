@@ -350,20 +350,28 @@ export class FaceRecognitionService {
     const threshold = opts.threshold ?? DEFAULT_VERIFY_THRESHOLD
     const maxPhotos = opts.maxPhotos ?? MAX_STORED_PHOTOS
 
-    const probeFaces = await this.onnxProvider.detectFaces(image)
-    if (probeFaces.length === 0) {
-      console.log(
-        '[FaceRecognitionService] verify: no face detected in probe image'
+    let probeEmbedding: Float32Array
+    try {
+      const probeFaces = await this.onnxProvider.detectFaces(image)
+      if (probeFaces.length === 0) {
+        console.log(
+          '[FaceRecognitionService] verify: no face detected in probe image'
+        )
+        return { match: false, reason: 'no-face' }
+      }
+
+      const probeFace = this.selectHighestScoringFace(probeFaces)
+      probeEmbedding = await this.onnxProvider.getAlignedEmbedding(
+        image,
+        probeFace.landmarks,
+        RECOGNITION_MODEL_NAME
+      )
+    } catch (error) {
+      console.warn(
+        `[FaceRecognitionService] verify: failed to process probe image: ${error instanceof Error ? error.message : String(error)}`
       )
       return { match: false, reason: 'no-face' }
     }
-
-    const probeFace = this.selectHighestScoringFace(probeFaces)
-    const probeEmbedding = await this.onnxProvider.getAlignedEmbedding(
-      image,
-      probeFace.landmarks,
-      RECOGNITION_MODEL_NAME
-    )
 
     let bestSimilarity = -Infinity
     let comparedAny = false
@@ -386,20 +394,28 @@ export class FaceRecognitionService {
         continue
       }
 
-      const storedFaces = await this.onnxProvider.detectFaces(storedImage)
-      if (storedFaces.length === 0) {
-        console.log(
-          `[FaceRecognitionService] verify: no face detected in stored photo for ${photo.name}`
+      let storedEmbedding: Float32Array
+      try {
+        const storedFaces = await this.onnxProvider.detectFaces(storedImage)
+        if (storedFaces.length === 0) {
+          console.log(
+            `[FaceRecognitionService] verify: no face detected in stored photo for ${photo.name}`
+          )
+          continue
+        }
+
+        const storedFace = this.selectHighestScoringFace(storedFaces)
+        storedEmbedding = await this.onnxProvider.getAlignedEmbedding(
+          storedImage,
+          storedFace.landmarks,
+          RECOGNITION_MODEL_NAME
+        )
+      } catch (error) {
+        console.warn(
+          `[FaceRecognitionService] verify: failed to process stored photo ${photo.name}: ${error instanceof Error ? error.message : String(error)}`
         )
         continue
       }
-
-      const storedFace = this.selectHighestScoringFace(storedFaces)
-      const storedEmbedding = await this.onnxProvider.getAlignedEmbedding(
-        storedImage,
-        storedFace.landmarks,
-        RECOGNITION_MODEL_NAME
-      )
 
       const similarity = this.calculateSimilarity(
         probeEmbedding,

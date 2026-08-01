@@ -453,6 +453,77 @@ describe('FaceRecognitionService', () => {
 
       expect(result).toEqual({ match: false, reason: 'no-match' })
     })
+
+    it('returns no-face when probe inference fails (R4)', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces').mockRejectedValue(
+        new Error('Model not loaded: det_500m')
+      )
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({ match: false, reason: 'no-face' })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('returns no-face when probe embedding fails (R4)', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces').mockResolvedValue([
+        probeFace
+      ])
+      vi.spyOn(
+        service['onnxProvider'],
+        'getAlignedEmbedding'
+      ).mockRejectedValue(
+        new Error('Failed to estimate similarity transform from landmarks')
+      )
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({ match: false, reason: 'no-face' })
+    })
+
+    it('skips a stored photo whose inference fails and continues (R4)', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockRejectedValueOnce(
+          new Error('Failed to estimate similarity transform from landmarks')
+        )
+        .mockResolvedValueOnce([probeFace])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [
+          { name: 'alice', url: 'http://photos.test/alice.jpg' },
+          { name: 'bob', url: 'http://photos.test/bob.jpg' }
+        ],
+        { threshold: 0.5 }
+      )
+
+      expect(result).toEqual({
+        match: true,
+        name: 'bob',
+        similarity: 1,
+        reason: 'match'
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+    })
   })
 
   describe('onnx lifecycle', () => {
