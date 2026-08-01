@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { VERIFY_FETCH_TIMEOUT_MS } from '../src/config/constants'
 import { FaceRecognitionService } from '../src/services/face-recognition'
 
 describe('FaceRecognitionService', () => {
@@ -282,7 +283,8 @@ describe('FaceRecognitionService', () => {
         reason: 'match'
       })
       expect(fetchSpy).toHaveBeenCalledTimes(1)
-      expect(fetchSpy).toHaveBeenCalledWith('http://photos.test/alice.jpg')
+      expect(fetchSpy.mock.calls[0][0]).toBe('http://photos.test/alice.jpg')
+      expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
       expect(detectSpy).toHaveBeenCalledTimes(2)
       expect(embedSpy).toHaveBeenCalledTimes(2)
     })
@@ -312,9 +314,10 @@ describe('FaceRecognitionService', () => {
       expect(result.similarity).toBe(0)
     })
 
-    it('stops fetching stored photos after the first match', async () => {
+    it('downloads stored photos in parallel and stops inference after the first match', async () => {
       await initOnnx()
-      vi.spyOn(service['onnxProvider'], 'detectFaces')
+      const detectSpy = vi
+        .spyOn(service['onnxProvider'], 'detectFaces')
         .mockResolvedValueOnce([probeFace])
         .mockResolvedValueOnce([probeFace])
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
@@ -339,7 +342,10 @@ describe('FaceRecognitionService', () => {
         similarity: 1,
         reason: 'match'
       })
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      // Downloads run in parallel for every candidate, but inference stops
+      // at the first match: 1 probe detect + 1 alice detect.
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+      expect(detectSpy).toHaveBeenCalledTimes(2)
     })
 
     it('caps the number of stored photos evaluated at 10', async () => {
@@ -523,6 +529,36 @@ describe('FaceRecognitionService', () => {
         reason: 'match'
       })
       expect(fetchSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('aborts stored photo fetches that exceed the timeout (R4)', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces').mockResolvedValue([
+        probeFace
+      ])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      const fetchSpy = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new Error('Aborted'))
+            })
+          })
+      )
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        { threshold: 0.5 }
+      )
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+      expect(result).toEqual({ match: false, reason: 'no-match' })
+      expect(VERIFY_FETCH_TIMEOUT_MS).toBeGreaterThan(0)
     })
   })
 

@@ -1,4 +1,8 @@
-import { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS } from 'config/constants'
+import {
+  DEFAULT_VERIFY_THRESHOLD,
+  MAX_STORED_PHOTOS,
+  VERIFY_FETCH_TIMEOUT_MS
+} from 'config/constants'
 import type { FaceDetection } from './onnx-provider'
 import {
   DETECTOR_MODEL_NAME,
@@ -7,7 +11,7 @@ import {
 } from './onnx-provider'
 import { PythonManager } from './python-manager'
 
-export { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS }
+export { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS, VERIFY_FETCH_TIMEOUT_MS }
 
 const DETECTOR_MODEL_PATH = 'models/insightface/det_500m.onnx'
 const RECOGNITION_MODEL_PATH = 'models/insightface/w600k_mbf.onnx'
@@ -331,9 +335,9 @@ export class FaceRecognitionService {
    * Verifies a probe image against stored user photos
    *
    * Detects and embeds the highest-scoring probe face, then compares it
-   * against each stored photo (sequential, capped at `maxPhotos`, default
-   * `MAX_STORED_PHOTOS`), returning the first cosine similarity at or above
-   * the threshold.
+   * against each stored photo (downloaded in parallel with a per-fetch
+   * timeout, capped at `maxPhotos`, default `MAX_STORED_PHOTOS`), returning
+   * the first cosine similarity at or above the threshold.
    *
    * @param image - Probe image buffer
    * @param storedPhotos - Stored user photos to compare against
@@ -376,23 +380,43 @@ export class FaceRecognitionService {
     let bestSimilarity = -Infinity
     let comparedAny = false
 
-    for (const photo of storedPhotos.slice(0, maxPhotos)) {
-      let storedImage: Buffer
-      try {
-        const response = await fetch(photo.url)
-        if (!response.ok) {
-          console.warn(
-            `[FaceRecognitionService] verify: failed to fetch stored photo ${photo.url} (status ${response.status})`
-          )
-          continue
-        }
-        storedImage = Buffer.from(await response.arrayBuffer())
-      } catch (error) {
-        console.warn(
-          `[FaceRecognitionService] verify: error fetching stored photo ${photo.url}: ${error instanceof Error ? error.message : String(error)}`
+    const storedCandidates = storedPhotos.slice(0, maxPhotos)
+
+    const downloadedPhotos = await Promise.allSettled(
+      storedCandidates.map(async photo => {
+        const controller = new AbortController()
+        const timer = setTimeout(
+          () => controller.abort(),
+          VERIFY_FETCH_TIMEOUT_MS
         )
-        continue
-      }
+        try {
+          const response = await fetch(photo.url, {
+            signal: controller.signal
+          })
+          if (!response.ok) {
+            console.warn(
+              `[FaceRecognitionService] verify: failed to fetch stored photo ${photo.url} (status ${response.status})`
+            )
+            return null
+          }
+          return {
+            photo,
+            storedImage: Buffer.from(await response.arrayBuffer())
+          }
+        } catch (error) {
+          console.warn(
+            `[FaceRecognitionService] verify: error fetching stored photo ${photo.url}: ${error instanceof Error ? error.message : String(error)}`
+          )
+          return null
+        } finally {
+          clearTimeout(timer)
+        }
+      })
+    )
+
+    for (const result of downloadedPhotos) {
+      if (result.status === 'rejected' || !result.value) continue
+      const { photo, storedImage } = result.value
 
       let storedEmbedding: Float32Array
       try {
