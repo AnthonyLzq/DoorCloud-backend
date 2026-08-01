@@ -1,0 +1,16 @@
+schema: spec-driven
+change: migrate-human-to-buffalo-s
+created: 2026-07-31
+status: archived
+current_phase: archived
+phases:
+  explore: completed
+  propose: completed
+  spec: completed
+  design: completed
+  tasks: completed
+  apply: completed
+  verify: completed
+  archive: completed
+completed_specs:
+  - face-verification
