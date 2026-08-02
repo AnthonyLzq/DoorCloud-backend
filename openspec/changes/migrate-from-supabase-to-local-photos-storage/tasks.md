@@ -38,10 +38,10 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Static serving + UserState persistence
 
-- [ ] 2.1 RED: `test/server.test.ts`: `GET /photos/<stored>` returns 200; `../` and absolute segment return 4xx and never read outside root. Depends: 1.2.
-- [ ] 2.2 GREEN: `src/network/server.ts` `#config()`: register `@fastify/static` at `/photos` rooted at `PHOTOS_DIR`. Depends: 2.1.
-- [ ] 2.3 RED: New `test/state.test.ts` (temp db via `mkdtempSync` + `unlinkSync`, mirroring `test/benchmark-storage.test.ts`): UserState writes/reads `last_message_at`; new instance on same file persists (restart survival). Depends: 1.2.
-- [ ] 2.4 GREEN: `src/storage/state.ts`: `UserState` over `node:sqlite` `DatabaseSync` (`data/app-state.db`, table `user_state(id, last_message_at)`). Depends: 2.3.
+- [x] 2.1 RED: `test/server.test.ts`: `GET /photos/<stored>` returns 200; `../` and absolute segment return 4xx and never read outside root. Depends: 1.2.
+- [x] 2.2 GREEN: `src/network/server.ts` `#config()`: register `@fastify/static` at `/photos` rooted at `PHOTOS_DIR`. Depends: 2.1.
+- [x] 2.3 RED: New `test/state.test.ts` (temp db via `mkdtempSync` + `unlinkSync`, mirroring `test/benchmark-storage.test.ts`): UserState writes/reads `last_message_at`; new instance on same file persists (restart survival). Depends: 1.2.
+- [x] 2.4 GREEN: `src/storage/state.ts`: `UserState` over `node:sqlite` `DatabaseSync` (`data/app-state.db`, table `user_state(id, last_message_at)`). Depends: 2.3.
 
 ## Phase 3: Core rewiring (user service + routes)
 

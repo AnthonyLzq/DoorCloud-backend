@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -42,14 +45,20 @@ interface ServerLike {
 }
 
 let currentServer: ServerLike | null = null
+let tmpRoot: string
+let photosDir: string
 
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
+  tmpRoot = mkdtempSync(join(tmpdir(), 'doorcloud-server-'))
+  photosDir = join(tmpRoot, 'photos')
+  mkdirSync(photosDir, { recursive: true })
   mocks.getEnv.mockReturnValue({
     NODE_ENV: 'production',
     CORS_ORIGINS: undefined,
-    PORT: 0
+    PORT: 0,
+    PHOTOS_DIR: photosDir
   })
   mocks.mqttConnection.mockReturnValue({
     start: vi.fn().mockResolvedValue(undefined),
@@ -62,6 +71,7 @@ afterEach(async () => {
     await currentServer.stop()
     currentServer = null
   }
+  rmSync(tmpRoot, { force: true, recursive: true })
 })
 
 async function startServer(): Promise<ServerLike> {
@@ -106,5 +116,52 @@ describe('Server lifecycle (RF-5)', () => {
     // Cleanup ran: sessions released, MQTT never started, no HTTP listen
     expect(mocks.frsShutdown).toHaveBeenCalledTimes(1)
     expect(mocks.mqttConnection).not.toHaveBeenCalled()
+  })
+})
+
+describe('Static photo serving (RF-4)', () => {
+  it('serves a stored photo with 200 and its content', async () => {
+    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
+    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
+
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+
+    const response = await Server.app.inject({
+      method: 'GET',
+      url: '/photos/Ana-42/selfie.jpg'
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toBe('photo-content')
+  })
+
+  it('rejects ../ traversal with 4xx and never reads outside the root', async () => {
+    writeFileSync(join(tmpRoot, 'secret.txt'), 'TOP-SECRET')
+
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+
+    const response = await Server.app.inject({
+      method: 'GET',
+      url: '/photos/../secret.txt'
+    })
+
+    expect(response.statusCode).toBeGreaterThanOrEqual(400)
+    expect(response.statusCode).toBeLessThan(500)
+    expect(response.body).not.toContain('TOP-SECRET')
+  })
+
+  it('rejects an absolute path segment with 4xx', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+
+    const response = await Server.app.inject({
+      method: 'GET',
+      url: '/photos//etc/passwd'
+    })
+
+    expect(response.statusCode).toBeGreaterThanOrEqual(400)
+    expect(response.statusCode).toBeLessThan(500)
   })
 })

@@ -1,5 +1,6 @@
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import fastifyStatic from '@fastify/static'
 import { getEnv } from 'config/env'
 import { supabaseConnection } from 'database'
 import fastify, { type FastifyInstance } from 'fastify'
@@ -40,7 +41,7 @@ class Server {
   }
 
   #config() {
-    const { CORS_ORIGINS } = getEnv()
+    const { CORS_ORIGINS, PHOTOS_DIR } = getEnv()
 
     this.#app.register(cors, {
       origin: CORS_ORIGINS ?? true
@@ -51,10 +52,18 @@ class Server {
         files: 3
       }
     })
+    this.#app.register(fastifyStatic, {
+      root: PHOTOS_DIR,
+      prefix: '/photos/'
+    })
 
     this.#app.setValidatorCompiler(validatorCompiler)
     this.#app.setSerializerCompiler(serializerCompiler)
     applyRoutes(this.#app.withTypeProvider<ZodTypeProvider>())
+  }
+
+  public get app(): FastifyInstance {
+    return this.#app
   }
 
   #startMqtt() {
