@@ -164,3 +164,6 @@ metrics/roc-pipeline/
 
 # Local skill registry cache (gentle-ai tool state, not part of the repo)
 .atl/
+
+# SQLite app state (runtime data, created on first use)
+data/app-state.db
