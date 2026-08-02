@@ -5,6 +5,23 @@
     "port": 4096
   },
   "instructions": ["AGENTS.md", "docs/ai/AI_CONTEXT.md"],
+  "agent": {
+    "review-risk": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "review-resilience": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "review-readability": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "review-reliability": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "review-refuter": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    }
+  },
   "permission": {
     "read": {
       "*": "allow",

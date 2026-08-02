@@ -52,10 +52,10 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Supabase removal
 
-- [ ] 4.1 RED: `test/server.test.ts`: drop `supabaseConnection` mock; assert no supabase instantiation; static route registered. Depends: 3.2.
-- [ ] 4.2 GREEN: delete `src/database/**` (supabase module + `database` barrel); remove `supabaseConnection`/`database` imports from `server.ts`/`user.ts`; drop `@supabase/*` deps, add `@fastify/static` in `package.json`. Depends: 4.1.
-- [ ] 4.3 GREEN: `test/index.test.ts` `validEnv`: swap `SUPABASE_*` for `PHOTOS_*`/`USER_*`. Depends: 4.2.
-- [ ] 4.4 GATE: `pnpm test:local && pnpm typecheck && pnpm lint` green; no `@supabase` in `src/` or `package.json`. Depends: 4.2.
+- [x] 4.1 RED: `test/server.test.ts`: drop `supabaseConnection` mock; assert no supabase instantiation; static route registered. Depends: 3.2.
+- [x] 4.2 GREEN: delete `src/database/**` (supabase module + `database` barrel); remove `supabaseConnection`/`database` imports from `server.ts`/`user.ts`; drop `@supabase/*` deps, add `@fastify/static` in `package.json`. Depends: 4.1.
+- [x] 4.3 GREEN: `test/index.test.ts` `validEnv`: swap `SUPABASE_*` for `PHOTOS_*`/`USER_*`. Depends: 4.2.
+- [x] 4.4 GATE: `pnpm test:local && pnpm typecheck && pnpm lint` green; no `@supabase` in `src/` or `package.json`. Depends: 4.2.
 
 ## Phase 5: Backup CLI
 

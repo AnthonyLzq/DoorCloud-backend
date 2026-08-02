@@ -2,7 +2,6 @@ import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import { getEnv } from 'config/env'
-import { supabaseConnection } from 'database'
 import fastify, { type FastifyInstance } from 'fastify'
 import {
   serializerCompiler,
@@ -74,7 +73,6 @@ class Server {
     const { PORT } = getEnv()
 
     try {
-      supabaseConnection(this.#app.log)
       // Fail fast: if face recognition cannot start, do not open ports or MQTT
       await this.#faceRecognitionService.init({ mode: 'onnx' })
       this.#startMqtt()

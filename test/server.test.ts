@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getEnv: vi.fn(),
-  supabaseConnection: vi.fn(),
   mqttConnection: vi.fn(),
   applyRoutes: vi.fn(),
   humanInit: vi.fn(),
@@ -15,9 +14,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../src/config/env', () => ({
   getEnv: mocks.getEnv
-}))
-vi.mock('../src/database', () => ({
-  supabaseConnection: mocks.supabaseConnection
 }))
 vi.mock('../src/network/mqtt', () => ({
   mqttConnection: mocks.mqttConnection
@@ -97,10 +93,12 @@ describe('Server lifecycle (RF-5)', () => {
     expect(mocks.frsShutdown).toHaveBeenCalledTimes(1)
   })
 
-  it('start() still wires supabase and MQTT alongside ONNX face recognition', async () => {
+  it('start() wires MQTT and photo storage without instantiating Supabase', async () => {
     await startServer()
 
-    expect(mocks.supabaseConnection).toHaveBeenCalled()
+    expect(
+      (globalThis as { __supabaseClient__?: unknown }).__supabaseClient__
+    ).toBeUndefined()
     expect(mocks.mqttConnection).toHaveBeenCalled()
     expect(mocks.mqttConnection.mock.results[0].value.start).toHaveBeenCalled()
     expect(mocks.frsInit).toHaveBeenCalledWith({ mode: 'onnx' })

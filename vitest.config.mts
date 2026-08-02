@@ -9,7 +9,6 @@ export default defineConfig({
   resolve: {
     alias: {
       config: src('config'),
-      database: src('database'),
       integrations: src('integrations'),
       lib: src('lib'),
       network: src('network'),
