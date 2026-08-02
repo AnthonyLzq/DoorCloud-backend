@@ -13,12 +13,26 @@ let sharedUserState: UserState | null = null
  * One SQLite connection per process, created lazily on first use. The MQTT
  * photo handler and HTTP routes construct a `UserServices` per message or
  * request; without a shared connection each construction would open (and
- * leak) a new `DatabaseSync` handle plus a CREATE TABLE write.
+ * leak) a new `DatabaseSync` handle plus a CREATE TABLE write. The optional
+ * `dbPath` lets callers point the shared state at a configured
+ * `STATE_DB_PATH` (e.g. a mounted volume in Docker).
  */
-export function getUserState(): UserState {
-  if (!sharedUserState) sharedUserState = new UserState()
+export function getUserState(dbPath?: string): UserState {
+  if (!sharedUserState) sharedUserState = new UserState(dbPath)
 
   return sharedUserState
+}
+
+/**
+ * Drop the shared connection so the next `getUserState()` call opens a fresh
+ * one. Used by tests to isolate cases; harmless in production where the state
+ * connection is meant to live for the whole process.
+ */
+export function resetUserState(): void {
+  if (sharedUserState) {
+    sharedUserState.close()
+    sharedUserState = null
+  }
 }
 
 /**

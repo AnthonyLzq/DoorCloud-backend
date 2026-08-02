@@ -131,6 +131,7 @@ const envSchema = z
       16,
       'PHOTOS_URL_SECRET must be at least 16 characters'
     ),
+    STATE_DB_PATH: optionalString('STATE_DB_PATH'),
     USER_ID: requiredString('USER_ID'),
     USER_NAME: requiredString('USER_NAME'),
     USER_PHONE: requiredString('USER_PHONE'),

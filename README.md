@@ -146,11 +146,15 @@ build time, and keeps pnpm pinned to the project baseline:
 docker build -t doorcloud-backend .
 docker run --env-file .env -p 1996:1996 \
   -v /var/lib/doorcloud/photos:/var/lib/doorcloud/photos \
+  -v /var/lib/doorcloud/state:/var/lib/doorcloud/state \
+  -e STATE_DB_PATH=/var/lib/doorcloud/state/app-state.db \
   doorcloud-backend
 ```
 
 Mount the host directory for `PHOTOS_DIR` so stored photos persist across
-container restarts. The SQLite state file lives under `data/app-state.db`.
+container restarts. The SQLite state file lives under `data/app-state.db` by
+default; in Docker, set `STATE_DB_PATH` to a path inside a mounted volume (as
+above) so `last_message_at` also survives container recreation.
 
 ## Local Mosquitto broker
 

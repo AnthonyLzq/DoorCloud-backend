@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { getUserState, UserState } from '../src/storage/state'
+import { getUserState, resetUserState, UserState } from '../src/storage/state'
 
 let tmpDir: string
 let dbPath: string
@@ -11,6 +11,7 @@ let dbPath: string
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'doorcloud-state-'))
   dbPath = join(tmpDir, 'app-state.db')
+  resetUserState()
 })
 
 afterEach(() => {
@@ -107,7 +108,21 @@ describe('UserState', () => {
 
   describe('getUserState', () => {
     it('returns the same shared instance on repeated calls', () => {
-      expect(getUserState()).toBe(getUserState())
+      expect(getUserState(dbPath)).toBe(getUserState(dbPath))
+    })
+
+    it('persists through the shared instance at the provided path', () => {
+      const shared = getUserState(dbPath)
+
+      try {
+        shared.setLastMessage('42', new Date('2026-08-01T12:00:00.000Z'))
+
+        expect(shared.getLastMessage('42')?.toISOString()).toBe(
+          '2026-08-01T12:00:00.000Z'
+        )
+      } finally {
+        shared.close()
+      }
     })
   })
 })
