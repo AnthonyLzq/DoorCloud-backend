@@ -1,0 +1,18 @@
+schema: spec-driven
+change: migrate-from-supabase-to-local-photos-storage
+created: 2026-07-30
+status: archived
+current_phase: archived
+phases:
+  explore: completed
+  propose: completed
+  spec: completed
+  design: completed
+  tasks: completed
+  apply: completed
+  verify: completed
+  archive: completed
+completed_specs:
+  - photo-storage
+  - user-config
+  - face-verification
