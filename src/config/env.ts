@@ -123,10 +123,15 @@ const envSchema = z
     MQTT_RECONNECT_PERIOD: optionalInteger('MQTT_RECONNECT_PERIOD', 1_000),
     MQTT_CONNECT_TIMEOUT: optionalInteger('MQTT_CONNECT_TIMEOUT', 30_000, 1),
     MQTT_QOS: optionalQos('MQTT_QOS', 0),
-    SUPABASE_URL: requiredString('SUPABASE_URL').url(
-      'SUPABASE_URL must be a URL'
+    PHOTOS_DIR: requiredString('PHOTOS_DIR'),
+    PHOTOS_BASE_URL: requiredString('PHOTOS_BASE_URL').url(
+      'PHOTOS_BASE_URL must be a URL'
     ),
-    SUPABASE_KEY: requiredString('SUPABASE_KEY'),
+    USER_ID: requiredString('USER_ID'),
+    USER_NAME: requiredString('USER_NAME'),
+    USER_PHONE: requiredString('USER_PHONE'),
+    BACKUP_DEST: optionalString('BACKUP_DEST'),
+    BACKUP_SECRET: optionalString('BACKUP_SECRET'),
     OPENWA_BASE_URL: z
       .preprocess(
         value => (value === '' || value === undefined ? undefined : value),

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { DEFAULT_VERIFY_THRESHOLD } from '../src/config/constants'
 import { parseEnv } from '../src/config/env'
+import { getActiveUser } from '../src/config/user'
 import {
   getOpenWaSetupQr,
   getOpenWaSetupStatus,
@@ -104,8 +105,11 @@ const validEnv = {
   OPENWA_BASE_URL: 'http://localhost:2785',
   OPENWA_CHAT_ID: '51999999999@c.us',
   OPENWA_SESSION_ID: 'main',
-  SUPABASE_KEY: 'supabase-key',
-  SUPABASE_URL: 'https://supabase.example.com'
+  PHOTOS_DIR: '/tmp/doorcloud-photos',
+  PHOTOS_BASE_URL: 'http://localhost:1996/photos',
+  USER_ID: '42',
+  USER_NAME: 'Ana',
+  USER_PHONE: '51999999999@c.us'
 }
 
 const log = {
@@ -219,6 +223,61 @@ describe('DoorCloud backend tests', () => {
       })
 
       expect(parseEnv(validEnv).FACE_VERIFY_MAX_PHOTOS).toBe(10)
+    })
+
+    test('parses PHOTOS_* and USER_* without SUPABASE_*', () => {
+      const env = parseEnv(validEnv)
+
+      expect(env).toMatchObject({
+        PHOTOS_DIR: '/tmp/doorcloud-photos',
+        PHOTOS_BASE_URL: 'http://localhost:1996/photos',
+        USER_ID: '42',
+        USER_NAME: 'Ana',
+        USER_PHONE: '51999999999@c.us'
+      })
+      expect('SUPABASE_URL' in env).toBe(false)
+      expect('SUPABASE_KEY' in env).toBe(false)
+    })
+
+    test('parses optional BACKUP_DEST and BACKUP_SECRET', () => {
+      expect(
+        parseEnv({
+          ...validEnv,
+          BACKUP_DEST: '/tmp/doorcloud-backup',
+          BACKUP_SECRET: 'secret'
+        })
+      ).toMatchObject({
+        BACKUP_DEST: '/tmp/doorcloud-backup',
+        BACKUP_SECRET: 'secret'
+      })
+      expect(parseEnv(validEnv).BACKUP_DEST).toBeUndefined()
+      expect(parseEnv(validEnv).BACKUP_SECRET).toBeUndefined()
+    })
+
+    test('rejects missing PHOTOS_DIR', () => {
+      const { PHOTOS_DIR: _omit, ...rest } = validEnv
+
+      expect(() => parseEnv(rest)).toThrow('PHOTOS_DIR')
+    })
+
+    test('rejects missing USER_NAME', () => {
+      const { USER_NAME: _omit, ...rest } = validEnv
+
+      expect(() => parseEnv(rest)).toThrow('USER_NAME')
+    })
+  })
+
+  describe('user config', () => {
+    test('resolves the active user from USER_* env', () => {
+      expect(getActiveUser()).toMatchObject({
+        id: '42',
+        name: 'Ana',
+        phone: '51999999999@c.us'
+      })
+    })
+
+    test('returns an immutable user', () => {
+      expect(Object.isFrozen(getActiveUser())).toBe(true)
     })
   })
 
