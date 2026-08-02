@@ -41,6 +41,10 @@ vi.mock('../src/storage/photos', () => ({
   }
 }))
 vi.mock('../src/storage/state', () => ({
+  getUserState: () => ({
+    getLastMessage: mocks.getLastMessage,
+    setLastMessage: mocks.setLastMessage
+  }),
   UserState: class MockUserState {
     getLastMessage = mocks.getLastMessage
     setLastMessage = mocks.setLastMessage

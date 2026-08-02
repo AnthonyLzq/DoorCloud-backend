@@ -5,6 +5,22 @@ import { DatabaseSync } from 'node:sqlite'
 const DATA_DIR = resolve(process.cwd(), 'data')
 const DEFAULT_DB_PATH = resolve(DATA_DIR, 'app-state.db')
 
+let sharedUserState: UserState | null = null
+
+/**
+ * Shared process-wide state connection.
+ *
+ * One SQLite connection per process, created lazily on first use. The MQTT
+ * photo handler and HTTP routes construct a `UserServices` per message or
+ * request; without a shared connection each construction would open (and
+ * leak) a new `DatabaseSync` handle plus a CREATE TABLE write.
+ */
+export function getUserState(): UserState {
+  if (!sharedUserState) sharedUserState = new UserState()
+
+  return sharedUserState
+}
+
 /**
  * SQLite-backed persistence for the single user's last-message timestamp.
  *

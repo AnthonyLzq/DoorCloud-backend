@@ -12,7 +12,7 @@ import {
 import { CustomError } from 'network/http'
 import { faceRecognitionService } from 'services/face-recognition'
 import { DiskPhotoStorage } from 'storage/photos'
-import { UserState } from 'storage/state'
+import { getUserState, type UserState } from 'storage/state'
 import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
 
 const MAX_HOUR_DIFFERENCE = 16
@@ -31,7 +31,7 @@ class UserServices {
       baseUrl: PHOTOS_BASE_URL,
       urlSecret: PHOTOS_URL_SECRET
     })
-    this.#userState = new UserState()
+    this.#userState = getUserState()
   }
 
   async uploadPhotos(

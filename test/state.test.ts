@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { UserState } from '../src/storage/state'
+import { getUserState, UserState } from '../src/storage/state'
 
 let tmpDir: string
 let dbPath: string
@@ -102,6 +102,12 @@ describe('UserState', () => {
       const state = new UserState(dbPath)
 
       expect(() => state.close()).not.toThrow()
+    })
+  })
+
+  describe('getUserState', () => {
+    it('returns the same shared instance on repeated calls', () => {
+      expect(getUserState()).toBe(getUserState())
     })
   })
 })
