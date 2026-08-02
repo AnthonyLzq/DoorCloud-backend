@@ -59,9 +59,9 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Backup CLI
 
-- [ ] 5.1 RED: New `test/photos-backup.test.ts` (mocked `fetch`/fs, argv injection): folder copy preserves relative paths + overwrite; webhook POST raw bytes with HMAC-SHA256 hex header + timestamp; non-2xx -> exit 1; unwritable dest -> non-zero; dry-run writes nothing. Depends: 1.2.
-- [ ] 5.2 GREEN: `scripts/photos-backup.ts`: `--dest <folder|url>`, `--secret`, `--dry-run`; env fallback `BACKUP_DEST`/`BACKUP_SECRET`; exit 0 all-ok / 1 any-failure. Depends: 5.1.
-- [ ] 5.3 GREEN: `package.json`: add `photos:backup` script. Depends: 5.2.
+- [x] 5.1 RED: New `test/photos-backup.test.ts` (mocked `fetch`/fs, argv injection): folder copy preserves relative paths + overwrite; webhook POST raw bytes with HMAC-SHA256 hex header + timestamp; non-2xx -> exit 1; unwritable dest -> non-zero; dry-run writes nothing. Depends: 1.2.
+- [x] 5.2 GREEN: `scripts/photos-backup.ts`: `--dest <folder|url>`, `--secret`, `--dry-run`; env fallback `BACKUP_DEST`/`BACKUP_SECRET`; exit 0 all-ok / 1 any-failure. Depends: 5.1.
+- [x] 5.3 GREEN: `package.json`: add `photos:backup` script. Depends: 5.2.
 
 ## Phase 6: Docs and verification
 
