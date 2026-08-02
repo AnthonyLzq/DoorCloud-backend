@@ -8,9 +8,13 @@ All notable changes to this project will be documented in this file. See [commit
 
 * **face-recognition:** migrate photo verification from `@vladmandic/human` to the ONNX-only Buffalo-S pipeline (SCRFD `det_500m` detection + landmark alignment + `w600k_mbf` embedding). `FaceRecognitionService.verify()` replaces `compareFaces` in the MQTT photo flow; the server lifecycle initializes ONNX models on startup and releases them on shutdown, with fatal error handlers for `uncaughtException`/`unhandledRejection`. The verification threshold is derived from the production pipeline on BFW at FAR 1e-4 (0.3435, see `docs/benchmark-analysis.md` section 4.7) and is configurable via `FACE_VERIFY_THRESHOLD`. Rollback: revert the migration commits; `lib/human` was left untouched.
 
+* **storage:** migrate photo storage from Supabase to local disk. Photos are written under `PHOTOS_DIR` and served statically at `GET /photos/*` rooted at `PHOTOS_BASE_URL`; the single user is resolved from `USER_ID`/`USER_NAME`/`USER_PHONE`, and `last_message_at` persists in a local SQLite database. A new backup CLI (`pnpm photos:backup`) copies `PHOTOS_DIR` to a local folder or a signed webhook (`--dest`, `--secret`, `--dry-run`; env fallbacks `BACKUP_DEST`/`BACKUP_SECRET`). Rollback: `git revert` restores the Supabase implementation; disk photos can be re-uploaded to the bucket via the backup CLI.
+
 ### BREAKING CHANGES
 
 * **mqtt:** remove legacy `DoorCloud/photo/#` topic support. All publishers must migrate to versioned `doorcloud/v1/photo/*` topics. The `MQTT_LEGACY_TOPICS_ENABLED` environment variable has been removed. Legacy delimiter-based payloads (`userID----format----photo`) are no longer supported; use JSON payloads instead.
+
+* **storage:** remove Supabase. `SUPABASE_URL`/`SUPABASE_KEY` are no longer validated and must be deleted from `.env`; add `PHOTOS_DIR`, `PHOTOS_BASE_URL`, `USER_ID`, `USER_NAME`, `USER_PHONE` (and optional `BACKUP_DEST`/`BACKUP_SECRET`). The `POST /api/user` create route is removed; the active user is configured via `USER_*` env.
 
 ## [1.0.0](https://github.com/AnthonyLzq/DoorCloud-backend/compare/v0.4.0...v1.0.0) (2023-01-15)
 

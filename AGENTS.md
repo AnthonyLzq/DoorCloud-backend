@@ -15,7 +15,7 @@ DoorCloud Backend es un servicio TypeScript/Fastify que combina:
 ```
 src/
 ├── config/          # Configuración y validación de entorno
-├── database/        # Conexión y queries a Supabase
+├── storage/         # Fotos en disco (PHOTOS_DIR) + estado SQLite
 ├── integrations/    # Integraciones externas (OpenWA)
 ├── lib/             # Librerías internas (Human para face recognition)
 ├── network/         # HTTP y MQTT routes
@@ -178,6 +178,7 @@ Antes de hacer commit, asegúrate de que:
 
 ### Node.js
 - `fastify` ^5.10.0 - Framework HTTP
+- `@fastify/static` ^8.3.0 - Servicio estático de fotos (PHOTOS_DIR)
 - `zod` ^4.4.3 - Validación de schemas
 - `onnxruntime-node` ^1.17.0 - ONNX Runtime
 - `sharp` ^0.33.0 - Procesamiento de imágenes
@@ -199,9 +200,18 @@ MQTT_PORT=1883
 MQTT_USER=doorcloud-backend
 MQTT_PASS=doorcloud-backend-local
 
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-key
+# Photo storage (local disk)
+PHOTOS_DIR=/var/lib/doorcloud/photos
+PHOTOS_BASE_URL=http://localhost:1996/photos
+
+# Single local user
+USER_ID=42
+USER_NAME=Ana
+USER_PHONE=51999999999@c.us
+
+# Backup CLI (pnpm photos:backup)
+BACKUP_DEST=/var/backups/doorcloud-photos
+BACKUP_SECRET=your-webhook-secret
 
 # OpenWA
 OPENWA_BASE_URL=http://localhost:2785

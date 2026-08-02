@@ -344,53 +344,48 @@ cosineSimilarity(embedding1, embedding2) =
 Result: 0.0 (completely different) to 1.0 (identical)
 ```
 
-## Database Schema (Supabase)
+## Local Storage
 
-### Tables
+### Photos (disk)
 
-#### users
+Photos are stored under `PHOTOS_DIR` and served statically at `GET /photos/*`.
+URLs are built from `PHOTOS_BASE_URL` so the fetch-by-URL contract used by
+`verify()` and OpenWA `send-image` is unchanged.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | number | Primary key |
-| name | string | User name |
-| phone | string | WhatsApp phone number |
-| lastMessage | Date | Last message timestamp |
+| Concern | Value |
+|---------|-------|
+| Layout | `{name}-{id}/{fieldname}-{uuid}.{ext}` (verified); numeric-timestamp prefix (no-match) |
+| Storage | `src/storage/photos.ts` - `PhotoStorage` (upload/list/getUrl) |
+| Serving | `@fastify/static` at `/photos` rooted at `PHOTOS_DIR` |
+| URLs | `{PHOTOS_BASE_URL}/{relative-path}` |
 
-### Storage Buckets
+### User Config
 
-#### photos
+The single user comes from the environment instead of a `users` table:
 
-Used for storing user photos.
+| Concern | Value |
+|---------|-------|
+| Source | `src/config/user.ts` - `getActiveUser()` returns `{ id, name, phone }` from `USER_ID`/`USER_NAME`/`USER_PHONE` |
+| Folder | `{name}-{id}` |
 
-**Operations:**
-- `upload(path, buffer, { contentType })` - Upload photo
-- `createSignedUrls(paths, time)` - Get temporary URLs
-- `list(folder)` - List all files in folder
+### User State (SQLite)
 
-### Critical Queries
+`last_message_at` persists across restarts in a local SQLite database instead
+of a `users.lastMessage` column:
 
-| Function | Table | Operation | Notes |
-|----------|-------|-----------|-------|
-| `createUser(name, phone)` | users | INSERT | Creates new user |
-| `getUserByUserID(id)` | users | SELECT | Get user by ID |
-| `updateUserLastMessage(id)` | users | UPDATE | Update last message timestamp |
-| `uploadUserPhoto(path, buffer)` | photos | UPLOAD | Upload to storage |
-| `getPhotosUrls(paths, time)` | photos | SIGNED URL | Get temporary URLs |
-| `getAllFilesFromBucket(folder)` | photos | LIST | List all files |
+| Concern | Value |
+|---------|-------|
+| File | `data/app-state.db` |
+| Table | `user_state(id, last_message_at)` |
+| Module | `src/storage/state.ts` - `UserState` (node:sqlite `DatabaseSync`) |
 
-### Connection Pattern
+### Backup CLI
 
-```typescript
-// Singleton pattern
-const supabaseConnection = (log?: FastifyBaseLogger) => {
-  if (!global.__supabaseClient__) {
-    const { SUPABASE_URL, SUPABASE_KEY } = getEnv()
-    global.__supabaseClient__ = createClient(SUPABASE_URL, SUPABASE_KEY)
-  }
-  return global.__supabaseClient__
-}
-```
+`pnpm photos:backup` (scripts/photos-backup.ts) copies `PHOTOS_DIR` to a
+local folder (`--dest <path>`, preserving relative paths and overwriting) or a
+signed webhook (`--dest <url>` with `--secret`; per-file POST carrying
+`X-DoorCloud-Signature` = lowercase hex HMAC-SHA256 of the body and
+`X-DoorCloud-Timestamp`). Env fallbacks: `BACKUP_DEST`, `BACKUP_SECRET`.
 
 ## Error Handling Patterns
 
@@ -456,7 +451,7 @@ class CustomError extends Error {
 }
 ```
 
-**Database errors:**
+**Storage errors:**
 ```typescript
 if (error) {
   log.error(error, errorMessage)
@@ -476,7 +471,7 @@ if (!data) {
 | Python IPC | Process crash | Auto-restart up to 3 times |
 | MQTT | Subscription fail | Log error, reject connection |
 | MQTT | Message processing | Log error, continue processing |
-| HTTP | Database error | Throw CustomError with status |
+| HTTP | Storage error | Throw CustomError with status |
 | HTTP | Validation error | Return 400 with details |
 
 ### Critical Error Scenarios
@@ -493,8 +488,8 @@ if (!data) {
 3. Fastify server continues running
 4. Manual intervention required
 
-**Database connection fail:**
-1. Supabase client throws error
+**Storage failure:**
+1. Storage module throws error
 2. CustomError thrown with 500 status
 3. Request fails gracefully
 4. No automatic retry (stateless)

@@ -14,9 +14,10 @@ To have installed the following:
 A `.env` file with the correct variables specified in the `.env.example` file.
 
 Required environment variables are validated on startup: `MQTT_USER`,
-`MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `SUPABASE_URL`, `SUPABASE_KEY`, and
-`MODELS_CDN_URL`. MQTT is required: broker connection or subscription failures
-are treated as fatal startup errors. `OPENWA_BASE_URL` defaults to
+`MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `PHOTOS_DIR`, `PHOTOS_BASE_URL`,
+`USER_ID`, `USER_NAME`, `USER_PHONE`, and `MODELS_CDN_URL`. MQTT is required:
+broker connection or subscription failures are treated as fatal startup
+errors. `OPENWA_BASE_URL` defaults to
 `http://localhost:2785` and `OPENWA_SESSION_ID` defaults to `main`;
 `OPENWA_API_KEY` and `OPENWA_CHAT_ID` are required only when using OpenWA setup
 or WhatsApp sends. `OPENWA_CHAT_ID` should be the WhatsApp chat ID for the
@@ -83,6 +84,58 @@ The repository enforces this baseline through `.nvmrc`, `package.json`, and
 `pnpm-workspace.yaml`. Use `nvm use` before pnpm commands so `engineStrict`
 does not reject the install.
 
+## Photo storage and backup
+
+Photos are stored locally on disk instead of a cloud bucket. Uploads are
+written under `PHOTOS_DIR` and served statically at `GET /photos/*`; the base
+URL clients use is `PHOTOS_BASE_URL` (default `http://localhost:1996/photos`).
+The single DoorCloud user is configured through `USER_ID`, `USER_NAME`, and
+`USER_PHONE`; the `POST /api/user` create route is no longer exposed.
+
+### PHOTOS_BASE_URL and Docker
+
+`PHOTOS_BASE_URL` must be reachable from the consumers of photo URLs: the
+backend itself (`verify()` fetches each URL in-process) and OpenWA
+(`send-image`). OpenWA runs on the same host by default
+(`http://localhost:2785`); if OpenWA runs in Docker, `localhost` inside the
+container does not resolve to the backend, so `PHOTOS_BASE_URL` must be the
+host's reachable address (e.g. `http://192.168.1.10:1996/photos`).
+
+### Backup CLI
+
+`pnpm photos:backup` copies `PHOTOS_DIR` to a local folder or a signed
+webhook endpoint:
+
+```bash
+# Local folder copy (preserves the relative layout, overwrites existing files)
+pnpm photos:backup --dest /var/backups/doorcloud-photos
+
+# Signed webhook push (per-file POST with an HMAC-SHA256 signature)
+pnpm photos:backup --dest https://example.com/hooks/doorcloud --secret webhook-secret
+
+# Preview what would happen without writing or sending anything
+pnpm photos:backup --dry-run
+```
+
+Flags and env fallbacks:
+
+| Setting | Flag | Env fallback |
+|---------|------|--------------|
+| Destination (folder or webhook URL) | `--dest` | `BACKUP_DEST` |
+| Webhook signing secret | `--secret` | `BACKUP_SECRET` |
+| Dry run | `--dry-run` | — |
+
+Webhook pushes POST each file's raw bytes to `<dest>?path=<relative-path>`
+with an `X-DoorCloud-Signature` header (lowercase hex HMAC-SHA256 of the
+body) and an `X-DoorCloud-Timestamp` header (Unix milliseconds). The CLI
+exits `0` when every file succeeds and `1` when any file fails.
+
+### Rollback
+
+The Supabase implementation is preserved in git history. To roll back, revert
+the migration commits and restore the `SUPABASE_*` variables in `.env`.
+Photos already on disk can be re-uploaded to the bucket via the backup CLI.
+
 ## Docker
 
 The image uses the current Node 22 Alpine 3.23 line, upgrades Alpine packages at
@@ -90,8 +143,13 @@ build time, and keeps pnpm pinned to the project baseline:
 
 ```bash
 docker build -t doorcloud-backend .
-docker run --env-file .env -p 1996:1996 doorcloud-backend
+docker run --env-file .env -p 1996:1996 \
+  -v /var/lib/doorcloud/photos:/var/lib/doorcloud/photos \
+  doorcloud-backend
 ```
+
+Mount the host directory for `PHOTOS_DIR` so stored photos persist across
+container restarts. The SQLite state file lives under `data/app-state.db`.
 
 ## Local Mosquitto broker
 

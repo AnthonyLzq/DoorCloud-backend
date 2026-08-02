@@ -65,6 +65,6 @@ Chain strategy: stacked-to-main
 
 ## Phase 6: Docs and verification
 
-- [ ] 6.1 README: `PHOTOS_DIR`/`PHOTOS_BASE_URL` (Docker caveat)/`USER_*`/`BACKUP_*` and backup CLI usage. Depends: 5.2.
-- [ ] 6.2 CHANGELOG: rollout note incl. `.env` migration (delete `SUPABASE_*`). Depends: 6.1.
-- [ ] 6.3 GATE: full `pnpm test:local && pnpm typecheck && pnpm lint`; confirm `verify()` runs against local static URLs. Depends: 6.1.
+- [x] 6.1 README: `PHOTOS_DIR`/`PHOTOS_BASE_URL` (Docker caveat)/`USER_*`/`BACKUP_*` and backup CLI usage. Depends: 5.2.
+- [x] 6.2 CHANGELOG: rollout note incl. `.env` migration (delete `SUPABASE_*`). Depends: 6.1.
+- [x] 6.3 GATE: full `pnpm test:local && pnpm typecheck && pnpm lint`; confirm `verify()` runs against local static URLs. Depends: 6.1.

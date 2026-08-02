@@ -54,7 +54,7 @@ Protocol: JSON-line over stdin/stdout pipes. All Python prints must use `flush=T
 Files:
 - `src/network/http/routes/setup.ts` - Setup endpoints
 - `src/services/user.ts` - User service
-- `src/database/supabase/queries/user.ts` - User queries
+- `src/storage/photos.ts` - Local photo storage (disk)
 
 ### WhatsApp Integration
 
@@ -75,22 +75,25 @@ Files:
 - **MQTT**: Client in `src/network/mqtt/`
 - **Face recognition**: Hybrid ONNX (Node.js) + Python process
 - **WhatsApp**: OpenWA integration in `src/integrations/whatsapp/`
-- **Database**: Supabase in `src/database/supabase/`
+- **Storage**: Photos on disk via `src/storage/photos.ts` served at `/photos`; user state via `src/storage/state.ts` (SQLite)
 - **Config**: Environment validation in `src/config/env.ts`
 
-## Database schema (Supabase)
+## Local storage
 
-Tables:
-- `users` - id, name, phone, lastMessage
+Photos:
+- Written under `PHOTOS_DIR` as `{name}-{id}/{fieldname}-{uuid}.{ext}`
+  (verified) or with a numeric-timestamp prefix (no-match)
+- Served statically at `GET /photos/*`; URLs built from `PHOTOS_BASE_URL`
+- `src/storage/photos.ts` - `PhotoStorage` interface (upload/list/getUrl)
 
-Storage buckets:
-- `photos` - User photo storage
+User config and state:
+- Single user from `USER_ID`/`USER_NAME`/`USER_PHONE` (`src/config/user.ts`)
+- `last_message_at` persisted in SQLite `data/app-state.db`, table
+  `user_state(id, last_message_at)`, via `src/storage/state.ts`
 
-Key queries:
-- `createUser(name, phone)` - INSERT
-- `getUserByUserID(id)` - SELECT
-- `uploadUserPhoto(path, buffer)` - Storage upload
-- `getPhotosUrls(paths, time)` - Signed URLs
+Backup:
+- `scripts/photos-backup.ts` - `pnpm photos:backup` copies `PHOTOS_DIR` to a
+  local folder or a signed webhook
 
 ## Error handling patterns
 
@@ -106,7 +109,7 @@ Key queries:
 
 **HTTP:**
 - CustomError class with status codes
-- Database errors throw 500
+- Storage errors throw 500
 - Validation errors return 400
 
 ## Testing
