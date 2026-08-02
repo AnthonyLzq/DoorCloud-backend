@@ -23,12 +23,13 @@ class UserServices {
   #userState: UserState
 
   constructor(log: FastifyBaseLogger) {
-    const { PHOTOS_DIR, PHOTOS_BASE_URL } = getEnv()
+    const { PHOTOS_DIR, PHOTOS_BASE_URL, PHOTOS_URL_SECRET } = getEnv()
 
     this.#log = log
     this.#photoStorage = new DiskPhotoStorage({
       photosDir: PHOTOS_DIR,
-      baseUrl: PHOTOS_BASE_URL
+      baseUrl: PHOTOS_BASE_URL,
+      urlSecret: PHOTOS_URL_SECRET
     })
     this.#userState = new UserState()
   }

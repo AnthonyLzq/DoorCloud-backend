@@ -127,6 +127,10 @@ const envSchema = z
     PHOTOS_BASE_URL: requiredString('PHOTOS_BASE_URL').url(
       'PHOTOS_BASE_URL must be a URL'
     ),
+    PHOTOS_URL_SECRET: requiredString('PHOTOS_URL_SECRET').min(
+      16,
+      'PHOTOS_URL_SECRET must be at least 16 characters'
+    ),
     USER_ID: requiredString('USER_ID'),
     USER_NAME: requiredString('USER_NAME'),
     USER_PHONE: requiredString('USER_PHONE'),

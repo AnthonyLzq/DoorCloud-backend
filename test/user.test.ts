@@ -107,7 +107,8 @@ beforeEach(() => {
     FACE_VERIFY_THRESHOLD: DEFAULT_VERIFY_THRESHOLD,
     FACE_VERIFY_MAX_PHOTOS: MAX_STORED_PHOTOS,
     PHOTOS_DIR: '/tmp/doorcloud-photos',
-    PHOTOS_BASE_URL: 'https://example.com/photos'
+    PHOTOS_BASE_URL: 'https://example.com/photos',
+    PHOTOS_URL_SECRET: 'test-photo-url-secret'
   })
   mocks.getActiveUser.mockReturnValue({
     id: '1',

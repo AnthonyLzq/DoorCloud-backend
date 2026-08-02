@@ -1,6 +1,7 @@
+import { createReadStream } from 'node:fs'
+import { resolve } from 'node:path'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
-import fastifyStatic from '@fastify/static'
 import { getEnv } from 'config/env'
 import fastify, { type FastifyInstance } from 'fastify'
 import {
@@ -9,6 +10,7 @@ import {
   type ZodTypeProvider
 } from 'fastify-type-provider-zod'
 import { faceRecognitionService } from 'services/face-recognition'
+import { DiskPhotoStorage } from 'storage/photos'
 import { applyRoutes } from './http'
 import { mqttConnection } from './mqtt'
 
@@ -40,7 +42,14 @@ class Server {
   }
 
   #config() {
-    const { CORS_ORIGINS, PHOTOS_DIR } = getEnv()
+    const { CORS_ORIGINS, PHOTOS_DIR, PHOTOS_BASE_URL, PHOTOS_URL_SECRET } =
+      getEnv()
+
+    const photoStorage = new DiskPhotoStorage({
+      photosDir: PHOTOS_DIR,
+      baseUrl: PHOTOS_BASE_URL,
+      urlSecret: PHOTOS_URL_SECRET
+    })
 
     this.#app.register(cors, {
       origin: CORS_ORIGINS ?? true
@@ -51,9 +60,25 @@ class Server {
         files: 3
       }
     })
-    this.#app.register(fastifyStatic, {
-      root: PHOTOS_DIR,
-      prefix: '/photos/'
+
+    this.#app.get<{
+      Params: { signature: string; expiresAt: string; '*': string }
+    }>('/photos/:signature/:expiresAt/*', async (request, reply) => {
+      const { signature, expiresAt } = request.params
+      const path = request.params['*']
+      const expiresAtNumber = Number(expiresAt)
+
+      if (
+        path.startsWith('/') ||
+        path.includes('..') ||
+        !Number.isFinite(expiresAtNumber)
+      )
+        return reply.code(400).send({ error: 'Invalid path' })
+
+      if (!photoStorage.isUrlValid(path, signature, expiresAtNumber))
+        return reply.code(404).send({ error: 'Not found' })
+
+      return reply.send(createReadStream(resolve(PHOTOS_DIR, path)))
     })
 
     this.#app.setValidatorCompiler(validatorCompiler)

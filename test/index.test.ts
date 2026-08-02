@@ -107,6 +107,7 @@ const validEnv = {
   OPENWA_SESSION_ID: 'main',
   PHOTOS_DIR: '/tmp/doorcloud-photos',
   PHOTOS_BASE_URL: 'http://localhost:1996/photos',
+  PHOTOS_URL_SECRET: 'test-photo-url-secret',
   USER_ID: '42',
   USER_NAME: 'Ana',
   USER_PHONE: '51999999999@c.us'

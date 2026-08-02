@@ -12,7 +12,8 @@ beforeEach(() => {
   photosDir = mkdtempSync(join(tmpdir(), 'doorcloud-photos-'))
   storage = new DiskPhotoStorage({
     photosDir,
-    baseUrl: 'http://localhost:1996/photos'
+    baseUrl: 'http://localhost:1996/photos',
+    urlSecret: 'test-photo-url-secret'
   })
 })
 
@@ -76,15 +77,20 @@ describe('DiskPhotoStorage', () => {
 
       expect(files).toEqual(['selfie-a.jpg'])
     })
+
+    test('returns an empty list when the user folder does not exist yet', async () => {
+      expect(await storage.list('Ana-42')).toEqual([])
+    })
   })
 
   describe('getUrl', () => {
-    test('builds {PHOTOS_BASE_URL}/{path}', () => {
-      expect(
-        storage.getUrl('Ana-42/selfie-123e4567-e89b-12d3-a456-426614174000.jpg')
-      ).toBe(
-        'http://localhost:1996/photos/Ana-42/selfie-123e4567-e89b-12d3-a456-426614174000.jpg'
-      )
+    test('builds a signed URL and validates expiry and signature', () => {
+      const m = storage.getUrl('Ana-42/selfie.jpg').match(/\/photos\/([a-f0-9]{64})\/(\d+)\/(.+)$/)!
+
+      expect(m[3]).toBe('Ana-42/selfie.jpg')
+      expect(storage.isUrlValid(m[3], m[1], Number(m[2]))).toBe(true)
+      expect(storage.isUrlValid(m[3], 'f'.repeat(64), Number(m[2]))).toBe(false)
+      expect(storage.isUrlValid(m[3], m[1], Number(m[2]) - 60_000)).toBe(false)
     })
   })
 })

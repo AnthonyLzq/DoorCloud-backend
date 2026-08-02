@@ -87,8 +87,9 @@ does not reject the install.
 ## Photo storage and backup
 
 Photos are stored locally on disk instead of a cloud bucket. Uploads are
-written under `PHOTOS_DIR` and served statically at `GET /photos/*`; the base
-URL clients use is `PHOTOS_BASE_URL` (default `http://localhost:1996/photos`).
+written under `PHOTOS_DIR` and served through HMAC-signed URLs that expire
+after 30 seconds (`GET /photos/:signature/:expiresAt/*`); the base URL
+clients use is `PHOTOS_BASE_URL` (default `http://localhost:1996/photos`).
 The single DoorCloud user is configured through `USER_ID`, `USER_NAME`, and
 `USER_PHONE`; the `POST /api/user` create route is no longer exposed.
 

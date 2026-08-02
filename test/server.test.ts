@@ -1,7 +1,15 @@
+import { createHmac } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const PHOTO_URL_SECRET = 'test-photo-url-secret'
+
+const signedPhotoUrl = (path: string, expiresAt = Date.now() + 30_000) =>
+  `/photos/${createHmac('sha256', PHOTO_URL_SECRET)
+    .update(`${expiresAt}:${path}`)
+    .digest('hex')}/${expiresAt}/${path}`
 
 const mocks = vi.hoisted(() => ({
   getEnv: vi.fn(),
@@ -54,7 +62,9 @@ beforeEach(() => {
     NODE_ENV: 'production',
     CORS_ORIGINS: undefined,
     PORT: 0,
-    PHOTOS_DIR: photosDir
+    PHOTOS_DIR: photosDir,
+    PHOTOS_BASE_URL: 'http://localhost:1996/photos',
+    PHOTOS_URL_SECRET: PHOTO_URL_SECRET
   })
   mocks.mqttConnection.mockReturnValue({
     start: vi.fn().mockResolvedValue(undefined),
@@ -117,49 +127,29 @@ describe('Server lifecycle (RF-5)', () => {
   })
 })
 
-describe('Static photo serving (RF-4)', () => {
-  it('serves a stored photo with 200 and its content', async () => {
+describe('Signed photo serving (RF-4)', () => {
+  it('serves a signed URL and rejects unsigned, tampered, expired, traversal, and absolute URLs', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+    const inject = async (url: string) =>
+      (await Server.app.inject({ method: 'GET', url })).statusCode
+
     mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
     writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
-
-    const { Server } = await import('../src/network/server.js')
-    currentServer = Server
-
-    const response = await Server.app.inject({
-      method: 'GET',
-      url: '/photos/Ana-42/selfie.jpg'
-    })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.body).toBe('photo-content')
-  })
-
-  it('rejects ../ traversal with 4xx and never reads outside the root', async () => {
     writeFileSync(join(tmpRoot, 'secret.txt'), 'TOP-SECRET')
 
-    const { Server } = await import('../src/network/server.js')
-    currentServer = Server
+    const urls = [
+      signedPhotoUrl('Ana-42/selfie.jpg'),
+      '/photos/Ana-42/selfie.jpg',
+      `/photos/${'f'.repeat(64)}/${Date.now() + 30_000}/Ana-42/selfie.jpg`,
+      signedPhotoUrl('Ana-42/selfie.jpg', Date.now() - 1_000),
+      signedPhotoUrl('../secret.txt'),
+      signedPhotoUrl('/etc/passwd')
+    ]
+    const statuses = await Promise.all(urls.map(inject))
 
-    const response = await Server.app.inject({
-      method: 'GET',
-      url: '/photos/../secret.txt'
-    })
-
-    expect(response.statusCode).toBeGreaterThanOrEqual(400)
-    expect(response.statusCode).toBeLessThan(500)
-    expect(response.body).not.toContain('TOP-SECRET')
-  })
-
-  it('rejects an absolute path segment with 4xx', async () => {
-    const { Server } = await import('../src/network/server.js')
-    currentServer = Server
-
-    const response = await Server.app.inject({
-      method: 'GET',
-      url: '/photos//etc/passwd'
-    })
-
-    expect(response.statusCode).toBeGreaterThanOrEqual(400)
-    expect(response.statusCode).toBeLessThan(500)
+    expect(statuses[0]).toBe(200)
+    expect(statuses.slice(1, 4)).toEqual([404, 404, 404])
+    expect(statuses.slice(4).every(s => s >= 400)).toBe(true)
   })
 })
