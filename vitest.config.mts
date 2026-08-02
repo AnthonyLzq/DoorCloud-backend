@@ -15,6 +15,7 @@ export default defineConfig({
       network: src('network'),
       schemas: src('schemas'),
       services: src('services'),
+      storage: src('storage'),
       utils: src('utils')
     }
   },

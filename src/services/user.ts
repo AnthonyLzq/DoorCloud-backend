@@ -3,14 +3,7 @@ import { appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { MultipartFile } from '@fastify/multipart'
 import { getEnv } from 'config/env'
-import {
-  createUser,
-  getAllFilesFromBucket,
-  getPhotosUrls,
-  getUserByUserID,
-  updateUserLastMessage,
-  uploadUserPhoto
-} from 'database'
+import { getActiveUser } from 'config/user'
 import type { FastifyBaseLogger } from 'fastify'
 import {
   sayHelloThroughWhatsapp,
@@ -18,23 +11,26 @@ import {
 } from 'integrations'
 import { CustomError } from 'network/http'
 import { faceRecognitionService } from 'services/face-recognition'
+import { DiskPhotoStorage } from 'storage/photos'
+import { UserState } from 'storage/state'
 import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
 
 const MAX_HOUR_DIFFERENCE = 16
 
 class UserServices {
   #log: FastifyBaseLogger
+  #photoStorage: DiskPhotoStorage
+  #userState: UserState
 
   constructor(log: FastifyBaseLogger) {
+    const { PHOTOS_DIR, PHOTOS_BASE_URL } = getEnv()
+
     this.#log = log
-  }
-
-  async createUser(name: string, phone: string) {
-    const data = await createUser(name, phone, this.#log)
-
-    this.#log.info(data, 'User created')
-
-    return data[0]
+    this.#photoStorage = new DiskPhotoStorage({
+      photosDir: PHOTOS_DIR,
+      baseUrl: PHOTOS_BASE_URL
+    })
+    this.#userState = new UserState()
   }
 
   async uploadPhotos(
@@ -52,25 +48,20 @@ class UserServices {
       throw new CustomError(errorMessage, 400)
     }
 
-    await getUserByUserID(parsedUserID, this.#log)
-
     const paths: string[] = []
 
     for await (const file of files) {
       const format = file.mimetype.split('/')[1]
-      const response = await uploadUserPhoto({
-        path: `${userName}-${userID}/${
-          file.fieldname
-        }-${crypto.randomUUID()}.${format}`,
-        bufferFile: await file.toBuffer(),
-        log: this.#log,
-        format
-      })
+      const path = await this.#photoStorage.upload(
+        `${userName}-${userID}`,
+        `${file.fieldname}-${crypto.randomUUID()}.${format}`,
+        await file.toBuffer()
+      )
 
-      paths.push(response.data.path)
+      paths.push(path)
     }
 
-    return await getPhotosUrls(paths, 900, this.#log)
+    return paths.map(path => this.#photoStorage.getUrl(path))
   }
 
   async sendPhotoThroughWhatsapp(
@@ -87,45 +78,32 @@ class UserServices {
       throw new CustomError(errorMessage, 400)
     }
 
-    const [user] = await getUserByUserID(parsedUserID, this.#log)
-
-    if (!user) {
-      const errorMessage = 'User not found'
-      this.#log.error(errorMessage)
-
-      throw new CustomError(errorMessage, 404)
-    }
-
-    const { id, name, phone, lastMessage } = user
+    const { id, name, phone } = getActiveUser()
+    const lastMessage = this.#userState.getLastMessage(id)
 
     if (!lastMessage)
       await Promise.all([
         sayHelloThroughWhatsapp(name, phone, this.#log),
-        updateUserLastMessage(id, this.#log),
+        this.#userState.setLastMessage(id, new Date()),
         randomWait(5_000, 7_500)
       ])
     else {
-      const currentDate = new Date()
-      const lastMessageDate = new Date(lastMessage)
-      const hDiff = (currentDate.getTime() - lastMessageDate.getTime()) / 36e5
+      const hDiff = (Date.now() - lastMessage.getTime()) / 36e5
 
       if (hDiff > MAX_HOUR_DIFFERENCE)
         await Promise.all([
           sayHelloThroughWhatsapp(name, phone, this.#log),
-          updateUserLastMessage(id, this.#log),
+          this.#userState.setLastMessage(id, new Date()),
           randomWait(5_000, 7_500)
         ])
     }
 
-    const photosFromUser = (
-      await getAllFilesFromBucket(`${name}-${id}`, this.#log)
+    const userFolder = `${name}-${id}`
+    const photosFromUser = (await this.#photoStorage.list(userFolder)).map(
+      file => `${userFolder}/${file}`
     )
-      .filter(file => !/^\d/.test(file.name))
-      .map(file => `${name}-${id}/${file.name}`)
-    const urlPhotosFromUser = await getPhotosUrls(
-      photosFromUser,
-      900,
-      this.#log
+    const urlPhotosFromUser = photosFromUser.map(path =>
+      this.#photoStorage.getUrl(path)
     )
     const timeBefore = getTimestamp()
     const { FACE_VERIFY_THRESHOLD, FACE_VERIFY_MAX_PHOTOS } = getEnv()
@@ -157,22 +135,14 @@ class UserServices {
       'utf-8'
     )
 
-    const uploadResponse = await uploadUserPhoto({
-      path: `${name}-${userID}/${
-        foundName ?? getTimestamp()
-      }-${crypto.randomUUID()}.${format}`,
-      bufferFile: bufferPhoto,
-      log: this.#log,
-      format
-    })
-    const [url] = await getPhotosUrls(
-      [uploadResponse.data.path],
-      900,
-      this.#log
+    const uploadPath = await this.#photoStorage.upload(
+      userFolder,
+      `${foundName ?? getTimestamp()}-${crypto.randomUUID()}.${format}`,
+      bufferPhoto
     )
 
     await sendPhotoDetectionResultThroughWhatsapp({
-      imageUrl: url,
+      imageUrl: this.#photoStorage.getUrl(uploadPath),
       success: matchResult,
       name: foundName,
       phoneNumber: phone,

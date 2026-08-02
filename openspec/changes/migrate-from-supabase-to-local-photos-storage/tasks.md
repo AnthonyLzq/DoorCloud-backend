@@ -45,10 +45,10 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Core rewiring (user service + routes)
 
-- [ ] 3.1 RED: Rewrite `test/user.test.ts` mocks off `../src/database` onto `../src/storage/photos`, `../src/config/user`, `../src/storage/state`; keep verify-call shape, no-match filter, CSV/WhatsApp contract, no-match upload write, greeting gating (null / >16h). Depends: 1.4, 1.5, 2.4.
-- [ ] 3.2 GREEN: `src/services/user.ts`: replace DB calls with `photoStorage` + `getActiveUser()` + `UserState`; numeric-prefix no-match write; build static URLs. Depends: 3.1.
-- [ ] 3.3 RED: Route test via `app.inject`: `POST /api/user` returns 404; `POST /api/user/:folderID/upload` still validates. Depends: 3.2.
-- [ ] 3.4 GREEN: `src/network/http/routes/user.ts`: remove create route, keep upload; `src/schemas/userSchemas.ts`: remove `userSchema`, keep `uploadUserPhotoParamsSchema`. Depends: 3.3.
+- [x] 3.1 RED: Rewrite `test/user.test.ts` mocks off `../src/database` onto `../src/storage/photos`, `../src/config/user`, `../src/storage/state`; keep verify-call shape, no-match filter, CSV/WhatsApp contract, no-match upload write, greeting gating (null / >16h). Depends: 1.4, 1.5, 2.4.
+- [x] 3.2 GREEN: `src/services/user.ts`: replace DB calls with `photoStorage` + `getActiveUser()` + `UserState`; numeric-prefix no-match write; build static URLs. Depends: 3.1.
+- [x] 3.3 RED: Route test via `app.inject`: `POST /api/user` returns 404; `POST /api/user/:folderID/upload` still validates. Depends: 3.2.
+- [x] 3.4 GREEN: `src/network/http/routes/user.ts`: remove create route, keep upload; `src/schemas/userSchemas.ts`: remove `userSchema`, keep `uploadUserPhotoParamsSchema`. Depends: 3.3.
 
 ## Phase 4: Supabase removal
 

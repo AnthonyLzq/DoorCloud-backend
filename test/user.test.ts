@@ -1,4 +1,11 @@
+import multipart from '@fastify/multipart'
 import { fromPartial } from '@total-typescript/shoehorn'
+import Fastify from 'fastify'
+import {
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider
+} from 'fastify-type-provider-zod'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -8,11 +15,12 @@ import {
 
 const mocks = vi.hoisted(() => ({
   getEnv: vi.fn(),
-  getUserByUserID: vi.fn(),
-  getAllFilesFromBucket: vi.fn(),
-  getPhotosUrls: vi.fn(),
-  uploadUserPhoto: vi.fn(),
-  updateUserLastMessage: vi.fn(),
+  getActiveUser: vi.fn(),
+  uploadPhoto: vi.fn(),
+  listPhotos: vi.fn(),
+  getPhotoUrl: vi.fn(),
+  getLastMessage: vi.fn(),
+  setLastMessage: vi.fn(),
   sayHelloThroughWhatsapp: vi.fn(),
   sendPhotoDetectionResultThroughWhatsapp: vi.fn(),
   verify: vi.fn(),
@@ -22,12 +30,22 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../src/config/env', () => ({
   getEnv: mocks.getEnv
 }))
-vi.mock('../src/database', () => ({
-  getUserByUserID: mocks.getUserByUserID,
-  getAllFilesFromBucket: mocks.getAllFilesFromBucket,
-  getPhotosUrls: mocks.getPhotosUrls,
-  uploadUserPhoto: mocks.uploadUserPhoto,
-  updateUserLastMessage: mocks.updateUserLastMessage
+vi.mock('../src/config/user', () => ({
+  getActiveUser: mocks.getActiveUser
+}))
+vi.mock('../src/storage/photos', () => ({
+  DiskPhotoStorage: class MockDiskPhotoStorage {
+    upload = mocks.uploadPhoto
+    list = mocks.listPhotos
+    getUrl = mocks.getPhotoUrl
+  }
+}))
+vi.mock('../src/storage/state', () => ({
+  UserState: class MockUserState {
+    getLastMessage = mocks.getLastMessage
+    setLastMessage = mocks.setLastMessage
+    close = vi.fn()
+  }
 }))
 vi.mock('../src/integrations', () => ({
   sayHelloThroughWhatsapp: mocks.sayHelloThroughWhatsapp,
@@ -39,9 +57,14 @@ vi.mock('../src/services/face-recognition', () => ({
     verify: mocks.verify
   }
 }))
-vi.mock('node:fs', () => ({
-  appendFileSync: mocks.appendFileSync
-}))
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+
+  return {
+    ...actual,
+    appendFileSync: mocks.appendFileSync
+  }
+})
 vi.mock('../src/utils', () => ({
   diffTimeInSeconds: vi.fn(() => 1),
   getTimestamp: vi.fn(() => '2026-01-01T00:00:00.000Z'),
@@ -58,30 +81,55 @@ const logMock = {
   error: vi.fn()
 }
 
+const buildMultipartBody = (
+  fieldName: string,
+  filename: string
+): { body: string; contentType: string } => {
+  const boundary = '----doorcloud-test'
+  const parts = [
+    `--${boundary}\r\n`,
+    `Content-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\n`,
+    'Content-Type: image/jpeg\r\n',
+    '\r\n',
+    'photo-bytes',
+    `\r\n--${boundary}--\r\n`
+  ]
+
+  return {
+    body: parts.join(''),
+    contentType: `multipart/form-data; boundary=${boundary}`
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.getEnv.mockReturnValue({
     FACE_VERIFY_THRESHOLD: DEFAULT_VERIFY_THRESHOLD,
-    FACE_VERIFY_MAX_PHOTOS: MAX_STORED_PHOTOS
+    FACE_VERIFY_MAX_PHOTOS: MAX_STORED_PHOTOS,
+    PHOTOS_DIR: '/tmp/doorcloud-photos',
+    PHOTOS_BASE_URL: 'https://example.com/photos'
+  })
+  mocks.getActiveUser.mockReturnValue({
+    id: '1',
+    name: 'John',
+    phone: '51999999999'
   })
   mocks.verify.mockResolvedValue({
     match: false,
     reason: 'no-match'
   })
-  mocks.getUserByUserID.mockResolvedValue([
-    { id: 1, name: 'John', phone: '51999999999', lastMessage: null }
-  ])
-  mocks.getAllFilesFromBucket.mockResolvedValue([{ name: 'selfie-abc123.jpg' }])
-  mocks.getPhotosUrls.mockResolvedValue([
-    'https://example.com/John-1/selfie-abc123.jpg'
-  ])
-  mocks.uploadUserPhoto.mockResolvedValue({
-    data: { path: 'John-1/2026-01-01T00:00:00.000Z-uuid.jpg' }
-  })
+  mocks.listPhotos.mockResolvedValue(['selfie-abc123.jpg'])
+  mocks.getPhotoUrl.mockImplementation(
+    (path: string) => `https://example.com/photos/${path}`
+  )
+  mocks.uploadPhoto.mockResolvedValue(
+    'John-1/2026-01-01T00:00:00.000Z-uuid.jpg'
+  )
+  mocks.getLastMessage.mockReturnValue(new Date(Date.now() - 2 * 36e5))
 })
 
-describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
-  it('routes photos through FaceRecognitionService.verify', async () => {
+describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
+  it('routes photos through FaceRecognitionService.verify with static URLs', async () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
@@ -90,20 +138,18 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
     expect(mocks.verify).toHaveBeenCalledTimes(1)
     expect(mocks.verify).toHaveBeenCalledWith(
       Buffer.from('photo'),
-      [{ name: 'selfie', url: 'https://example.com/John-1/selfie-abc123.jpg' }],
+      [
+        {
+          name: 'selfie',
+          url: 'https://example.com/photos/John-1/selfie-abc123.jpg'
+        }
+      ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
     )
   })
 
-  it('filters out no-match photos (numeric timestamp prefix) before verify', async () => {
-    mocks.getAllFilesFromBucket.mockResolvedValue([
-      { name: '1785597387029-no-match-uuid.jpg' },
-      { name: 'selfie-abc123.jpg' },
-      { name: '1750000000000-another-no-match.jpg' }
-    ])
-    mocks.getPhotosUrls.mockResolvedValue([
-      'https://example.com/John-1/selfie-abc123.jpg'
-    ])
+  it('passes only non-numeric-prefix photos from local storage to verify', async () => {
+    mocks.listPhotos.mockResolvedValue(['selfie-abc123.jpg'])
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
@@ -111,7 +157,12 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
 
     expect(mocks.verify).toHaveBeenCalledWith(
       Buffer.from('photo'),
-      [{ name: 'selfie', url: 'https://example.com/John-1/selfie-abc123.jpg' }],
+      [
+        {
+          name: 'selfie',
+          url: 'https://example.com/photos/John-1/selfie-abc123.jpg'
+        }
+      ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
     )
   })
@@ -153,5 +204,136 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-6)', () => {
       '\n0,1',
       'utf-8'
     )
+  })
+
+  it('writes a no-match photo locally with a timestamp-uuid name and sends its URL', async () => {
+    const { UserServices } = await import('../src/services/index.js')
+    us = new UserServices(fromPartial(logMock))
+
+    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+
+    expect(mocks.uploadPhoto).toHaveBeenCalledWith(
+      'John-1',
+      expect.stringMatching(/^2026-01-01T00:00:00\.000Z-[0-9a-f-]{36}\.jpg$/),
+      Buffer.from('photo')
+    )
+    expect(mocks.sendPhotoDetectionResultThroughWhatsapp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        imageUrl:
+          'https://example.com/photos/John-1/2026-01-01T00:00:00.000Z-uuid.jpg',
+        success: false
+      })
+    )
+  })
+
+  it('greets when there is no stored last message', async () => {
+    mocks.getLastMessage.mockReturnValue(null)
+    const { UserServices } = await import('../src/services/index.js')
+    us = new UserServices(fromPartial(logMock))
+
+    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+
+    expect(mocks.sayHelloThroughWhatsapp).toHaveBeenCalledWith(
+      'John',
+      '51999999999',
+      expect.anything()
+    )
+    expect(mocks.setLastMessage).toHaveBeenCalledWith('1', expect.any(Date))
+  })
+
+  it('greets again when the last message is older than 16 hours', async () => {
+    mocks.getLastMessage.mockReturnValue(new Date(Date.now() - 20 * 36e5))
+    const { UserServices } = await import('../src/services/index.js')
+    us = new UserServices(fromPartial(logMock))
+
+    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+
+    expect(mocks.sayHelloThroughWhatsapp).toHaveBeenCalledTimes(1)
+    expect(mocks.setLastMessage).toHaveBeenCalledWith('1', expect.any(Date))
+  })
+
+  it('does not greet when the last message is within 16 hours', async () => {
+    const { UserServices } = await import('../src/services/index.js')
+    us = new UserServices(fromPartial(logMock))
+
+    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+
+    expect(mocks.sayHelloThroughWhatsapp).not.toHaveBeenCalled()
+    expect(mocks.setLastMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('User HTTP routes (RF-3)', () => {
+  const buildApp = async () => {
+    const app = Fastify().withTypeProvider<ZodTypeProvider>()
+    app.setValidatorCompiler(validatorCompiler)
+    app.setSerializerCompiler(serializerCompiler)
+    await app.register(multipart, {
+      limits: {
+        fields: 3,
+        files: 3
+      }
+    })
+    const { User } = await import('../src/network/http/routes/user.js')
+    await User(app)
+
+    return app
+  }
+
+  it('returns 404 for POST /api/user (create route removed)', async () => {
+    const app = await buildApp()
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user',
+        payload: { name: 'Ana', phone: '51999999999' }
+      })
+
+      expect(res.statusCode).toBe(404)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('keeps POST /api/user/:folderID/upload validating and uploading', async () => {
+    const app = await buildApp()
+    const { body, contentType } = buildMultipartBody('selfie', 'selfie.jpg')
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user/John-1/upload',
+        headers: { 'content-type': contentType },
+        payload: body
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mocks.uploadPhoto).toHaveBeenCalledWith(
+        'John-1',
+        expect.stringMatching(/^selfie-[0-9a-f-]{36}\.jpeg$/),
+        expect.any(Buffer)
+      )
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('rejects an upload with a non-numeric userID', async () => {
+    const app = await buildApp()
+    const { body, contentType } = buildMultipartBody('selfie', 'selfie.jpg')
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user/John-abc/upload',
+        headers: { 'content-type': contentType },
+        payload: body
+      })
+
+      expect(res.statusCode).toBe(400)
+    } finally {
+      await app.close()
+    }
   })
 })
