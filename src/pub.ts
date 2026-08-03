@@ -21,7 +21,6 @@ const dataUrl = `data:image/png;base64,${base64Photo}`
 
 // Create JSON payload with versioned topic format
 const payload = JSON.stringify({
-  userId: '1',
   format: 'png',
   photo: dataUrl
 })

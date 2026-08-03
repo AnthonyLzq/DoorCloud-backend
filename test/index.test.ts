@@ -323,14 +323,12 @@ describe('DoorCloud backend tests', () => {
     test('parses versioned photo send payloads', () => {
       const payload = Buffer.from(
         JSON.stringify({
-          userId: '42',
           format: 'jpeg',
           photo: 'data:image/jpeg;base64,aGVsbG8='
         })
       )
 
       expect(parsePhotoSendPayload(payload)).toMatchObject({
-        userID: '42',
         format: 'jpeg',
         base64Photo: 'aGVsbG8='
       })

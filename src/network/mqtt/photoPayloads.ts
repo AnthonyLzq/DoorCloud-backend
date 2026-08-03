@@ -7,7 +7,6 @@ const imageFormatSchema = z
   .regex(/^[a-z0-9.+-]+$/i, 'format must be an image subtype')
 
 const photoSendPayloadSchema = z.object({
-  userId: z.union([z.string().trim().min(1), z.number().int().positive()]),
   format: imageFormatSchema,
   photo: z.string().trim().min(1)
 })
@@ -20,7 +19,6 @@ const photoMetricsPayloadSchema = z.object({
 })
 
 type PhotoSendPayload = {
-  userID: string
   format: string
   base64Photo: string
 }
@@ -40,10 +38,8 @@ const parseJsonMessage = (message: Buffer): unknown =>
 
 const parsePhotoSendPayload = (message: Buffer): PhotoSendPayload => {
   const payload = photoSendPayloadSchema.parse(parseJsonMessage(message))
-  const userID = String(payload.userId)
 
   return {
-    userID,
     format: payload.format,
     base64Photo: stripDataUrlPrefix(payload.photo, payload.format)
   }
