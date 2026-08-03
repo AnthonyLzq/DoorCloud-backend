@@ -297,8 +297,14 @@ export const backupToWebhook = async (
         lastError = error
         attempt++
 
+        const delay =
+          attempt <= maxRetries ? backoffDelay(attempt - 1, baseDelayMs) : 0
+        console.warn(
+          `[photos-backup] Network error sending ${rel} (attempt ${attempt}/${maxRetries + 1}): ${error instanceof Error ? error.message : String(error)}${delay > 0 ? `, retrying in ${delay}ms` : ', giving up'}`
+        )
+
         if (attempt <= maxRetries) {
-          await sleep(backoffDelay(attempt - 1, baseDelayMs))
+          await sleep(delay)
         }
 
         continue
@@ -308,8 +314,12 @@ export const backupToWebhook = async (
 
       if (!response.ok) {
         // A rejected webhook is a definitive answer: fail immediately, do
-        // not retry (matches the documented contract).
-        throw new Error(`Webhook rejected ${rel}: HTTP ${response.status}`)
+        // not retry (matches the documented contract). Log the status so
+        // transient receiver failures (5xx/429) are distinguishable from
+        // permanent configuration errors (4xx) in the operational record.
+        throw new Error(
+          `Webhook rejected ${rel}: HTTP ${response.status} ${response.statusText} (not retried; receiver returned a non-2xx response)`
+        )
       }
 
       lastError = undefined
