@@ -8,7 +8,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import yargs from 'yargs'
+import yargs, { type Argv } from 'yargs'
 
 type BackupArgs = {
   dest?: string
@@ -80,18 +80,14 @@ export const signBody = (
     .digest('hex')
 
 /**
- * Parses CLI arguments with yargs
+ * Builds the yargs options shared by the `door-cloud backup` CLI command and
+ * the testable parseArgs helper, so option definitions cannot drift.
  *
- * Supports `--dest`, `--secret` and `--dry-run`; strict mode rejects unknown
- * flags and prints usage on failure.
- *
- * @param argv - Raw argument vector (typically process.argv.slice(2))
- * @returns Normalized backup arguments
+ * @param cli - yargs instance to attach the backup options to
+ * @returns The same instance with the backup options registered
  */
-export const parseArgs = (argv: string[]): BackupArgs => {
-  const parsed = yargs(argv)
-    .scriptName('photos-backup')
-    .usage('Copy PHOTOS_DIR to a local folder or a signed webhook')
+export const backupCliOptions = (cli: Argv): Argv<BackupArgs> =>
+  cli
     .option('dest', {
       type: 'string',
       describe: 'Destination folder or webhook URL'
@@ -104,7 +100,21 @@ export const parseArgs = (argv: string[]): BackupArgs => {
       type: 'boolean',
       default: false,
       describe: 'Report what would happen without writing anything'
-    })
+    }) as unknown as Argv<BackupArgs>
+
+/**
+ * Parses CLI arguments with yargs
+ *
+ * Supports `--dest`, `--secret` and `--dry-run`; strict mode rejects unknown
+ * flags and prints usage on failure.
+ *
+ * @param argv - Raw argument vector (typically process.argv.slice(2))
+ * @returns Normalized backup arguments
+ */
+export const parseArgs = (argv: string[]): BackupArgs => {
+  const parsed = backupCliOptions(yargs(argv))
+    .scriptName('photos-backup')
+    .usage('Copy PHOTOS_DIR to a local folder or a signed webhook')
     .strict()
     .help()
     .fail((msg, err) => {
@@ -368,59 +378,4 @@ export const runBackup = async (opts: RunBackupOptions): Promise<number> => {
     )
     return 1
   }
-}
-
-/**
- * CLI entry point: parses args, resolves env fallbacks, runs the backup
- *
- * @returns Promise that resolves after setting the process exit code
- */
-const main = async (): Promise<void> => {
-  let args: BackupArgs
-  try {
-    args = parseArgs(process.argv.slice(2))
-  } catch (error) {
-    console.error(
-      `[photos-backup] ${error instanceof Error ? error.message : String(error)}`
-    )
-    process.exitCode = 1
-    return
-  }
-
-  const source = process.env.PHOTOS_DIR
-  const dest = args.dest ?? process.env.BACKUP_DEST
-  const secret = args.secret ?? process.env.BACKUP_SECRET
-
-  process.exitCode = await runBackup({
-    source,
-    dest,
-    secret,
-    dryRun: args.dryRun
-  })
-}
-
-/**
- * Detects whether this module was run directly as a CLI
- *
- * Allows importing the backup functions from tests without triggering main().
- *
- * @returns True when the entry script resolves to this file
- */
-const isEntryPoint = (): boolean => {
-  const entry = process.argv[1]
-  if (!entry) return false
-  try {
-    return resolve(entry) === resolve(__filename)
-  } catch {
-    return false
-  }
-}
-
-if (isEntryPoint()) {
-  main().catch(error => {
-    console.error(
-      `[photos-backup] ${error instanceof Error ? error.message : String(error)}`
-    )
-    process.exitCode = 1
-  })
 }
