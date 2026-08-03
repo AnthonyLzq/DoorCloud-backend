@@ -1,12 +1,40 @@
-import { writeFileSync } from 'node:fs'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import mqtt from 'mqtt'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { sendPhoto } from '../scripts/photo-send'
 
 let tmpDir: string
+
+vi.mock('mqtt', () => ({
+  default: { connect: vi.fn() }
+}))
+
+const mockClient = () => {
+  const handlers: Record<string, (...args: never[]) => void> = {}
+  const client = {
+    end: vi.fn((_force: boolean, _opts: unknown, callback?: () => void) =>
+      callback?.()
+    ),
+    on: vi.fn((event: string, handler: (...args: never[]) => void) => {
+      handlers[event] = handler
+    }),
+    publish: vi.fn(
+      (
+        _topic: string,
+        _payload: string,
+        _opts: unknown,
+        callback: (error: Error | null) => void
+      ) => callback(null)
+    )
+  }
+
+  vi.mocked(mqtt.connect).mockReturnValue(client as never)
+
+  return { client, handlers }
+}
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'doorcloud-photo-send-'))
@@ -15,6 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(tmpDir, { force: true, recursive: true })
   vi.unstubAllGlobals()
+  vi.mocked(mqtt.connect).mockReset()
 })
 
 describe('sendPhoto', () => {
@@ -82,5 +111,53 @@ describe('sendPhoto', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://example.com/selfie.jpg')
     expect(result.published).toBe(false)
     expect(result.payload.photo).toBe('data:image/jpeg;base64,dXJsLXBob3Rv')
+  })
+
+  test('connects with the default device credentials when unset', async () => {
+    const { handlers } = mockClient()
+    delete process.env.MQTT_DEVICE_USER
+    delete process.env.MQTT_DEVICE_PASS
+    const filePath = join(tmpDir, 'selfie.jpg')
+    writeFileSync(filePath, 'photo-bytes')
+
+    const pending = sendPhoto(filePath)
+    // sendPhoto suspends on readSource before connecting; wait for the
+    // connect handler to be registered before triggering it.
+    await vi.waitFor(() => expect(handlers.connect).toBeDefined())
+    handlers.connect?.()
+    await pending
+
+    expect(mqtt.connect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'doorcloud-device',
+        password: 'doorcloud-device-local'
+      })
+    )
+    expect(vi.mocked(mqtt.connect).mock.calls[0]?.[0]).not.toHaveProperty(
+      'username',
+      'doorcloud-backend'
+    )
+  })
+
+  test('prefers MQTT_DEVICE_* over the backend MQTT_USER/MQTT_PASS', async () => {
+    const { handlers } = mockClient()
+    process.env.MQTT_DEVICE_USER = 'my-device'
+    process.env.MQTT_DEVICE_PASS = 'my-device-secret'
+    process.env.MQTT_USER = 'doorcloud-backend'
+    process.env.MQTT_PASS = 'doorcloud-backend-local'
+    const filePath = join(tmpDir, 'selfie.jpg')
+    writeFileSync(filePath, 'photo-bytes')
+
+    const pending = sendPhoto(filePath)
+    await vi.waitFor(() => expect(handlers.connect).toBeDefined())
+    handlers.connect?.()
+    await pending
+
+    expect(mqtt.connect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'my-device',
+        password: 'my-device-secret'
+      })
+    )
   })
 })

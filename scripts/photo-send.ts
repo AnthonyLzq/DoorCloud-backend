@@ -33,12 +33,12 @@ const mqttOptions = (): mqtt.IClientOptions => {
   const {
     MQTT_CLEAN = 'true',
     MQTT_CONNECT_TIMEOUT = '30000',
+    MQTT_DEVICE_PASS,
+    MQTT_DEVICE_USER,
     MQTT_HOST,
     MQTT_KEEPALIVE = '60',
-    MQTT_PASS,
     MQTT_PORT = '1883',
-    MQTT_PROTOCOL = 'mqtt',
-    MQTT_USER
+    MQTT_PROTOCOL = 'mqtt'
   } = process.env
 
   return {
@@ -46,11 +46,14 @@ const mqttOptions = (): mqtt.IClientOptions => {
     connectTimeout: Number(MQTT_CONNECT_TIMEOUT),
     host: MQTT_HOST ?? 'localhost',
     keepalive: Number(MQTT_KEEPALIVE),
-    password: MQTT_PASS,
+    // The CLI publishes as a device: the mosquitto ACL only allows the device
+    // user to write doorcloud/v1/photo/send. Defaults match
+    // scripts/mosquitto/create-password-file.sh.
+    password: MQTT_DEVICE_PASS ?? 'doorcloud-device-local',
     port: Number(MQTT_PORT),
     protocol: MQTT_PROTOCOL === 'mqtts' ? 'mqtts' : 'mqtt',
     reconnectPeriod: 0,
-    username: MQTT_USER
+    username: MQTT_DEVICE_USER ?? 'doorcloud-device'
   }
 }
 
