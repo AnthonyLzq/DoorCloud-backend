@@ -10,6 +10,20 @@ All notable changes to this project will be documented in this file. See [commit
 
 * **storage:** migrate photo storage from Supabase to local disk. Photos are written under `PHOTOS_DIR` and served statically at `GET /photos/*` rooted at `PHOTOS_BASE_URL`; the single user is resolved from `USER_ID`/`USER_NAME`/`USER_PHONE`, and `last_message_at` persists in a local SQLite database. A new backup CLI (`pnpm photos:backup`) copies `PHOTOS_DIR` to a local folder or a signed webhook (`--dest`, `--secret`, `--dry-run`; env fallbacks `BACKUP_DEST`/`BACKUP_SECRET`). Rollback: `git revert` restores the Supabase implementation; disk photos can be re-uploaded to the bucket via the backup CLI.
 
+* **whatsapp:** friendlier door-detection captions. Confident matches send `Hey, {name} is here!`, near-threshold matches send `Hey, I think {name} is here, check it out!`, and unknown visitors get `Hey, I do not know who this is, but he/she is at your door.` The confidence band is a placeholder margin above `FACE_VERIFY_THRESHOLD` (`MATCH_CONFIDENCE_MARGIN` in `src/integrations/whatsapp/utils.ts`) until the recognition pipeline exposes calibrated confidence levels.
+
+### Fixes
+
+* **cli:** `door-cloud photos:send` now publishes with the MQTT device credentials (`MQTT_DEVICE_USER`/`MQTT_DEVICE_PASS`, defaulting to `doorcloud-device`/`doorcloud-device-local`) instead of the backend credentials. The mosquitto ACL only allows the device user to write `doorcloud/v1/photo/send`, so publishing as the backend user was silently dropped by the broker (QoS 0 gives no delivery feedback) while the CLI reported `Published`. Add `MQTT_DEVICE_USER`/`MQTT_DEVICE_PASS` to `.env` (or rely on the defaults) when running the CLI.
+
+* **openwa:** OpenWA's SSRF guard rejects photo URLs that resolve to private IPs (`Destination address is not allowed`), which happens when `PHOTOS_BASE_URL` points at the host through the compose network gateway. The compose `openwa` service now forwards `OPENWA_SSRF_ALLOWED_HOSTS` as `SSRF_ALLOWED_HOSTS`; set it to the gateway IP (or any host OpenWA must fetch) in `.env`.
+
+* **openwa:** session ids are resolved before sending. OpenWA keys its engines by the session id used at start time (a UUID), so a configured NAME like `main` made every send fail with `Session 'main' is not active`. When `OPENWA_SESSION_ID` is not a UUID it is resolved to the active session id via `GET /api/sessions`; a missing session now fails with an actionable message pointing at `/setup`. Failed requests also log the OpenWA response body and MQTT photo errors are logged with the pino `err` key so the real message is not lost.
+
+* **photos:** person identity always comes from the parent folder name. Verification now reports the folder name (e.g. `Anthony`) as the matched identity instead of deriving it from the reference photo file name (`IMG-*.png` used to match as `IMG`). Uploads keep the client-provided file name (sanitized, deduplicated with a uuid) instead of forcing the form `fieldname` prefix, so folder layout (`PHOTOS_DIR/{Person}/...`) is the single source of identity and files inside may be named anything.
+
+* **photos:** multi-person door verification. Every child folder of `PHOTOS_DIR` is a known person and the folder name IS the identity (`PHOTOS_DIR/Bryan Ramos/`, `PHOTOS_DIR/Henry Cordero/`, `PHOTOS_DIR/Diana Kevans/`, ...). The door probe is ALWAYS compared against all person folders (`listDirectories()` in `src/storage/photos.ts` + `list()` per folder), so the WhatsApp message names the actual person at the door. Matched door photos accumulate in that person's folder to reinforce future matches; unmatched photos keep going to `PHOTOS_DIR/{USER_NAME}` with a numeric-timestamp prefix and are never re-used as references.
+
 ### BREAKING CHANGES
 
 * **mqtt:** remove legacy `DoorCloud/photo/#` topic support. All publishers must migrate to versioned `doorcloud/v1/photo/*` topics. The `MQTT_LEGACY_TOPICS_ENABLED` environment variable has been removed. Legacy delimiter-based payloads (`userID----format----photo`) are no longer supported; use JSON payloads instead.

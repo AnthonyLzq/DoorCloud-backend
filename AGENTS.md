@@ -42,6 +42,26 @@ docs/
 └── benchmark-analysis.md   # Documento thesis-like: benchmark + bias + Appendix A (auto-generado)
 ```
 
+## Fotos de personas conocidas (PHOTOS_DIR)
+
+`PHOTOS_DIR` es la raíz de fotos. **Cada carpeta hija es una persona conocida**
+y el nombre de la carpeta ES la identidad (ej. `PHOTOS_DIR/Bryan Ramos/`,
+`PHOTOS_DIR/Henry Cordero/`, `PHOTOS_DIR/Diana Kevans/`, ...). Dentro de cada
+carpeta se acumulan las fotos de referencia de esa persona; los archivos
+pueden llamarse como sea: el sistema NUNCA deriva la identidad del nombre del
+archivo, solo de la carpeta padre.
+
+- La verificación de la puerta SIEMPRE compara contra todas las carpetas
+  hijas (`listDirectories()` + `list()` en `src/storage/photos.ts`). En un
+  match, el aviso de WhatsApp dice quién está afuera (`Hey, Bryan Ramos is
+  here!`) y la foto de la puerta se guarda de vuelta en la carpeta de esa
+  persona para reforzar futuros matches.
+- Las fotos sin match se guardan en `PHOTOS_DIR/{USER_NAME}` con prefijo
+  numérico-timestamp (nunca se usan como referencia).
+- `POST /api/user/upload` guarda en la carpeta de `USER_NAME`. Para agregar
+  fotos de otras personas: crear la carpeta manualmente y copiar las fotos,
+  o dejar que se acumulen solas con cada match.
+
 ## Convenciones de Código
 
 ### TypeScript

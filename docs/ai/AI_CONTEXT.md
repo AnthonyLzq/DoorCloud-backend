@@ -81,10 +81,19 @@ Files:
 ## Local storage
 
 Photos:
-- Written under `PHOTOS_DIR` as `{name}-{id}/{fieldname}-{uuid}.{ext}`
-  (verified) or with a numeric-timestamp prefix (no-match)
-- Served statically at `GET /photos/*`; URLs built from `PHOTOS_BASE_URL`
-- `src/storage/photos.ts` - `PhotoStorage` interface (upload/list/getUrl)
+- `PHOTOS_DIR/{Person}/...` — one folder per KNOWN person; the folder name IS
+  the identity (`Bryan Ramos`, `Henry Cordero`, `Diana Kevans`, ...), files
+  inside may be named anything
+- Verification ALWAYS compares the probe against every person folder:
+  `listDirectories()` + `list()` in `src/storage/photos.ts`; `user.ts` builds
+  reference photos with a Promise.all over folders
+- Matched door photos are stored back into that person's folder
+  (`{foundName}-{uuid}.{ext}`); unmatched go to `PHOTOS_DIR/{USER_NAME}` with
+  a numeric-timestamp prefix (never re-used as reference)
+- Uploads keep the client file name (sanitized + uuid); served statically at
+  `GET /photos/*`; URLs built from `PHOTOS_BASE_URL`
+- `src/storage/photos.ts` - `PhotoStorage` interface
+  (upload/list/listDirectories/getUrl)
 
 User config and state:
 - Single user from `USER_NAME` (`src/config/user.ts`); `USER_PHONE` optional;
