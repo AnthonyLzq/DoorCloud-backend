@@ -21,6 +21,17 @@ const signPhotoPath = (
 
 export interface PhotoStorage {
   upload(userFolder: string, filename: string, buffer: Buffer): Promise<string>
+
+  /**
+   * Lists a user's stored photos under `PHOTOS_DIR/{userFolder}`.
+   *
+   * Returns only verified photo filenames: files whose names start with a
+   * numeric timestamp (no-match photos) are excluded, and a missing user
+   * folder resolves to an empty list.
+   *
+   * @param userFolder - `{name}-{id}` folder to list
+   * @returns Verified photo filenames (without the folder prefix)
+   */
   list(userFolder: string): Promise<string[]>
   getUrl(relativePath: string): string
   isUrlValid(path: string, signature: string, expiresAt: number): boolean
