@@ -3,6 +3,7 @@ import 'dotenv/config'
 import { resolve } from 'node:path'
 import yargs from 'yargs'
 
+import { sendPhoto } from '../scripts/photo-send'
 import { backupCliOptions, runBackup } from '../scripts/photos-backup'
 import { setupPhotos } from '../scripts/photos-setup'
 
@@ -13,6 +14,11 @@ type BackupCliArgs = {
 }
 
 type SetupCliArgs = {
+  source: string
+  dryRun: boolean
+}
+
+type PhotoSendCliArgs = {
   source: string
   dryRun: boolean
 }
@@ -85,9 +91,48 @@ const main = async (): Promise<void> => {
         }
       }
     )
+    .command<PhotoSendCliArgs>(
+      'photo:send <source>',
+      'Publish a photo to doorcloud/v1/photo/send for face verification',
+      yargs =>
+        yargs
+          .positional('source', {
+            type: 'string',
+            describe: 'Local image path or http(s) URL of the photo to send'
+          })
+          .option('dry-run', {
+            type: 'boolean',
+            default: false,
+            describe: 'Print the payload without connecting or publishing'
+          }),
+      async args => {
+        try {
+          const result = await sendPhoto(args.source, { dryRun: args.dryRun })
+
+          const action = args.dryRun ? 'Would publish' : 'Published'
+          const { format, photo } = result.payload
+          console.log(
+            `[door-cloud] ${action} ${format} photo (${photo.length} chars) to ${result.topic}`
+          )
+
+          if (args.dryRun) {
+            console.log(
+              `[door-cloud] Payload: ${JSON.stringify(result.payload)}`
+            )
+          }
+
+          process.exitCode = 0
+        } catch (error) {
+          console.error(
+            `[door-cloud] ${error instanceof Error ? error.message : String(error)}`
+          )
+          process.exitCode = 1
+        }
+      }
+    )
     .demandCommand(
       1,
-      'Run a command. Try `door-cloud backup --help` or `door-cloud photos:setup --help`.'
+      'Run a command. Try `door-cloud backup --help`, `door-cloud photos:setup --help` or `door-cloud photo:send --help`.'
     )
     .help()
     .strict()
