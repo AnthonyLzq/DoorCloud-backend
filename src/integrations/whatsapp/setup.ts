@@ -188,7 +188,8 @@ const startOpenWaSetupSession = async (
 }
 
 const getOpenWaSetupQr = async (log?: FastifyBaseLogger): Promise<OpenWaQr> => {
-  const session = await ensureOpenWaSession(log)
+  const status = await startOpenWaSetupSession(log)
+  const session = status.session ?? (await ensureOpenWaSession(log))
   const { data, response, text } = await requestOpenWa<OpenWaQr>({
     log,
     path: `/api/sessions/${session.id}/qr`,

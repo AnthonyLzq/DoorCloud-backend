@@ -526,9 +526,17 @@ describe('DoorCloud backend tests', () => {
       )
     })
 
-    test('loads the OpenWA setup QR', async () => {
+    test('loads the OpenWA setup QR and starts the session first', async () => {
       const fetchMock = vi
         .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ id: 'main', status: 'qr_ready' }), {
+            status: 200
+          })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ status: 'qr_ready' }), { status: 201 })
+        )
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ id: 'main', status: 'qr_ready' }), {
             status: 200
@@ -550,6 +558,11 @@ describe('DoorCloud backend tests', () => {
         qrCode: 'data:image/png;base64,ZmFrZQ==',
         status: 'qr_ready'
       })
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        'http://localhost:2785/api/sessions/main/start',
+        expect.objectContaining({ method: 'POST' })
+      )
     })
 
     test('sends OpenWA setup test text and image', async () => {
