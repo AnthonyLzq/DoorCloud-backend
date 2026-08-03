@@ -255,6 +255,15 @@ describe('DoorCloud backend tests', () => {
       expect(parseEnv(validEnv).BACKUP_SECRET).toBeUndefined()
     })
 
+    test('rejects a placeholder PHOTOS_URL_SECRET', () => {
+      expect(() =>
+        parseEnv({
+          ...validEnv,
+          PHOTOS_URL_SECRET: 'replace-with-a-long-random-string'
+        })
+      ).toThrow('PHOTOS_URL_SECRET')
+    })
+
     test('rejects missing PHOTOS_DIR', () => {
       const { PHOTOS_DIR: _omit, ...rest } = validEnv
 

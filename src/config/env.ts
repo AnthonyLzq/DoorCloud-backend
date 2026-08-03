@@ -107,6 +107,23 @@ const commaSeparatedOrigins = (_name: string) =>
     return value
   }, z.array(z.string().trim().min(1)).optional())
 
+/**
+ * Rejects obviously insecure placeholder secrets so a deployment that copies
+ * `.env.example` (which documents `replace-with-a-long-random-string`)
+ * cannot run with a publicly known HMAC key.
+ */
+const nonPlaceholderSecret = (name: string) =>
+  z
+    .string({ error: `${name} is required` })
+    .refine(
+      value =>
+        !/^(replace|your|example|changeme|change[-_ ]me|xxx)/i.test(value) &&
+        !/placeholder/i.test(value),
+      {
+        message: `${name} looks like a placeholder; set a real secret`
+      }
+    )
+
 const envSchema = z
   .object({
     NODE_ENV: z.string().trim().min(1).default('development'),
@@ -127,10 +144,9 @@ const envSchema = z
     PHOTOS_BASE_URL: requiredString('PHOTOS_BASE_URL').url(
       'PHOTOS_BASE_URL must be a URL'
     ),
-    PHOTOS_URL_SECRET: requiredString('PHOTOS_URL_SECRET').min(
-      16,
-      'PHOTOS_URL_SECRET must be at least 16 characters'
-    ),
+    PHOTOS_URL_SECRET: requiredString('PHOTOS_URL_SECRET')
+      .min(16, 'PHOTOS_URL_SECRET must be at least 16 characters')
+      .pipe(nonPlaceholderSecret('PHOTOS_URL_SECRET')),
     STATE_DB_PATH: optionalString('STATE_DB_PATH'),
     USER_ID: requiredString('USER_ID'),
     USER_NAME: requiredString('USER_NAME'),
