@@ -134,7 +134,7 @@ class Server {
   }
 
   public async start(): Promise<void> {
-    const { PORT } = getEnv()
+    const { HOST, PORT } = getEnv()
 
     try {
       // Fail fast: if face recognition cannot start, do not open ports or MQTT
@@ -142,6 +142,7 @@ class Server {
       this.#startMqtt()
       await this.#mqqtConnection?.start()
       await this.#app.listen({
+        host: HOST,
         port: PORT
       })
     } catch (error) {

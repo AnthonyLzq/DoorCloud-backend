@@ -7,14 +7,19 @@ services:
     environment:
       NODE_ENV: production
       PORT: 2785
+      # OpenWA blocks outbound fetches to private IPs (SSRF guard). The photo
+      # URL sent to WhatsApp points at the host via the compose gateway
+      # (PHOTOS_BASE_URL), so allowlist that host. Comma-separated; leave
+      # empty if PHOTOS_BASE_URL is publicly reachable.
+      SSRF_ALLOWED_HOSTS: '${OPENWA_SSRF_ALLOWED_HOSTS:-}'
     volumes:
       - openwa-data:/app/data
     healthcheck:
       test:
         - CMD-SHELL
         - >
-          wget -qO- http://127.0.0.1:2785/api/health >/dev/null
-          || wget -qO- http://127.0.0.1:2785/ >/dev/null
+          curl -fsS http://127.0.0.1:2785/api/health >/dev/null
+          || curl -fsS http://127.0.0.1:2785/ >/dev/null
       interval: 10s
       timeout: 6s
       retries: 12

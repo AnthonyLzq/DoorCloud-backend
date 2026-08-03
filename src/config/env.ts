@@ -128,6 +128,9 @@ const envSchema = z
   .object({
     NODE_ENV: z.string().trim().min(1).default('development'),
     PORT: optionalPort(1996),
+    // Bind address. 0.0.0.0 so Docker services (e.g. the OpenWA container)
+    // can reach the HTTP API through the compose network gateway.
+    HOST: optionalString('HOST').default('0.0.0.0'),
     CORS_ORIGINS: commaSeparatedOrigins('CORS_ORIGINS'),
     MQTT_HOST: requiredString('MQTT_HOST'),
     MQTT_PROTOCOL: z.enum(['mqtt', 'mqtts']).default('mqtts'),
