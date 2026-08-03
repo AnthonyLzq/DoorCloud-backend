@@ -6,6 +6,42 @@
   },
   "instructions": ["AGENTS.md", "docs/ai/AI_CONTEXT.md"],
   "agent": {
+    "explore": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "general": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-apply": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-archive": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-design": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-explore": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-init": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-onboard": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-propose": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-spec": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-tasks": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
+    "sdd-verify": {
+      "model": "omniroute/oc/deepseek-v4-flash-free"
+    },
     "review-risk": {
       "model": "omniroute/oc/deepseek-v4-flash-free"
     },
