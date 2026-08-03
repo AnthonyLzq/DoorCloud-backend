@@ -28,6 +28,25 @@ type RunBackupOptions = {
   dryRun?: boolean
 }
 
+const DEFAULT_WEBHOOK_TIMEOUT_MS = 30_000
+const DEFAULT_WEBHOOK_MAX_RETRIES = 3
+const DEFAULT_WEBHOOK_BASE_DELAY_MS = 500
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * Computes the exponential backoff delay for a retry attempt
+ *
+ * @param attempt - Zero-based attempt index that just failed
+ * @param baseDelayMs - Base delay in milliseconds
+ * @returns Delay in milliseconds before the next attempt
+ */
+export const backoffDelay = (
+  attempt: number,
+  baseDelayMs = DEFAULT_WEBHOOK_BASE_DELAY_MS
+): number => baseDelayMs * 2 ** attempt
+
 /**
  * Determines whether a destination string is a webhook URL
  *
@@ -38,16 +57,27 @@ export const isWebhookDest = (dest: string): boolean =>
   /^https?:\/\//i.test(dest)
 
 /**
- * Signs a request body with HMAC-SHA256 for the webhook receiver
+ * Signs a webhook payload with HMAC-SHA256 for the receiver
  *
- * The receiver should verify this signature before trusting the payload.
+ * The signature covers the timestamp and the raw body, so an on-path attacker
+ * cannot rewrite `X-DoorCloud-Timestamp` (e.g. to extend the freshness
+ * window) without invalidating the signature. The receiver should verify the
+ * signature and check the timestamp before trusting the payload.
  *
  * @param body - Raw backup payload bytes
  * @param secret - Shared webhook secret (BACKUP_SECRET / --secret)
+ * @param timestamp - Unix milliseconds covered by the signature (defaults to now)
  * @returns Hex-encoded HMAC-SHA256 digest
  */
-export const signBody = (body: Buffer, secret: string): string =>
-  createHmac('sha256', secret).update(body).digest('hex')
+export const signBody = (
+  body: Buffer,
+  secret: string,
+  timestamp: number = Date.now()
+): string =>
+  createHmac('sha256', secret)
+    .update(`${timestamp}.`)
+    .update(body)
+    .digest('hex')
 
 /**
  * Parses CLI arguments with yargs
@@ -186,14 +216,16 @@ export const backupToFolder = async (
  * Backs up PHOTOS_DIR to a webhook URL with per-file POSTs
  *
  * Each file is sent as an octet-stream body with a HMAC-SHA256 signature and
- * timestamp; the destination URL carries the relative path. Non-2xx responses
- * fail the backup.
+ * timestamp; the destination URL carries the relative path. Network failures
+ * and timeouts are retried with exponential backoff; non-2xx responses fail
+ * the backup immediately.
  *
  * @param source - Source photos directory
  * @param dest - Webhook destination URL
  * @param secret - Shared secret used to sign each body
  * @param dryRun - Count only, do not send
  * @param fetchImpl - Fetch implementation (injected for tests)
+ * @param retry - Optional retry tuning (timeout, attempts, backoff base)
  * @returns Number of files and total bytes that would be / were sent
  */
 export const backupToWebhook = async (
@@ -201,8 +233,18 @@ export const backupToWebhook = async (
   dest: string,
   secret: string,
   dryRun: boolean,
-  fetchImpl: typeof fetch = globalThis.fetch
+  fetchImpl: typeof fetch = globalThis.fetch,
+  retry: {
+    timeoutMs?: number
+    maxRetries?: number
+    baseDelayMs?: number
+  } = {}
 ): Promise<BackupSummary> => {
+  const {
+    timeoutMs = DEFAULT_WEBHOOK_TIMEOUT_MS,
+    maxRetries = DEFAULT_WEBHOOK_MAX_RETRIES,
+    baseDelayMs = DEFAULT_WEBHOOK_BASE_DELAY_MS
+  } = retry
   const sourceRoot = resolve(source)
 
   if (!existsSync(sourceRoot)) {
@@ -218,19 +260,47 @@ export const backupToWebhook = async (
 
     if (dryRun) continue
 
-    const response = await fetchImpl(buildWebhookUrl(dest, rel), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'X-DoorCloud-Signature': signBody(body, secret),
-        'X-DoorCloud-Timestamp': String(Date.now())
-      },
-      body
-    })
+    const timestamp = Date.now()
+    const url = buildWebhookUrl(dest, rel)
 
-    if (!response.ok) {
-      throw new Error(`Webhook rejected ${rel}: HTTP ${response.status}`)
+    let lastError: unknown
+    let attempt = 0
+
+    while (attempt <= maxRetries) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+      try {
+        const response = await fetchImpl(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'X-DoorCloud-Signature': signBody(body, secret, timestamp),
+            'X-DoorCloud-Timestamp': String(timestamp)
+          },
+          body,
+          signal: controller.signal
+        })
+
+        if (!response.ok) {
+          throw new Error(`Webhook rejected ${rel}: HTTP ${response.status}`)
+        }
+
+        lastError = undefined
+        break
+      } catch (error) {
+        lastError = error
+        attempt++
+
+        if (attempt <= maxRetries) {
+          await sleep(backoffDelay(attempt - 1, baseDelayMs))
+        }
+      } finally {
+        clearTimeout(timeout)
+      }
     }
+
+    if (lastError) throw lastError
   }
 
   return { files: files.length, bytes }

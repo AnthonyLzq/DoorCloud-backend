@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import {
+  backoffDelay,
   backupToFolder,
   backupToWebhook,
   collectFiles,
@@ -90,9 +91,21 @@ describe('parseArgs', () => {
 })
 
 describe('signBody', () => {
-  test('returns lowercase hex HMAC-SHA256 of the body with the secret', () => {
-    expect(signBody(Buffer.from('hello'), 's3cret')).toBe(
-      'e5a01537481fa0b2c697f787c7aff885412cf0760d08e08502259b39d2d6ae68'
+  test('returns lowercase hex HMAC-SHA256 covering timestamp and body', () => {
+    const sig = signBody(Buffer.from('hello'), 's3cret', 1_728_000_000_000)
+    const expected = createHmac('sha256', 's3cret')
+      .update('1728000000000.')
+      .update(Buffer.from('hello'))
+      .digest('hex')
+
+    expect(sig).toBe(expected)
+  })
+
+  test('changes when the timestamp changes', () => {
+    const body = Buffer.from('hello')
+
+    expect(signBody(body, 's3cret', 1_728_000_000_000)).not.toBe(
+      signBody(body, 's3cret', 1_728_000_000_001)
     )
   })
 })
@@ -165,6 +178,19 @@ describe('backupToFolder', () => {
   })
 })
 
+describe('backoffDelay', () => {
+  test('doubles the base delay per failed attempt', () => {
+    expect(backoffDelay(0)).toBe(500)
+    expect(backoffDelay(1)).toBe(1_000)
+    expect(backoffDelay(2)).toBe(2_000)
+  })
+
+  test('honors a custom base delay', () => {
+    expect(backoffDelay(0, 100)).toBe(100)
+    expect(backoffDelay(2, 100)).toBe(400)
+  })
+})
+
 describe('backupToWebhook', () => {
   test('POSTs raw bytes with signature and timestamp headers', async () => {
     seedSource()
@@ -188,11 +214,13 @@ describe('backupToWebhook', () => {
     expect(url).toContain('path=Ana-42%2Fselfie-a.jpg')
     expect(init.method).toBe('POST')
     expect(init.body).toEqual(Buffer.from('aaa'))
+    const timestamp = Number(init.headers['X-DoorCloud-Timestamp'])
     const expectedSig = createHmac('sha256', 's3cret')
+      .update(`${timestamp}.`)
       .update(Buffer.from('aaa'))
       .digest('hex')
     expect(init.headers['X-DoorCloud-Signature']).toBe(expectedSig)
-    expect(Number(init.headers['X-DoorCloud-Timestamp'])).toBeGreaterThan(0)
+    expect(timestamp).toBeGreaterThan(0)
   })
 
   test('dry-run does not call fetch', async () => {
@@ -209,6 +237,64 @@ describe('backupToWebhook', () => {
 
     expect(summary.files).toBe(2)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  test('retries network errors with backoff before succeeding', async () => {
+    seedSource()
+    let call = 0
+    const fetchMock = vi.fn(async () => {
+      call++
+      if (call % 3 !== 0) throw new Error('ECONNRESET')
+      return new Response('ok', { status: 200 })
+    })
+
+    const summary = await backupToWebhook(
+      sourceDir,
+      'https://hooks.example.com/push',
+      's3cret',
+      false,
+      fetchMock,
+      { baseDelayMs: 0 }
+    )
+
+    expect(summary.files).toBe(2)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
+  })
+
+  test('fails after exhausting retries on persistent network errors', async () => {
+    seedSource()
+    const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNRESET'))
+
+    await expect(
+      backupToWebhook(
+        sourceDir,
+        'https://hooks.example.com/push',
+        's3cret',
+        false,
+        fetchMock,
+        { baseDelayMs: 0, maxRetries: 2 }
+      )
+    ).rejects.toThrow('ECONNRESET')
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  test('passes an abort signal to fetch so calls can time out', async () => {
+    seedSource()
+    const fetchMock = vi.fn()
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }))
+
+    await backupToWebhook(
+      sourceDir,
+      'https://hooks.example.com/push',
+      's3cret',
+      false,
+      fetchMock,
+      { timeoutMs: 5_000 }
+    )
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 })
 

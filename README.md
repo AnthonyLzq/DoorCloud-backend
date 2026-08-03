@@ -129,9 +129,14 @@ Flags and env fallbacks:
 | Dry run | `--dry-run` | — |
 
 Webhook pushes POST each file's raw bytes to `<dest>?path=<relative-path>`
-with an `X-DoorCloud-Signature` header (lowercase hex HMAC-SHA256 of the
-body) and an `X-DoorCloud-Timestamp` header (Unix milliseconds). The CLI
-exits `0` when every file succeeds and `1` when any file fails.
+with an `X-DoorCloud-Signature` header (lowercase hex HMAC-SHA256 covering
+`{timestamp}.{body}` with the configured secret) and an
+`X-DoorCloud-Timestamp` header (Unix milliseconds). Because the signature
+covers the timestamp, an on-path attacker cannot rewrite the timestamp
+without invalidating the signature. Network errors and timeouts are retried
+with exponential backoff (500ms, 1s, 2s... up to 3 retries per file, 30s
+fetch timeout); non-2xx responses fail immediately. The CLI exits `0` when
+every file succeeds and `1` when any file fails.
 
 #### Installing `door-cloud` as a global CLI
 
