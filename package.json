@@ -13,12 +13,12 @@
   "description": "Backend for DoorCloud",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "format": "biome format --write src/",
+    "lint": "biome check src/ bin/",
+    "lint:fix": "biome check --write src/ bin/",
+    "format": "biome format --write src/ bin/",
     "models:download": "./scripts/download-models.sh",
     "models:test": "tsx scripts/test-onnx-inference.ts",
-    "photos:backup": "tsx scripts/photos-backup.ts",
+    "photos:backup": "tsx bin/door-cloud.ts backup",
     "benchmark:embeddings": "npx tsx scripts/embed-bfw.ts",
     "benchmark:analyze": "NODE_OPTIONS=--max-old-space-size=4096 npx tsx scripts/analyze-bias.ts",
     "benchmark:plots": ".venv/bin/python3 scripts/plot-bias-analysis.py",
@@ -34,7 +34,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "openwa:qr": "node scripts/openwa/qr-sign-in.mjs",
     "openwa:sync-api-key": "node scripts/openwa/sync-api-key.mjs",
-    "pub": "nodemon --exec \"DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts\""
+    "pub": "nodemon --exec \"DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts\"",
+    "door-cloud": "tsx bin/door-cloud.ts"
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
   "license": "MIT",
@@ -104,5 +105,8 @@
       "commit": true,
       "bump": true
     }
+  },
+  "bin": {
+    "door-cloud": "bin/door-cloud.ts"
   }
 }

@@ -104,18 +104,20 @@ host's reachable address (e.g. `http://192.168.1.10:1996/photos`).
 
 ### Backup CLI
 
-`pnpm photos:backup` copies `PHOTOS_DIR` to a local folder or a signed
-webhook endpoint:
+`pnpm door-cloud backup` (alias: `pnpm photos:backup`) copies `PHOTOS_DIR` to
+a local folder or a signed webhook endpoint. The CLI loads `.env` via dotenv,
+so `PHOTOS_DIR`, `BACKUP_DEST`, and `BACKUP_SECRET` can come from the
+environment file:
 
 ```bash
 # Local folder copy (preserves the relative layout, overwrites existing files)
-pnpm photos:backup --dest /var/backups/doorcloud-photos
+pnpm door-cloud backup --dest /var/backups/doorcloud-photos
 
 # Signed webhook push (per-file POST with an HMAC-SHA256 signature)
-pnpm photos:backup --dest https://example.com/hooks/doorcloud --secret webhook-secret
+pnpm door-cloud backup --dest https://example.com/hooks/doorcloud --secret webhook-secret
 
 # Preview what would happen without writing or sending anything
-pnpm photos:backup --dry-run
+pnpm door-cloud backup --dry-run
 ```
 
 Flags and env fallbacks:
@@ -130,6 +132,43 @@ Webhook pushes POST each file's raw bytes to `<dest>?path=<relative-path>`
 with an `X-DoorCloud-Signature` header (lowercase hex HMAC-SHA256 of the
 body) and an `X-DoorCloud-Timestamp` header (Unix milliseconds). The CLI
 exits `0` when every file succeeds and `1` when any file fails.
+
+#### Installing `door-cloud` as a global CLI
+
+The package exposes the `door-cloud` command through its `bin` field. The
+entry point is `bin/door-cloud.ts`, which runs under `tsx`; since `tsx` is a
+devDependency of this project (not a runtime dependency of the installed
+global shim), you need `tsx` available on the global `PATH` once:
+
+```bash
+pnpm add --global tsx
+```
+
+Then link the package globally from the repo root:
+
+```bash
+pnpm link --global
+```
+
+After that the command works from anywhere, loading `.env` relative to the
+current working directory:
+
+```bash
+door-cloud --help
+door-cloud backup --dest /var/backups/doorcloud-photos
+```
+
+Notes:
+
+- The global `door-cloud` shim executes the project-local `tsx`; without the
+  global `tsx` install the shim fails with `exec: tsx: not found`.
+- Re-run `pnpm link --global` after the bin entry changes (e.g. the file the
+  `bin` field points to), so the generated shim tracks the new path.
+- Inside the repo you never need the global install: `pnpm door-cloud backup`
+  resolves the local `tsx` automatically.
+- The CLI does not require the backend to be running; it reads `PHOTOS_DIR`
+  directly from disk. For webhook backups set `BACKUP_SECRET` (or pass
+  `--secret`).
 
 ### Rollback
 
