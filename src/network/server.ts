@@ -145,7 +145,7 @@ class Server {
         port: PORT
       })
     } catch (error) {
-      this.#app.log.error({ error }, 'Fatal error during server startup')
+      this.#app.log.error({ err: error }, 'Fatal error during server startup')
       await this.#stopInternal()
       throw error
     }

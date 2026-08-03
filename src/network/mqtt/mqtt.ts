@@ -60,7 +60,7 @@ const logError = (
   message: string,
   error: Error
 ) => {
-  if (log) log.error({ error }, message)
+  if (log) log.error({ err: error }, message)
   else writeDebug(`${message}: ${error.message}`)
 }
 

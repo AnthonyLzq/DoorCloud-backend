@@ -166,7 +166,7 @@ const Setup = (server: ZodFastifyInstance): void => {
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
-        server.log.error({ error }, 'OpenWA setup status failed')
+        server.log.error({ err: error }, 'OpenWA setup status failed')
 
         throw error
       }
@@ -199,7 +199,7 @@ const Setup = (server: ZodFastifyInstance): void => {
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
-        server.log.error({ error }, 'OpenWA setup start failed')
+        server.log.error({ err: error }, 'OpenWA setup start failed')
 
         throw error
       }
@@ -216,7 +216,7 @@ const Setup = (server: ZodFastifyInstance): void => {
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
-        server.log.error({ error }, 'OpenWA setup QR failed')
+        server.log.error({ err: error }, 'OpenWA setup QR failed')
 
         throw error
       }
@@ -242,7 +242,7 @@ const Setup = (server: ZodFastifyInstance): void => {
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {
-        server.log.error({ error }, 'OpenWA setup send-test failed')
+        server.log.error({ err: error }, 'OpenWA setup send-test failed')
 
         throw error
       }
