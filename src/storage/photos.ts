@@ -8,8 +8,6 @@ const isNotFoundError = (error: unknown): boolean =>
   'code' in error &&
   (error as { code?: unknown }).code === 'ENOENT'
 
-const PHOTO_URL_TTL_MS = 30_000
-
 const signPhotoPath = (
   secret: string,
   expiresAt: number,
@@ -53,15 +51,18 @@ export class DiskPhotoStorage implements PhotoStorage {
   #photosDir: string
   #baseUrl: string
   #urlSecret: string
+  #urlTtlMs: number
 
   constructor(config: {
     photosDir: string
     baseUrl: string
     urlSecret: string
+    urlTtlMs: number
   }) {
     this.#photosDir = config.photosDir
     this.#baseUrl = config.baseUrl.replace(/\/+$/, '')
     this.#urlSecret = config.urlSecret
+    this.#urlTtlMs = config.urlTtlMs
   }
 
   #safeJoin(...parts: string[]): string {
@@ -120,7 +121,7 @@ export class DiskPhotoStorage implements PhotoStorage {
   }
 
   getUrl(relativePath: string): string {
-    const expiresAt = Date.now() + PHOTO_URL_TTL_MS
+    const expiresAt = Date.now() + this.#urlTtlMs
     const signature = signPhotoPath(this.#urlSecret, expiresAt, relativePath)
 
     return `${this.#baseUrl}/${signature}/${expiresAt}/${relativePath}`

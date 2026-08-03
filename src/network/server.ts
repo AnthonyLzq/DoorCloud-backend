@@ -54,13 +54,19 @@ class Server {
   }
 
   #config() {
-    const { CORS_ORIGINS, PHOTOS_DIR, PHOTOS_BASE_URL, PHOTOS_URL_SECRET } =
-      getEnv()
+    const {
+      CORS_ORIGINS,
+      PHOTOS_DIR,
+      PHOTOS_BASE_URL,
+      PHOTOS_URL_SECRET,
+      PHOTO_URL_TTL_MS
+    } = getEnv()
 
     const photoStorage = new DiskPhotoStorage({
       photosDir: PHOTOS_DIR,
       baseUrl: PHOTOS_BASE_URL,
-      urlSecret: PHOTOS_URL_SECRET
+      urlSecret: PHOTOS_URL_SECRET,
+      urlTtlMs: PHOTO_URL_TTL_MS
     })
 
     this.#app.register(cors, {

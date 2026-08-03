@@ -64,7 +64,8 @@ beforeEach(() => {
     PORT: 0,
     PHOTOS_DIR: photosDir,
     PHOTOS_BASE_URL: 'http://localhost:1996/photos',
-    PHOTOS_URL_SECRET: PHOTO_URL_SECRET
+    PHOTOS_URL_SECRET: PHOTO_URL_SECRET,
+    PHOTO_URL_TTL_MS: 300_000
   })
   mocks.mqttConnection.mockReturnValue({
     start: vi.fn().mockResolvedValue(undefined),

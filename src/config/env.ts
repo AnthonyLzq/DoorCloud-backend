@@ -147,6 +147,7 @@ const envSchema = z
     PHOTOS_URL_SECRET: requiredString('PHOTOS_URL_SECRET')
       .min(16, 'PHOTOS_URL_SECRET must be at least 16 characters')
       .pipe(nonPlaceholderSecret('PHOTOS_URL_SECRET')),
+    PHOTO_URL_TTL_MS: optionalInteger('PHOTO_URL_TTL_MS', 300_000, 1_000),
     STATE_DB_PATH: optionalString('STATE_DB_PATH'),
     USER_ID: requiredString('USER_ID'),
     USER_NAME: requiredString('USER_NAME'),

@@ -264,6 +264,20 @@ describe('DoorCloud backend tests', () => {
       ).toThrow('PHOTOS_URL_SECRET')
     })
 
+    test('defaults PHOTO_URL_TTL_MS to 5 minutes when unset', () => {
+      expect(parseEnv(validEnv).PHOTO_URL_TTL_MS).toBe(300_000)
+    })
+
+    test('parses PHOTO_URL_TTL_MS and rejects non-positive values', () => {
+      expect(
+        parseEnv({ ...validEnv, PHOTO_URL_TTL_MS: '60000' })
+      ).toMatchObject({ PHOTO_URL_TTL_MS: 60_000 })
+
+      expect(() => parseEnv({ ...validEnv, PHOTO_URL_TTL_MS: '0' })).toThrow(
+        'PHOTO_URL_TTL_MS'
+      )
+    })
+
     test('rejects missing PHOTOS_DIR', () => {
       const { PHOTOS_DIR: _omit, ...rest } = validEnv
 

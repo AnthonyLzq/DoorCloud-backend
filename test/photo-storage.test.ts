@@ -26,7 +26,8 @@ beforeEach(() => {
   storage = new DiskPhotoStorage({
     photosDir,
     baseUrl: 'http://localhost:1996/photos',
-    urlSecret: 'test-photo-url-secret'
+    urlSecret: 'test-photo-url-secret',
+    urlTtlMs: 300_000
   })
   fsMocks.writeFile.mockImplementation(fsMocks.realWriteFile)
 })
