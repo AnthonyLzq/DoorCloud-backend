@@ -35,6 +35,18 @@ export interface PhotoStorage {
   list(userFolder: string): Promise<string[]>
   getUrl(relativePath: string): string
   isUrlValid(path: string, signature: string, expiresAt: number): boolean
+
+  /**
+   * Resolves a URL path segment to an absolute path inside PHOTOS_DIR.
+   *
+   * Throws when the path escapes the photos directory. Centralizes the
+   * containment check so route handlers do not re-implement traversal
+   * validation.
+   *
+   * @param relativePath - Path relative to PHOTOS_DIR
+   * @returns Absolute filesystem path
+   */
+  resolvePath(relativePath: string): string
 }
 
 export class DiskPhotoStorage implements PhotoStorage {
@@ -126,5 +138,9 @@ export class DiskPhotoStorage implements PhotoStorage {
     return (
       expected.length === provided.length && timingSafeEqual(expected, provided)
     )
+  }
+
+  resolvePath(relativePath: string): string {
+    return this.#safeJoin(relativePath)
   }
 }

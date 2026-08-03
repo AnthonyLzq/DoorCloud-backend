@@ -152,4 +152,38 @@ describe('Signed photo serving (RF-4)', () => {
     expect(statuses.slice(1, 4)).toEqual([404, 404, 404])
     expect(statuses.slice(4).every(s => s >= 400)).toBe(true)
   })
+
+  it('returns 404 for a validly signed URL whose file was removed', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+
+    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
+    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
+
+    const url = signedPhotoUrl('Ana-42/selfie.jpg')
+    expect((await Server.app.inject({ method: 'GET', url })).statusCode).toBe(
+      200
+    )
+
+    rmSync(join(photosDir, 'Ana-42', 'selfie.jpg'))
+
+    const response = await Server.app.inject({ method: 'GET', url })
+    expect(response.statusCode).toBe(404)
+    expect(response.headers['content-type']).toMatch(/application\/json/)
+  })
+
+  it('serves photos with the correct content type', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+
+    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
+    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
+
+    const url = signedPhotoUrl('Ana-42/selfie.jpg')
+    const response = await Server.app.inject({ method: 'GET', url })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['content-type']).toMatch(/^image\/jpeg/)
+    expect(response.body).toBe('photo-content')
+  })
 })
