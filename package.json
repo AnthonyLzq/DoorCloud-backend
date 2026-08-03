@@ -23,7 +23,7 @@
     "benchmark:analyze": "NODE_OPTIONS=--max-old-space-size=4096 npx tsx scripts/analyze-bias.ts",
     "benchmark:plots": ".venv/bin/python3 scripts/plot-bias-analysis.py",
     "benchmark:plots-benchmark": ".venv/bin/python3 scripts/histogram_for_metrics.py",
-    "preservice": "node scripts/openwa/sync-api-key.mjs --optional",
+    "preservice": "node scripts/ensure-services.mjs && node scripts/openwa/sync-api-key.mjs --optional",
     "service": "nodemon --exitcrash",
     "start": "NODE_PATH=dist node dist/index.js",
     "release": "commit-and-tag-version",

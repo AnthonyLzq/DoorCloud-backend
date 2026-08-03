@@ -282,15 +282,23 @@ http://localhost:1996/setup
 
 The setup page can save OpenWA config into `.env`, refresh OpenWA status, start
 the session, render the sign-in QR, and send a text/image test to
-`OPENWA_CHAT_ID`.
+`OPENWA_CHAT_ID`. The correct order on the page is: **Start session** first,
+then **Load QR** — requesting the QR before the session is running returns a
+400 (`Session is not started`), and a missing broker/gateway shows as
+`ECONNREFUSED` in the setup logs.
 
-Before `pnpm service` starts the backend, the `preservice` script tries to fill an empty
-`OPENWA_API_KEY` by reading `/app/data/.api-key` from a running Docker Compose
-OpenWA service. It tries `OPENWA_COMPOSE_SERVICE`, then `openwa`, then
-`openwa-api`. To run the sync manually:
+Before `pnpm service` starts the backend, the `preservice` script:
+1. starts `mosquitto` and `openwa` with Docker Compose when they are not
+   already running, then
+2. tries to fill an empty `OPENWA_API_KEY` by reading `/app/data/.api-key`
+   from a running Docker Compose OpenWA service. It tries
+   `OPENWA_COMPOSE_SERVICE`, then `openwa`, then `openwa-api`.
+
+To run these steps manually:
 
 ```bash
-pnpm openwa:sync-api-key
+node scripts/ensure-services.mjs   # docker compose up -d mosquitto openwa when down
+pnpm openwa:sync-api-key           # fill OPENWA_API_KEY from the OpenWA container
 ```
 
 If OpenWA is managed by a separate Compose project, set
