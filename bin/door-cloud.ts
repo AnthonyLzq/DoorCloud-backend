@@ -92,7 +92,7 @@ const main = async (): Promise<void> => {
       }
     )
     .command<PhotoSendCliArgs>(
-      'photo:send <source>',
+      ['photos:send <source>', 'photo:send <source>'],
       'Publish a photo to doorcloud/v1/photo/send for face verification',
       yargs =>
         yargs
@@ -132,7 +132,7 @@ const main = async (): Promise<void> => {
     )
     .demandCommand(
       1,
-      'Run a command. Try `door-cloud backup --help`, `door-cloud photos:setup --help` or `door-cloud photo:send --help`.'
+      'Run a command. Try `door-cloud backup --help`, `door-cloud photos:setup --help` or `door-cloud photos:send --help`.'
     )
     .help()
     .strict()
