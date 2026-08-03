@@ -365,8 +365,8 @@ The single user comes from the environment instead of a `users` table:
 
 | Concern | Value |
 |---------|-------|
-| Source | `src/config/user.ts` - `getActiveUser()` returns `{ id, name, phone }` from `USER_ID`/`USER_NAME`/`USER_PHONE` |
-| Folder | `{name}-{id}` |
+| Source | `src/config/user.ts` - `getActiveUser()` returns `{ name, phone }` from `USER_NAME`/`USER_PHONE` |
+| Folder | `{name}` |
 
 ### User State (SQLite)
 

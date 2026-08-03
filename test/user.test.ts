@@ -117,7 +117,6 @@ beforeEach(() => {
     STATE_DB_PATH: '/tmp/doorcloud-state/app-state.db'
   })
   mocks.getActiveUser.mockReturnValue({
-    id: '1',
     name: 'John',
     phone: '51999999999'
   })
@@ -129,9 +128,7 @@ beforeEach(() => {
   mocks.getPhotoUrl.mockImplementation(
     (path: string) => `https://example.com/photos/${path}`
   )
-  mocks.uploadPhoto.mockResolvedValue(
-    'John-1/2026-01-01T00:00:00.000Z-uuid.jpg'
-  )
+  mocks.uploadPhoto.mockResolvedValue('John/2026-01-01T00:00:00.000Z-uuid.jpg')
   mocks.getLastMessage.mockReturnValue(new Date(Date.now() - 2 * 36e5))
 })
 
@@ -148,7 +145,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       [
         {
           name: 'selfie',
-          url: 'https://example.com/photos/John-1/selfie-abc123.jpg'
+          url: 'https://example.com/photos/John/selfie-abc123.jpg'
         }
       ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
@@ -167,7 +164,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       [
         {
           name: 'selfie',
-          url: 'https://example.com/photos/John-1/selfie-abc123.jpg'
+          url: 'https://example.com/photos/John/selfie-abc123.jpg'
         }
       ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
@@ -220,14 +217,14 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.uploadPhoto).toHaveBeenCalledWith(
-      'John-1',
+      'John',
       expect.stringMatching(/^2026-01-01T00:00:00\.000Z-[0-9a-f-]{36}\.jpg$/),
       Buffer.from('photo')
     )
     expect(mocks.sendPhotoDetectionResultThroughWhatsapp).toHaveBeenCalledWith(
       expect.objectContaining({
         imageUrl:
-          'https://example.com/photos/John-1/2026-01-01T00:00:00.000Z-uuid.jpg',
+          'https://example.com/photos/John/2026-01-01T00:00:00.000Z-uuid.jpg',
         success: false
       })
     )
@@ -245,7 +242,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       '51999999999',
       expect.anything()
     )
-    expect(mocks.setLastMessage).toHaveBeenCalledWith('1', expect.any(Date))
+    expect(mocks.setLastMessage).toHaveBeenCalledWith(expect.any(Date))
   })
 
   it('greets again when the last message is older than 16 hours', async () => {
@@ -256,7 +253,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sayHelloThroughWhatsapp).toHaveBeenCalledTimes(1)
-    expect(mocks.setLastMessage).toHaveBeenCalledWith('1', expect.any(Date))
+    expect(mocks.setLastMessage).toHaveBeenCalledWith(expect.any(Date))
   })
 
   it('does not greet when the last message is within 16 hours', async () => {
@@ -303,42 +300,24 @@ describe('User HTTP routes (RF-3)', () => {
     }
   })
 
-  it('keeps POST /api/user/:folderID/upload validating and uploading', async () => {
+  it('keeps POST /api/user/upload validating and uploading', async () => {
     const app = await buildApp()
     const { body, contentType } = buildMultipartBody('selfie', 'selfie.jpg')
 
     try {
       const res = await app.inject({
         method: 'POST',
-        url: '/api/user/John-1/upload',
+        url: '/api/user/upload',
         headers: { 'content-type': contentType },
         payload: body
       })
 
       expect(res.statusCode).toBe(200)
       expect(mocks.uploadPhoto).toHaveBeenCalledWith(
-        'John-1',
+        'John',
         expect.stringMatching(/^selfie-[0-9a-f-]{36}\.jpeg$/),
         expect.any(Buffer)
       )
-    } finally {
-      await app.close()
-    }
-  })
-
-  it('rejects an upload with a non-numeric userID', async () => {
-    const app = await buildApp()
-    const { body, contentType } = buildMultipartBody('selfie', 'selfie.jpg')
-
-    try {
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/user/John-abc/upload',
-        headers: { 'content-type': contentType },
-        payload: body
-      })
-
-      expect(res.statusCode).toBe(400)
     } finally {
       await app.close()
     }

@@ -108,7 +108,6 @@ const validEnv = {
   PHOTOS_DIR: '/tmp/doorcloud-photos',
   PHOTOS_BASE_URL: 'http://localhost:1996/photos',
   PHOTOS_URL_SECRET: 'test-photo-url-secret',
-  USER_ID: '42',
   USER_NAME: 'Ana',
   USER_PHONE: '51999999999@c.us'
 }
@@ -232,12 +231,12 @@ describe('DoorCloud backend tests', () => {
       expect(env).toMatchObject({
         PHOTOS_DIR: '/tmp/doorcloud-photos',
         PHOTOS_BASE_URL: 'http://localhost:1996/photos',
-        USER_ID: '42',
         USER_NAME: 'Ana',
         USER_PHONE: '51999999999@c.us'
       })
       expect('SUPABASE_URL' in env).toBe(false)
       expect('SUPABASE_KEY' in env).toBe(false)
+      expect('USER_ID' in env).toBe(false)
     })
 
     test('parses optional BACKUP_DEST and BACKUP_SECRET', () => {
@@ -294,7 +293,6 @@ describe('DoorCloud backend tests', () => {
   describe('user config', () => {
     test('resolves the active user from USER_* env', () => {
       expect(getActiveUser()).toMatchObject({
-        id: '42',
         name: 'Ana',
         phone: '51999999999@c.us'
       })

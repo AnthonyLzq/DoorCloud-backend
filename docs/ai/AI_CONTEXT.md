@@ -87,9 +87,11 @@ Photos:
 - `src/storage/photos.ts` - `PhotoStorage` interface (upload/list/getUrl)
 
 User config and state:
-- Single user from `USER_ID`/`USER_NAME`/`USER_PHONE` (`src/config/user.ts`)
+- Single user from `USER_NAME`/`USER_PHONE` (`src/config/user.ts`); photos
+  live under `PHOTOS_DIR/{USER_NAME}`
 - `last_message_at` persisted in SQLite `data/app-state.db`, table
-  `user_state(id, last_message_at)`, via `src/storage/state.ts`
+  `user_state(id, last_message_at)` under the fixed `local` key, via
+  `src/storage/state.ts`
 
 Backup:
 - `scripts/photos-backup.ts` - `pnpm photos:backup` copies `PHOTOS_DIR` to a

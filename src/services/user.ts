@@ -9,7 +9,6 @@ import {
   sayHelloThroughWhatsapp,
   sendPhotoDetectionResultThroughWhatsapp
 } from 'integrations'
-import { CustomError } from 'network/http'
 import { faceRecognitionService } from 'services/face-recognition'
 import { DiskPhotoStorage } from 'storage/photos'
 import { getUserState, type UserState } from 'storage/state'
@@ -42,26 +41,15 @@ class UserServices {
   }
 
   async uploadPhotos(
-    folderID: string,
     files: AsyncIterableIterator<MultipartFile>
   ): Promise<string[]> {
-    const [userName, ...rest] = folderID.split('-')
-    const userID = rest.join('-')
-    const parsedUserID = parseInt(userID, 10)
-
-    if (Number.isNaN(parsedUserID)) {
-      const errorMessage = 'Invalid userID: must be a number'
-      this.#log.error(errorMessage)
-
-      throw new CustomError(errorMessage, 400)
-    }
-
+    const { name } = getActiveUser()
     const paths: string[] = []
 
     for await (const file of files) {
       const format = file.mimetype.split('/')[1]
       const path = await this.#photoStorage.upload(
-        `${userName}-${userID}`,
+        name,
         `${file.fieldname}-${crypto.randomUUID()}.${format}`,
         await file.toBuffer()
       )
@@ -73,13 +61,13 @@ class UserServices {
   }
 
   async sendPhotoThroughWhatsapp(format: string, bufferPhoto: Buffer) {
-    const { id, name, phone } = getActiveUser()
-    const lastMessage = this.#userState.getLastMessage(id)
+    const { name, phone } = getActiveUser()
+    const lastMessage = this.#userState.getLastMessage()
 
     if (!lastMessage)
       await Promise.all([
         sayHelloThroughWhatsapp(name, phone, this.#log),
-        this.#userState.setLastMessage(id, new Date()),
+        this.#userState.setLastMessage(new Date()),
         randomWait(5_000, 7_500)
       ])
     else {
@@ -88,12 +76,12 @@ class UserServices {
       if (hDiff > MAX_HOUR_DIFFERENCE)
         await Promise.all([
           sayHelloThroughWhatsapp(name, phone, this.#log),
-          this.#userState.setLastMessage(id, new Date()),
+          this.#userState.setLastMessage(new Date()),
           randomWait(5_000, 7_500)
         ])
     }
 
-    const userFolder = `${name}-${id}`
+    const userFolder = name
     const photosFromUser = (await this.#photoStorage.list(userFolder)).map(
       file => `${userFolder}/${file}`
     )

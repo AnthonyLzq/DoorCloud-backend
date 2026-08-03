@@ -24,7 +24,7 @@ describe('UserState', () => {
       const state = new UserState(dbPath)
 
       try {
-        expect(state.getLastMessage('42')).toBeNull()
+        expect(state.getLastMessage()).toBeNull()
       } finally {
         state.close()
       }
@@ -34,28 +34,10 @@ describe('UserState', () => {
       const state = new UserState(dbPath)
 
       try {
-        state.setLastMessage('42', new Date('2026-08-01T12:00:00.000Z'))
+        state.setLastMessage(new Date('2026-08-01T12:00:00.000Z'))
 
-        expect(state.getLastMessage('42')?.toISOString()).toBe(
+        expect(state.getLastMessage()?.toISOString()).toBe(
           '2026-08-01T12:00:00.000Z'
-        )
-      } finally {
-        state.close()
-      }
-    })
-
-    it('stores last_message_at independently per user id', () => {
-      const state = new UserState(dbPath)
-
-      try {
-        state.setLastMessage('42', new Date('2026-08-01T10:00:00.000Z'))
-        state.setLastMessage('7', new Date('2026-08-01T11:00:00.000Z'))
-
-        expect(state.getLastMessage('42')?.toISOString()).toBe(
-          '2026-08-01T10:00:00.000Z'
-        )
-        expect(state.getLastMessage('7')?.toISOString()).toBe(
-          '2026-08-01T11:00:00.000Z'
         )
       } finally {
         state.close()
@@ -64,14 +46,14 @@ describe('UserState', () => {
   })
 
   describe('setLastMessage', () => {
-    it('upserts the row for the same id', () => {
+    it('upserts the single local user row', () => {
       const state = new UserState(dbPath)
 
       try {
-        state.setLastMessage('42', new Date('2026-08-01T10:00:00.000Z'))
-        state.setLastMessage('42', new Date('2026-08-01T11:00:00.000Z'))
+        state.setLastMessage(new Date('2026-08-01T10:00:00.000Z'))
+        state.setLastMessage(new Date('2026-08-01T11:00:00.000Z'))
 
-        expect(state.getLastMessage('42')?.toISOString()).toBe(
+        expect(state.getLastMessage()?.toISOString()).toBe(
           '2026-08-01T11:00:00.000Z'
         )
       } finally {
@@ -83,13 +65,13 @@ describe('UserState', () => {
   describe('restart survival', () => {
     it('persists last_message_at across instances on the same file', () => {
       const first = new UserState(dbPath)
-      first.setLastMessage('42', new Date('2026-08-01T12:00:00.000Z'))
+      first.setLastMessage(new Date('2026-08-01T12:00:00.000Z'))
       first.close()
 
       const second = new UserState(dbPath)
 
       try {
-        expect(second.getLastMessage('42')?.toISOString()).toBe(
+        expect(second.getLastMessage()?.toISOString()).toBe(
           '2026-08-01T12:00:00.000Z'
         )
       } finally {
@@ -115,9 +97,9 @@ describe('UserState', () => {
       const shared = getUserState(dbPath)
 
       try {
-        shared.setLastMessage('42', new Date('2026-08-01T12:00:00.000Z'))
+        shared.setLastMessage(new Date('2026-08-01T12:00:00.000Z'))
 
-        expect(shared.getLastMessage('42')?.toISOString()).toBe(
+        expect(shared.getLastMessage()?.toISOString()).toBe(
           '2026-08-01T12:00:00.000Z'
         )
       } finally {

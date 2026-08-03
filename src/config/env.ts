@@ -149,7 +149,6 @@ const envSchema = z
       .pipe(nonPlaceholderSecret('PHOTOS_URL_SECRET')),
     PHOTO_URL_TTL_MS: optionalInteger('PHOTO_URL_TTL_MS', 300_000, 1_000),
     STATE_DB_PATH: optionalString('STATE_DB_PATH'),
-    USER_ID: requiredString('USER_ID'),
     USER_NAME: requiredString('USER_NAME'),
     USER_PHONE: requiredString('USER_PHONE'),
     BACKUP_DEST: optionalString('BACKUP_DEST'),

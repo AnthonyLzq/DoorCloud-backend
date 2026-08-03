@@ -7,7 +7,6 @@ import type {
 } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 
-import { uploadUserPhotoParamsSchema } from 'schemas'
 import { UserServices } from 'services'
 import { response } from '../response'
 import { handlerErrorInRoute } from '../utils'
@@ -25,25 +24,10 @@ const User = (server: ZodFastifyInstance, prefix = '/api') => {
 
   server.route({
     method: 'POST',
-    url: `${prefix}/user/:folderID/upload`,
-    schema: {
-      params: uploadUserPhotoParamsSchema
-    },
+    url: `${prefix}/user/upload`,
     handler: async (request, reply) => {
-      const {
-        params: { folderID }
-      } = request
-
-      if (!folderID)
-        return response({
-          error: true,
-          message: 'folderID is required',
-          reply,
-          status: 400
-        })
-
       try {
-        const result = await us.uploadPhotos(folderID, await request.files())
+        const result = await us.uploadPhotos(await request.files())
 
         return response({ error: false, message: result, reply, status: 200 })
       } catch (error) {

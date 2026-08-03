@@ -5,6 +5,10 @@ import { DatabaseSync } from 'node:sqlite'
 const DATA_DIR = resolve(process.cwd(), 'data')
 const DEFAULT_DB_PATH = resolve(DATA_DIR, 'app-state.db')
 
+// Single local user: the last-message row always lives under this fixed key,
+// so callers do not need to thread a user id through the code.
+const SINGLE_USER_ID = 'local'
+
 let sharedUserState: UserState | null = null
 
 /**
@@ -60,23 +64,23 @@ export class UserState {
     this.db.close()
   }
 
-  getLastMessage(id: string): Date | null {
+  getLastMessage(): Date | null {
     const row = this.db
       .prepare('SELECT last_message_at FROM user_state WHERE id = ?')
-      .get(id) as { last_message_at: string | null } | undefined
+      .get(SINGLE_USER_ID) as { last_message_at: string | null } | undefined
 
     if (!row?.last_message_at) return null
 
     return new Date(row.last_message_at)
   }
 
-  setLastMessage(id: string, lastMessageAt: Date): void {
+  setLastMessage(lastMessageAt: Date): void {
     this.db
       .prepare(
         `INSERT INTO user_state (id, last_message_at) VALUES (?, ?)
         ON CONFLICT(id) DO UPDATE SET last_message_at = excluded.last_message_at`
       )
-      .run(id, lastMessageAt.toISOString())
+      .run(SINGLE_USER_ID, lastMessageAt.toISOString())
   }
 
   private migrate(): void {
