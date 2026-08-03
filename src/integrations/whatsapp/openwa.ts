@@ -8,6 +8,11 @@ type OpenWaMessageResponse = {
 
 type OpenWaRequestBody = Record<string, unknown>
 
+type OpenWaSession = {
+  id: string
+  name?: string
+}
+
 type OpenWaRequestOptions = {
   body?: OpenWaRequestBody
   log?: FastifyBaseLogger
@@ -21,6 +26,11 @@ type OpenWaResponse<T> = {
   response: Response
   text: string
 }
+
+const isUuid = (value: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  )
 
 const getOpenWaUrl = (path: string): string => {
   const { OPENWA_BASE_URL } = getEnv()
@@ -72,7 +82,9 @@ const requestOpenWa = async <T = unknown>({
       'OpenWA message request failed'
     )
 
-    throw new Error(`OpenWA message request failed with ${response.status}`)
+    throw new Error(
+      `OpenWA message request failed with ${response.status}: ${text}`
+    )
   }
 
   return {
@@ -82,12 +94,44 @@ const requestOpenWa = async <T = unknown>({
   }
 }
 
+// OpenWA keys running engines by the session id used at start time (a UUID),
+// so a configured NAME like 'main' never matches the active engine and every
+// send fails with "Session 'main' is not active". Resolve the configured
+// name to its session id before sending; UUIDs pass through untouched.
+const resolveOpenWaSessionId = async (
+  log?: FastifyBaseLogger
+): Promise<string> => {
+  const configuredSessionId = requiredOpenWaEnv('OPENWA_SESSION_ID')
+
+  if (isUuid(configuredSessionId)) return configuredSessionId
+
+  const { data, response, text } = await requestOpenWa<OpenWaSession[]>({
+    log,
+    path: '/api/sessions?limit=100&offset=0',
+    throwOnError: false
+  })
+
+  if (!response.ok)
+    throw new Error(
+      `OpenWA sessions list failed with ${response.status}: ${text}`
+    )
+
+  const session = data?.find(item => item.name === configuredSessionId)
+
+  if (!session?.id)
+    throw new Error(
+      `OpenWA session '${configuredSessionId}' was not found. Create and start it from /setup first.`
+    )
+
+  return session.id
+}
+
 const postOpenWaMessage = async (
   endpoint: string,
   body: OpenWaRequestBody,
   log?: FastifyBaseLogger
 ): Promise<OpenWaMessageResponse> => {
-  const openWaSessionId = requiredOpenWaEnv('OPENWA_SESSION_ID')
+  const openWaSessionId = await resolveOpenWaSessionId(log)
   const { data } = await requestOpenWa<OpenWaMessageResponse>({
     body,
     log,

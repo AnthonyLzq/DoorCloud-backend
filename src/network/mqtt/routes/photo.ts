@@ -66,7 +66,10 @@ const sub = async (
   await new Promise<void>((resolve, reject) => {
     client.subscribe(topics, { qos: MQTT_QOS }, error => {
       if (error) {
-        log.error({ error, topics }, 'Error subscribing to MQTT photo topics')
+        log.error(
+          { err: error, topics },
+          'Error subscribing to MQTT photo topics'
+        )
         reject(error)
 
         return
@@ -78,7 +81,7 @@ const sub = async (
   })
 
   client.on('error', error => {
-    log.error({ error, topics }, 'MQTT photo route error')
+    log.error({ err: error, topics }, 'MQTT photo route error')
   })
 
   client.on('message', async (topic, message) => {
@@ -92,7 +95,7 @@ const sub = async (
       if (isPhotoMetricsTopic(topic))
         recordMetrics(parsePhotoMetricsPayload(message), log, topic)
     } catch (error) {
-      log.error({ error, topic }, 'Error processing MQTT photo message')
+      log.error({ err: error, topic }, 'Error processing MQTT photo message')
     }
   })
 }

@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger, FastifyReply } from 'fastify'
-import { mkdtempSync, readFileSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import mqtt from 'mqtt'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -52,7 +52,7 @@ const mockClient = vi.hoisted(() => {
 
   client.connected = false
   client.end = vi.fn(
-    (force: boolean, options: unknown, done?: (error?: Error) => void) => {
+    (_force: boolean, _options: unknown, done?: (error?: Error) => void) => {
       done?.(undefined)
 
       return client
@@ -403,20 +403,35 @@ describe('DoorCloud backend tests', () => {
   })
 
   describe('OpenWA WhatsApp provider', () => {
-    test('sends text messages to the configured chat id', async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ messageId: 'text-1', timestamp: 1 }), {
-          status: 201
-        })
-      )
+    const SESSION_ID = '77388f1e-12c0-4b90-a8e1-3b4375ecde5e'
+
+    const sessionsListResponse = (
+      sessions = [{ id: SESSION_ID, name: 'main' }]
+    ) => new Response(JSON.stringify(sessions), { status: 200 })
+
+    test('resolves a configured session name to its id before sending text', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(sessionsListResponse())
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ messageId: 'text-1', timestamp: 1 }), {
+            status: 201
+          })
+        )
 
       vi.stubGlobal('fetch', fetchMock)
 
       await expect(sendWhatsappText('hello', log)).resolves.toMatchObject({
         messageId: 'text-1'
       })
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:2785/api/sessions/main/messages/send-text',
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        'http://localhost:2785/api/sessions?limit=100&offset=0',
+        expect.objectContaining({ method: 'GET' })
+      )
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `http://localhost:2785/api/sessions/${SESSION_ID}/messages/send-text`,
         expect.objectContaining({
           body: JSON.stringify({
             chatId: '51999999999@c.us',
@@ -432,11 +447,14 @@ describe('DoorCloud backend tests', () => {
     })
 
     test('sends image messages through OpenWA send-image', async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ messageId: 'image-1', timestamp: 2 }), {
-          status: 201
-        })
-      )
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(sessionsListResponse())
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ messageId: 'image-1', timestamp: 2 }), {
+            status: 201
+          })
+        )
 
       vi.stubGlobal('fetch', fetchMock)
 
@@ -447,8 +465,9 @@ describe('DoorCloud backend tests', () => {
           log
         })
       ).resolves.toMatchObject({ messageId: 'image-1' })
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:2785/api/sessions/main/messages/send-image',
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `http://localhost:2785/api/sessions/${SESSION_ID}/messages/send-image`,
         expect.objectContaining({
           body: JSON.stringify({
             caption: 'result',
@@ -460,18 +479,51 @@ describe('DoorCloud backend tests', () => {
       )
     })
 
-    test('surfaces OpenWA send errors', async () => {
+    test('uses the session id directly when configured as a UUID', async () => {
+      process.env.OPENWA_SESSION_ID = SESSION_ID
+
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ messageId: 'text-1', timestamp: 1 }), {
+          status: 201
+        })
+      )
+
+      vi.stubGlobal('fetch', fetchMock)
+
+      await sendWhatsappText('hello', log)
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://localhost:2785/api/sessions/${SESSION_ID}/messages/send-text`,
+        expect.objectContaining({ method: 'POST' })
+      )
+    })
+
+    test('surfaces OpenWA send errors with the response body', async () => {
+      process.env.OPENWA_SESSION_ID = SESSION_ID
+
       vi.stubGlobal(
         'fetch',
         vi.fn().mockResolvedValue(new Response('bad api key', { status: 401 }))
       )
 
       await expect(sendWhatsappText('hello', log)).rejects.toThrow(
-        'OpenWA message request failed with 401'
+        'OpenWA message request failed with 401: bad api key'
       )
       expect(log.error).toHaveBeenCalledWith(
         { responseBody: 'bad api key', status: 401 },
         'OpenWA message request failed'
+      )
+    })
+
+    test('fails with an actionable message when the configured session is missing', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(sessionsListResponse([]))
+      )
+
+      await expect(sendWhatsappText('hello', log)).rejects.toThrow(
+        /OpenWA session 'main' was not found\. Create and start it from \/setup first\./
       )
     })
 
@@ -568,11 +620,13 @@ describe('DoorCloud backend tests', () => {
     test('sends OpenWA setup test text and image', async () => {
       const fetchMock = vi
         .fn()
+        .mockResolvedValueOnce(sessionsListResponse())
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ messageId: 'text-1', timestamp: 1 }), {
             status: 201
           })
         )
+        .mockResolvedValueOnce(sessionsListResponse())
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ messageId: 'image-1', timestamp: 2 }), {
             status: 201
