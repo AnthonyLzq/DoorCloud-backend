@@ -270,8 +270,9 @@ export const backupToWebhook = async (
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
+      let response: Response | undefined
       try {
-        const response = await fetchImpl(url, {
+        response = await fetchImpl(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/octet-stream',
@@ -281,23 +282,28 @@ export const backupToWebhook = async (
           body,
           signal: controller.signal
         })
-
-        if (!response.ok) {
-          throw new Error(`Webhook rejected ${rel}: HTTP ${response.status}`)
-        }
-
-        lastError = undefined
-        break
       } catch (error) {
+        // Network error or timeout: retryable with backoff.
         lastError = error
         attempt++
 
         if (attempt <= maxRetries) {
           await sleep(backoffDelay(attempt - 1, baseDelayMs))
         }
+
+        continue
       } finally {
         clearTimeout(timeout)
       }
+
+      if (!response.ok) {
+        // A rejected webhook is a definitive answer: fail immediately, do
+        // not retry (matches the documented contract).
+        throw new Error(`Webhook rejected ${rel}: HTTP ${response.status}`)
+      }
+
+      lastError = undefined
+      break
     }
 
     if (lastError) throw lastError

@@ -279,6 +279,26 @@ describe('backupToWebhook', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  test('does not retry a non-2xx webhook rejection', async () => {
+    seedSource()
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('nope', { status: 500 }))
+
+    await expect(
+      backupToWebhook(
+        sourceDir,
+        'https://hooks.example.com/push',
+        's3cret',
+        false,
+        fetchMock,
+        { baseDelayMs: 0, maxRetries: 5 }
+      )
+    ).rejects.toThrow('Webhook rejected Ana-42/selfie-a.jpg: HTTP 500')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   test('passes an abort signal to fetch so calls can time out', async () => {
     seedSource()
     const fetchMock = vi.fn()
