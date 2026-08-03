@@ -42,19 +42,38 @@ const sendPhotoDetectionResultThroughWhatsapp = async ({
   imageUrl,
   success,
   name,
+  similarity,
+  threshold,
   log
 }: {
   imageUrl: string
   success: boolean
   name?: string
+  similarity?: number
+  threshold: number
   phoneNumber?: string
   log?: FastifyBaseLogger
 }) => {
+  // Margin above the verification threshold that counts as a confident match.
+  // Placeholder band until the recognition pipeline exposes calibrated
+  // confidence levels; tune MATCH_CONFIDENCE_MARGIN with real similarities.
+  const MATCH_CONFIDENCE_MARGIN = 0.05
+
+  let caption: string
+  if (!success) {
+    caption = 'Hey, I do not know who this is, but he/she is at your door.'
+  } else if (
+    similarity !== undefined &&
+    similarity < threshold + MATCH_CONFIDENCE_MARGIN
+  ) {
+    caption = `Hey, I think ${name} is here, check it out!`
+  } else {
+    caption = `Hey, ${name} is here!`
+  }
+
   await sendWhatsappImage({
     imageUrl,
-    caption: success
-      ? `The result of the recognition process was successful. ${name} is here.`
-      : 'The result of the recognition process was not successful.',
+    caption,
     log
   })
   log?.info('Image sent')
