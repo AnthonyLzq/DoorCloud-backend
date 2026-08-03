@@ -28,14 +28,10 @@ const handlePhotoSend = async (
 ) => {
   log.info({ topic }, 'Received a photo')
 
-  const { base64Photo, format, userID } = parsePhotoSendPayload(message)
+  const { base64Photo, format } = parsePhotoSendPayload(message)
   const us = new UserServices(log)
 
-  await us.sendPhotoThroughWhatsapp(
-    userID,
-    format,
-    Buffer.from(base64Photo, 'base64')
-  )
+  await us.sendPhotoThroughWhatsapp(format, Buffer.from(base64Photo, 'base64'))
 
   log.info({ topic }, 'Photo sent.')
 }

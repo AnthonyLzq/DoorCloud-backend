@@ -66,20 +66,7 @@ class UserServices {
     return paths.map(path => this.#photoStorage.getUrl(path))
   }
 
-  async sendPhotoThroughWhatsapp(
-    userID: string,
-    format: string,
-    bufferPhoto: Buffer
-  ) {
-    const parsedUserID = parseInt(userID, 10)
-
-    if (Number.isNaN(parsedUserID)) {
-      const errorMessage = 'Invalid userID: must be a number'
-      this.#log.error(errorMessage)
-
-      throw new CustomError(errorMessage, 400)
-    }
-
+  async sendPhotoThroughWhatsapp(format: string, bufferPhoto: Buffer) {
     const { id, name, phone } = getActiveUser()
     const lastMessage = this.#userState.getLastMessage(id)
 

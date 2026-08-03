@@ -139,7 +139,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.verify).toHaveBeenCalledTimes(1)
     expect(mocks.verify).toHaveBeenCalledWith(
@@ -159,7 +159,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.verify).toHaveBeenCalledWith(
       Buffer.from('photo'),
@@ -183,7 +183,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sendPhotoDetectionResultThroughWhatsapp).toHaveBeenCalledWith(
       expect.objectContaining({ success: true, name: 'selfie' })
@@ -200,7 +200,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sendPhotoDetectionResultThroughWhatsapp).toHaveBeenCalledWith(
       expect.objectContaining({ success: false })
@@ -216,7 +216,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.uploadPhoto).toHaveBeenCalledWith(
       'John-1',
@@ -237,7 +237,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sayHelloThroughWhatsapp).toHaveBeenCalledWith(
       'John',
@@ -252,7 +252,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sayHelloThroughWhatsapp).toHaveBeenCalledTimes(1)
     expect(mocks.setLastMessage).toHaveBeenCalledWith('1', expect.any(Date))
@@ -262,7 +262,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
-    await us.sendPhotoThroughWhatsapp('1', 'jpg', Buffer.from('photo'))
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sayHelloThroughWhatsapp).not.toHaveBeenCalled()
     expect(mocks.setLastMessage).not.toHaveBeenCalled()
