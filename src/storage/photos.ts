@@ -116,7 +116,7 @@ export class DiskPhotoStorage implements PhotoStorage {
     return entries
       .filter(entry => entry.isFile())
       .map(entry => entry.name)
-      .filter(name => !/^\d/.test(name))
+      .filter(name => !/^\d/.test(name) && !name.includes('.tmp-'))
   }
 
   getUrl(relativePath: string): string {

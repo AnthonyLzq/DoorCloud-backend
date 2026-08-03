@@ -112,6 +112,19 @@ describe('DiskPhotoStorage', () => {
       expect(files).toEqual(['selfie-a.jpg'])
     })
 
+    test('excludes orphaned .tmp- files left by a crash between write and rename', async () => {
+      mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
+      writeFileSync(join(photosDir, 'Ana-42/selfie-a.jpg'), 'a')
+      writeFileSync(
+        join(photosDir, 'Ana-42/selfie-a.jpg.tmp-123e4567-e89b-12d3'),
+        'partial'
+      )
+
+      const files = await storage.list('Ana-42')
+
+      expect(files).toEqual(['selfie-a.jpg'])
+    })
+
     test('returns an empty list when the user folder does not exist yet', async () => {
       expect(await storage.list('Ana-42')).toEqual([])
     })
