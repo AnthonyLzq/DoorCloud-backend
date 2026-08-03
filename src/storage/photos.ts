@@ -1,12 +1,27 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { Dirent } from 'node:fs'
-import { mkdir, readdir, rename, unlink, writeFile } from 'node:fs/promises'
-import { dirname, relative, resolve } from 'node:path'
+import {
+  mkdir,
+  readdir,
+  rename,
+  stat,
+  unlink,
+  writeFile
+} from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
 
 const isNotFoundError = (error: unknown): boolean =>
   error instanceof Error &&
   'code' in error &&
   (error as { code?: unknown }).code === 'ENOENT'
+
+// Temp-upload suffix shared by upload() (writing) and list() (filtering), so
+// the naming scheme and the exclusion filter cannot drift apart.
+const TMP_UPLOAD_SUFFIX = '.tmp-'
+
+// Orphaned temp files older than this are considered crash leftovers (not
+// concurrent uploads) and are removed by the next upload to the same folder.
+const TMP_ORPHAN_AGE_MS = 60_000
 
 const signPhotoPath = (
   secret: string,
@@ -85,7 +100,7 @@ export class DiskPhotoStorage implements PhotoStorage {
     buffer: Buffer
   ): Promise<string> {
     const fullPath = this.#safeJoin(userFolder, filename)
-    const tmpPath = `${fullPath}.tmp-${randomUUID()}`
+    const tmpPath = `${fullPath}${TMP_UPLOAD_SUFFIX}${randomUUID()}`
 
     await mkdir(dirname(fullPath), { recursive: true })
 
@@ -100,7 +115,45 @@ export class DiskPhotoStorage implements PhotoStorage {
       throw error
     }
 
+    await this.#removeOrphanedTmp(dirname(fullPath))
+
     return `${userFolder}/${filename}`
+  }
+
+  /**
+   * Removes temp-upload leftovers older than TMP_ORPHAN_AGE_MS from a folder.
+   *
+   * A crash between writeFile and rename leaves a truncated `.tmp-*` file;
+   * list() already hides it, and the next successful upload sweeps it away so
+   * the disk does not accumulate orphaned partial writes forever.
+   *
+   * @param dirPath - Folder to sweep (already validated as inside PHOTOS_DIR)
+   */
+  async #removeOrphanedTmp(dirPath: string): Promise<void> {
+    const cutoff = Date.now() - TMP_ORPHAN_AGE_MS
+    let entries: Dirent[]
+
+    try {
+      entries = await readdir(dirPath, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    await Promise.all(
+      entries
+        .filter(
+          entry => entry.isFile() && entry.name.includes(TMP_UPLOAD_SUFFIX)
+        )
+        .map(async entry => {
+          const entryPath = join(dirPath, entry.name)
+          try {
+            const { mtimeMs } = await stat(entryPath)
+            if (mtimeMs < cutoff) await unlink(entryPath)
+          } catch {
+            // A race removed the file already; nothing to do.
+          }
+        })
+    )
   }
 
   async list(userFolder: string): Promise<string[]> {
@@ -117,7 +170,7 @@ export class DiskPhotoStorage implements PhotoStorage {
     return entries
       .filter(entry => entry.isFile())
       .map(entry => entry.name)
-      .filter(name => !/^\d/.test(name) && !name.includes('.tmp-'))
+      .filter(name => !/^\d/.test(name) && !name.includes(TMP_UPLOAD_SUFFIX))
   }
 
   getUrl(relativePath: string): string {

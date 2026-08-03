@@ -230,7 +230,7 @@ MQTT_QOS=0
 Preferred MQTT topics are versioned:
 
 - `doorcloud/v1/photo/send` receives JSON photo payloads:
-  `{"userId":"123","format":"jpeg","photo":"data:image/jpeg;base64,..."}`
+  `{"format":"jpeg","photo":"data:image/jpeg;base64,..."}`
 - `doorcloud/v1/photo/metrics` receives JSON metrics payloads:
   `{"timestampSent": 1730000000000}`
 

@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  utimesSync,
+  writeFileSync
+} from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -86,6 +93,39 @@ describe('DiskPhotoStorage', () => {
         )
       ).rejects.toThrow('ENOSPC')
       expect(existsSync(target)).toBe(false)
+    })
+
+    test('sweeps orphaned temp files older than the age cutoff after a successful upload', async () => {
+      const orphanDir = join(photosDir, 'Ana-42')
+      mkdirSync(orphanDir, { recursive: true })
+
+      // An orphan left by a crash between writeFile and rename, aged past the
+      // cutoff, must be removed by the next upload to the same folder.
+      const staleOrphan = join(orphanDir, 'selfie.jpg.tmp-123e4567-e89b-12d3')
+      writeFileSync(staleOrphan, 'partial')
+      const old = new Date(Date.now() - 120_000)
+      utimesSync(staleOrphan, old, old)
+
+      // A recent temp file could belong to a concurrent upload: keep it.
+      const recentOrphan = join(orphanDir, 'other.jpg.tmp-fedcba98-7654-3210')
+      writeFileSync(recentOrphan, 'in-flight')
+
+      await storage.upload(
+        'Ana-42',
+        'selfie-123e4567-e89b-12d3-a456-426614174000.jpg',
+        Buffer.from('photo-bytes')
+      )
+
+      expect(existsSync(staleOrphan)).toBe(false)
+      expect(existsSync(recentOrphan)).toBe(true)
+      expect(
+        existsSync(
+          join(
+            photosDir,
+            'Ana-42/selfie-123e4567-e89b-12d3-a456-426614174000.jpg'
+          )
+        )
+      ).toBe(true)
     })
   })
 
