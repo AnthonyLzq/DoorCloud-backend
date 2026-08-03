@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   getActiveUser: vi.fn(),
   uploadPhoto: vi.fn(),
   listPhotos: vi.fn(),
+  listDirectories: vi.fn(),
   getPhotoUrl: vi.fn(),
   getLastMessage: vi.fn(),
   setLastMessage: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock('../src/storage/photos', () => ({
   DiskPhotoStorage: class MockDiskPhotoStorage {
     upload = mocks.uploadPhoto
     list = mocks.listPhotos
+    listDirectories = mocks.listDirectories
     getUrl = mocks.getPhotoUrl
   }
 }))
@@ -125,6 +127,7 @@ beforeEach(() => {
     reason: 'no-match'
   })
   mocks.listPhotos.mockResolvedValue(['selfie-abc123.jpg'])
+  mocks.listDirectories.mockResolvedValue(['John'])
   mocks.getPhotoUrl.mockImplementation(
     (path: string) => `https://example.com/photos/${path}`
   )
@@ -144,7 +147,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       Buffer.from('photo'),
       [
         {
-          name: 'selfie',
+          name: 'John',
           url: 'https://example.com/photos/John/selfie-abc123.jpg'
         }
       ],
@@ -152,8 +155,9 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     )
   })
 
-  it('passes only non-numeric-prefix photos from local storage to verify', async () => {
+  it('uses the parent folder name as the identity for every stored photo', async () => {
     mocks.listPhotos.mockResolvedValue(['selfie-abc123.jpg'])
+    mocks.listDirectories.mockResolvedValue(['John'])
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
@@ -163,8 +167,34 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       Buffer.from('photo'),
       [
         {
-          name: 'selfie',
+          name: 'John',
           url: 'https://example.com/photos/John/selfie-abc123.jpg'
+        }
+      ],
+      { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
+    )
+  })
+
+  it('verifies against every known person folder', async () => {
+    mocks.listDirectories.mockResolvedValue(['Bryan Ramos', 'Diana Kevans'])
+    mocks.listPhotos
+      .mockResolvedValueOnce(['maria1.jpg'])
+      .mockResolvedValueOnce(['casa.jpg'])
+    const { UserServices } = await import('../src/services/index.js')
+    us = new UserServices(fromPartial(logMock))
+
+    await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
+
+    expect(mocks.verify).toHaveBeenCalledWith(
+      Buffer.from('photo'),
+      [
+        {
+          name: 'Bryan Ramos',
+          url: 'https://example.com/photos/Bryan Ramos/maria1.jpg'
+        },
+        {
+          name: 'Diana Kevans',
+          url: 'https://example.com/photos/Diana Kevans/casa.jpg'
         }
       ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
@@ -174,7 +204,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
   it('keeps the WhatsApp and CSV contract when a photo matches', async () => {
     mocks.verify.mockResolvedValue({
       match: true,
-      name: 'selfie',
+      name: 'John',
       similarity: 0.81,
       reason: 'match'
     })
@@ -184,7 +214,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.sendPhotoDetectionResultThroughWhatsapp).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, name: 'selfie' })
+      expect.objectContaining({ success: true, name: 'John' })
     )
     expect(mocks.appendFileSync).toHaveBeenCalledWith(
       expect.stringContaining('matchPhoto.csv'),

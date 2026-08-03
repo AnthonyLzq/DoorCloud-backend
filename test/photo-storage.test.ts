@@ -171,6 +171,32 @@ describe('DiskPhotoStorage', () => {
     })
   })
 
+  describe('listDirectories', () => {
+    test('returns every person folder name directly under PHOTOS_DIR', async () => {
+      mkdirSync(join(photosDir, 'Bryan Ramos'), { recursive: true })
+      mkdirSync(join(photosDir, 'Diana Kevans'), { recursive: true })
+      writeFileSync(join(photosDir, 'not-a-folder.jpg'), 'x')
+
+      expect(await storage.listDirectories()).toEqual(
+        expect.arrayContaining(['Bryan Ramos', 'Diana Kevans'])
+      )
+    })
+
+    test('returns an empty list when PHOTOS_DIR does not exist yet', async () => {
+      const emptyDir = mkdtempSync(join(tmpdir(), 'doorcloud-photos-empty-'))
+
+      const emptyStorage = new DiskPhotoStorage({
+        baseUrl: 'https://example.com/photos',
+        photosDir: emptyDir,
+        urlSecret: 'secret',
+        urlTtlMs: 300_000
+      })
+      rmSync(emptyDir, { force: true, recursive: true })
+
+      expect(await emptyStorage.listDirectories()).toEqual([])
+    })
+  })
+
   describe('getUrl', () => {
     test('builds a signed URL and validates expiry and signature', () => {
       const m = storage

@@ -87,21 +87,26 @@ class UserServices {
         ])
     }
 
-    const userFolder = name
-    const photosFromUser = (await this.#photoStorage.list(userFolder)).map(
-      file => `${userFolder}/${file}`
-    )
-    const urlPhotosFromUser = photosFromUser.map(path =>
-      this.#photoStorage.getUrl(path)
-    )
+    const personFolders = await this.#photoStorage.listDirectories()
+    const referencePhotos = (
+      await Promise.all(
+        personFolders.map(async folder => {
+          const files = await this.#photoStorage.list(folder)
+
+          return files.map(file => ({
+            // The person identity always comes from the parent folder name,
+            // never from the file name (photos inside may be named anything)
+            name: folder,
+            url: this.#photoStorage.getUrl(`${folder}/${file}`)
+          }))
+        })
+      )
+    ).flat()
     const timeBefore = getTimestamp()
     const { FACE_VERIFY_THRESHOLD, FACE_VERIFY_MAX_PHOTOS } = getEnv()
     const verifyResult = await faceRecognitionService.verify(
       bufferPhoto,
-      urlPhotosFromUser.map((url, index) => ({
-        name: photosFromUser[index].split('/')[1].split('-')[0],
-        url
-      })),
+      referencePhotos,
       {
         threshold: FACE_VERIFY_THRESHOLD,
         maxPhotos: FACE_VERIFY_MAX_PHOTOS
@@ -124,9 +129,17 @@ class UserServices {
       'utf-8'
     )
 
+    // Matched door photos accumulate in the person's folder (they reinforce
+    // the reference set); unmatched ones go to the owner folder with a
+    // timestamp prefix so they are never re-listed as reference photos
+    const uploadFolder = foundName ?? name
+    const uploadName = foundName
+      ? `${foundName}-${crypto.randomUUID()}.${format}`
+      : `${getTimestamp()}-${crypto.randomUUID()}.${format}`
+
     const uploadPath = await this.#photoStorage.upload(
-      userFolder,
-      `${foundName ?? getTimestamp()}-${crypto.randomUUID()}.${format}`,
+      uploadFolder,
+      uploadName,
       bufferPhoto
     )
 
@@ -134,6 +147,8 @@ class UserServices {
       imageUrl: this.#photoStorage.getUrl(uploadPath),
       success: matchResult,
       name: foundName,
+      similarity: verifyResult.similarity,
+      threshold: FACE_VERIFY_THRESHOLD,
       phoneNumber: phone,
       log: this.#log
     })

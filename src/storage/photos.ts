@@ -46,6 +46,17 @@ export interface PhotoStorage {
    * @returns Verified photo filenames (without the folder prefix)
    */
   list(userFolder: string): Promise<string[]>
+
+  /**
+   * Lists the known person folders directly under `PHOTOS_DIR`.
+   *
+   * Every child directory is one known person; the folder name IS the
+   * person's identity (e.g. `Bryan Ramos`). A missing photos directory
+   * resolves to an empty list.
+   *
+   * @returns Person folder names (no path prefix)
+   */
+  listDirectories(): Promise<string[]>
   getUrl(relativePath: string): string
   isUrlValid(path: string, signature: string, expiresAt: number): boolean
 
@@ -171,6 +182,19 @@ export class DiskPhotoStorage implements PhotoStorage {
       .filter(entry => entry.isFile())
       .map(entry => entry.name)
       .filter(name => !/^\d/.test(name) && !name.includes(TMP_UPLOAD_SUFFIX))
+  }
+
+  async listDirectories(): Promise<string[]> {
+    let entries: Dirent[]
+
+    try {
+      entries = await readdir(this.#photosDir, { withFileTypes: true })
+    } catch (error) {
+      if (isNotFoundError(error)) return []
+      throw error
+    }
+
+    return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
   }
 
   getUrl(relativePath: string): string {
