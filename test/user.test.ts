@@ -322,4 +322,27 @@ describe('User HTTP routes (RF-3)', () => {
       await app.close()
     }
   })
+
+  it('keeps the client file name instead of the field name on upload', async () => {
+    const app = await buildApp()
+    const { body, contentType } = buildMultipartBody('photo', 'selfie.jpg')
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user/upload',
+        headers: { 'content-type': contentType },
+        payload: body
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mocks.uploadPhoto).toHaveBeenCalledWith(
+        'John',
+        expect.stringMatching(/^selfie-[0-9a-f-]{36}\.jpeg$/),
+        expect.any(Buffer)
+      )
+    } finally {
+      await app.close()
+    }
+  })
 })

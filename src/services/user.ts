@@ -48,9 +48,15 @@ class UserServices {
 
     for await (const file of files) {
       const format = file.mimetype.split('/')[1]
+      // Keep the client-provided file name (identity lives in the parent
+      // folder, not in the file name), sanitized and deduplicated with a uuid
+      const originalName = (file.filename || file.fieldname).trim()
+      const baseName =
+        originalName.replace(/\.[^./]+$/, '').replace(/[^\w.-]+/g, '-') ||
+        'photo'
       const path = await this.#photoStorage.upload(
         name,
-        `${file.fieldname}-${crypto.randomUUID()}.${format}`,
+        `${baseName}-${crypto.randomUUID()}.${format}`,
         await file.toBuffer()
       )
 
