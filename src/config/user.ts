@@ -2,7 +2,7 @@ import { getEnv } from 'config/env'
 
 type ActiveUser = {
   readonly name: string
-  readonly phone: string
+  readonly phone?: string
 }
 
 const getActiveUser = (): ActiveUser => {

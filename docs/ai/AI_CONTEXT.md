@@ -87,8 +87,8 @@ Photos:
 - `src/storage/photos.ts` - `PhotoStorage` interface (upload/list/getUrl)
 
 User config and state:
-- Single user from `USER_NAME`/`USER_PHONE` (`src/config/user.ts`); photos
-  live under `PHOTOS_DIR/{USER_NAME}`
+- Single user from `USER_NAME` (`src/config/user.ts`); `USER_PHONE` optional;
+  photos live under `PHOTOS_DIR/{USER_NAME}`
 - `last_message_at` persisted in SQLite `data/app-state.db`, table
   `user_state(id, last_message_at)` under the fixed `local` key, via
   `src/storage/state.ts`

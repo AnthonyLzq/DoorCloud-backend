@@ -15,7 +15,7 @@ A `.env` file with the correct variables specified in the `.env.example` file.
 
 Required environment variables are validated on startup: `MQTT_USER`,
 `MQTT_PASS`, `MQTT_HOST`, `MQTT_PORT`, `PHOTOS_DIR`, `PHOTOS_BASE_URL`,
-`USER_NAME`, `USER_PHONE`, and `MODELS_CDN_URL`. MQTT is required:
+`USER_NAME`, and `MODELS_CDN_URL`. MQTT is required:
 broker connection or subscription failures are treated as fatal startup
 errors. `OPENWA_BASE_URL` defaults to
 `http://localhost:2785` and `OPENWA_SESSION_ID` defaults to `main`;
@@ -92,10 +92,11 @@ written under `PHOTOS_DIR` and served through HMAC-signed URLs that expire
 `PHOTOS_BASE_URL` (default `http://localhost:1996/photos`). The URL lifetime
 is `PHOTO_URL_TTL_MS` (default 300000 ms = 5 minutes) and must cover the
 window in which OpenWA fetches the media; see `PHOTOS_BASE_URL and Docker`
-below. The single DoorCloud user is configured through `USER_NAME` and
-`USER_PHONE`; photos are stored under `PHOTOS_DIR/{USER_NAME}` and uploaded
-via `POST /api/user/upload`. The `POST /api/user` create route is no longer
-exposed.
+below. The single DoorCloud user is configured through `USER_NAME`; photos are
+stored under `PHOTOS_DIR/{USER_NAME}` and uploaded via `POST /api/user/upload`.
+WhatsApp sends go to `OPENWA_CHAT_ID` (settable from the `/setup` page);
+`USER_PHONE` is optional and only used as a legacy destination hint. The
+`POST /api/user` create route is no longer exposed.
 
 ### PHOTOS_BASE_URL and Docker
 

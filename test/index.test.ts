@@ -239,6 +239,14 @@ describe('DoorCloud backend tests', () => {
       expect('USER_ID' in env).toBe(false)
     })
 
+    test('USER_PHONE is optional', () => {
+      const { USER_PHONE: _omit, ...withoutPhone } = validEnv
+      const env = parseEnv(withoutPhone)
+
+      expect(env.USER_NAME).toBe('Ana')
+      expect(env.USER_PHONE).toBeUndefined()
+    })
+
     test('parses optional BACKUP_DEST and BACKUP_SECRET', () => {
       expect(
         parseEnv({

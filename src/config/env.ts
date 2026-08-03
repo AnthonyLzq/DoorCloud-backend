@@ -150,7 +150,7 @@ const envSchema = z
     PHOTO_URL_TTL_MS: optionalInteger('PHOTO_URL_TTL_MS', 300_000, 1_000),
     STATE_DB_PATH: optionalString('STATE_DB_PATH'),
     USER_NAME: requiredString('USER_NAME'),
-    USER_PHONE: requiredString('USER_PHONE'),
+    USER_PHONE: optionalString('USER_PHONE'),
     BACKUP_DEST: optionalString('BACKUP_DEST'),
     BACKUP_SECRET: optionalString('BACKUP_SECRET'),
     OPENWA_BASE_URL: z
