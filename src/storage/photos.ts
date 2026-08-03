@@ -1,6 +1,6 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { Dirent } from 'node:fs'
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 
 const isNotFoundError = (error: unknown): boolean =>
@@ -72,9 +72,20 @@ export class DiskPhotoStorage implements PhotoStorage {
     buffer: Buffer
   ): Promise<string> {
     const fullPath = this.#safeJoin(userFolder, filename)
+    const tmpPath = `${fullPath}.tmp-${randomUUID()}`
 
     await mkdir(dirname(fullPath), { recursive: true })
-    await writeFile(fullPath, buffer)
+
+    try {
+      // Write to a temp sibling then rename so a crash or ENOSPC never leaves
+      // a truncated file at the final path (which would otherwise be picked up
+      // by list() and fed to face verification).
+      await writeFile(tmpPath, buffer)
+      await rename(tmpPath, fullPath)
+    } catch (error) {
+      await unlink(tmpPath).catch(() => undefined)
+      throw error
+    }
 
     return `${userFolder}/${filename}`
   }

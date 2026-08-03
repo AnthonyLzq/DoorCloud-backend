@@ -1,9 +1,22 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { DiskPhotoStorage } from '../src/storage/photos'
+
+const fsMocks = vi.hoisted(() => ({
+  writeFile: vi.fn(),
+  realWriteFile: null as unknown as typeof import('node:fs/promises').writeFile
+}))
+
+vi.mock('node:fs/promises', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  fsMocks.realWriteFile = actual.writeFile
+  fsMocks.writeFile.mockImplementation(actual.writeFile)
+
+  return { ...actual, writeFile: fsMocks.writeFile }
+})
 
 let photosDir: string
 let storage: DiskPhotoStorage
@@ -15,6 +28,7 @@ beforeEach(() => {
     baseUrl: 'http://localhost:1996/photos',
     urlSecret: 'test-photo-url-secret'
   })
+  fsMocks.writeFile.mockImplementation(fsMocks.realWriteFile)
 })
 
 afterEach(() => {
@@ -52,6 +66,26 @@ describe('DiskPhotoStorage', () => {
         storage.upload('Ana-42', '../../evil.jpg', Buffer.from('x'))
       ).rejects.toThrow()
     })
+
+    test('does not leave a truncated file at the final path when writing fails', async () => {
+      const target = join(
+        photosDir,
+        'Ana-42',
+        'selfie-123e4567-e89b-12d3-a456-426614174000.jpg'
+      )
+      fsMocks.writeFile.mockRejectedValueOnce(
+        Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' })
+      )
+
+      await expect(
+        storage.upload(
+          'Ana-42',
+          'selfie-123e4567-e89b-12d3-a456-426614174000.jpg',
+          Buffer.from('photo-bytes')
+        )
+      ).rejects.toThrow('ENOSPC')
+      expect(existsSync(target)).toBe(false)
+    })
   })
 
   describe('list', () => {
@@ -85,7 +119,9 @@ describe('DiskPhotoStorage', () => {
 
   describe('getUrl', () => {
     test('builds a signed URL and validates expiry and signature', () => {
-      const m = storage.getUrl('Ana-42/selfie.jpg').match(/\/photos\/([a-f0-9]{64})\/(\d+)\/(.+)$/)!
+      const m = storage
+        .getUrl('Ana-42/selfie.jpg')
+        .match(/\/photos\/([a-f0-9]{64})\/(\d+)\/(.+)$/)!
 
       expect(m[3]).toBe('Ana-42/selfie.jpg')
       expect(storage.isUrlValid(m[3], m[1], Number(m[2]))).toBe(true)
