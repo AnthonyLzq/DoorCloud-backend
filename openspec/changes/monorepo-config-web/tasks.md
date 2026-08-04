@@ -32,9 +32,9 @@ Chain strategy: size-exception
 
 ## Phase 2: Shared Package (M2)
 
-- [ ] 2.1 packages/shared (D10): tsc build + exports map, zod; DTOs (personName, deleteQuery, items, promoteBody) + envelope + setup types (session:null)
-- [ ] 2.2 setup.ts schemas -> @doorcloud/shared (workspace:*)
-- [ ] 2.3 M2 gate: full suite
+- [x] 2.1 packages/shared (D10): tsc build + exports map, zod; DTOs (personName, deleteQuery, items, promoteBody) + envelope + setup types (session:null)
+- [x] 2.2 setup.ts schemas -> @doorcloud/shared (workspace:*)
+- [x] 2.3 M2 gate: full suite
 
 ## Phase 3: Feature — Web App + Admin API (M3)
 

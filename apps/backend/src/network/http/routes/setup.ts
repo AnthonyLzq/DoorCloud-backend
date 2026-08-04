@@ -1,3 +1,4 @@
+import { openWaSetupConfigSchema } from '@doorcloud/shared'
 import type {
   FastifyBaseLogger,
   FastifyInstance,
@@ -28,13 +29,6 @@ type ZodFastifyInstance = FastifyInstance<
 const setupTestSchema = z.object({
   imageUrl: z.string().url().optional(),
   text: z.string().trim().min(1).optional()
-})
-
-const setupConfigSchema = z.object({
-  OPENWA_API_KEY: z.string().trim().min(1).optional(),
-  OPENWA_BASE_URL: z.string().trim().url().optional(),
-  OPENWA_CHAT_ID: z.string().trim().min(1).optional(),
-  OPENWA_SESSION_ID: z.string().trim().min(1).optional()
 })
 
 const renderSetupHtml = (): string => `<!doctype html>
@@ -179,7 +173,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     {
       preHandler: setupAuthMiddleware,
       schema: {
-        body: setupConfigSchema
+        body: openWaSetupConfigSchema
       }
     },
     async (request, reply) => {

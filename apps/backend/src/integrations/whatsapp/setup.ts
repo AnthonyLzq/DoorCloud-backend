@@ -1,39 +1,15 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import type {
+  OpenWaQr,
+  OpenWaSession,
+  OpenWaSetupConfig,
+  OpenWaSetupConfigResult,
+  OpenWaSetupStatus
+} from '@doorcloud/shared'
 import { getEnv } from 'config/env'
 import { getEnvFilePath } from 'config/paths'
 import type { FastifyBaseLogger } from 'fastify'
 import { requestOpenWa, sendWhatsappImage, sendWhatsappText } from './openwa'
-
-type OpenWaSession = {
-  id: string
-  name?: string
-  phone?: string | null
-  status?: string
-}
-
-type OpenWaQr = {
-  qrCode: string
-  status?: string
-}
-
-type OpenWaSetupStatus = {
-  configured: boolean
-  configuredChatId?: string
-  configuredSessionId: string
-  missing: string[]
-  session: OpenWaSession | null
-}
-
-type OpenWaSetupConfig = {
-  OPENWA_API_KEY?: string
-  OPENWA_BASE_URL?: string
-  OPENWA_CHAT_ID?: string
-  OPENWA_SESSION_ID?: string
-}
-
-type OpenWaSetupConfigResult = {
-  saved: string[]
-}
 
 // The setup page writes .env inside the backend package (D4); the write
 // target is module-relative (paths.ts) so it never depends on process cwd.
@@ -276,13 +252,6 @@ const saveOpenWaSetupConfig = ({
   return { saved }
 }
 
-export type {
-  OpenWaQr,
-  OpenWaSession,
-  OpenWaSetupConfig,
-  OpenWaSetupConfigResult,
-  OpenWaSetupStatus
-}
 export {
   ensureOpenWaSession,
   getOpenWaSetupQr,
