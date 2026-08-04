@@ -1,10 +1,10 @@
 import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { FaceRecognitionService } from '../src/services/face-recognition'
-import { runBenchmark } from '../src/services/benchmark/runner'
-import { BenchmarkStorage } from '../src/services/benchmark/storage'
-import { generateLeaderboard } from '../src/services/benchmark/leaderboard'
+import { FaceRecognitionService } from '../apps/backend/src/services/face-recognition'
+import { runBenchmark } from '../apps/backend/src/services/benchmark/runner'
+import { BenchmarkStorage } from '../apps/backend/src/services/benchmark/storage'
+import { generateLeaderboard } from '../apps/backend/src/services/benchmark/leaderboard'
 
 const DATASETS = ['lfw', 'cfp-fp', 'agedb-30', 'calfw']
 const MODELS = [

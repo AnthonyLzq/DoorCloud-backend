@@ -127,8 +127,8 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/node,yarn
 
-src/**/*.jpeg
-src/**/*.png
+apps/backend/src/**/*.jpeg
+apps/backend/src/**/*.png
 src/tf.ts
 venv
 .venv
@@ -137,6 +137,7 @@ infra/mosquitto/passwordfile
 
 # Face recognition models (downloaded via scripts/download-models.sh)
 models/
+apps/backend/models/
 
 # OpenCode transient locks
 .opencode/goals/*.lock/
@@ -145,6 +146,7 @@ models/
 # Python cache
 __pycache__/
 scripts/__pycache__/
+apps/backend/scripts/__pycache__/
 
 # Metrics (runtime data, not code)
 metrics/*.csv
@@ -167,3 +169,4 @@ metrics/roc-pipeline/
 
 # SQLite app state (runtime data, created on first use)
 data/app-state.db
+apps/backend/data/app-state.db

@@ -1,6 +1,6 @@
-import { FaceRecognitionService } from '../src/services/face-recognition'
-import { runBenchmark } from '../src/services/benchmark/runner'
-import { BenchmarkStorage } from '../src/services/benchmark/storage'
+import { FaceRecognitionService } from '../apps/backend/src/services/face-recognition'
+import { runBenchmark } from '../apps/backend/src/services/benchmark/runner'
+import { BenchmarkStorage } from '../apps/backend/src/services/benchmark/storage'
 
 // Parse CLI args
 function getArg(name: string): string {

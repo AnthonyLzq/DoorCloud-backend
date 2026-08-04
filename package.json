@@ -1,6 +1,7 @@
 {
   "name": "doorcloud-backend",
   "version": "1.0.0",
+  "private": true,
   "packageManager": "pnpm@10.30.1",
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -9,92 +10,45 @@
       "@tensorflow/tfjs-node"
     ]
   },
-  "main": "src/index.ts",
-  "description": "Backend for DoorCloud",
+  "description": "DoorCloud monorepo root (orchestrator)",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "lint": "biome check src/ bin/",
-    "lint:fix": "biome check --write src/ bin/",
-    "format": "biome format --write src/ bin/",
-    "models:download": "./scripts/download-models.sh",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "pnpm -r format",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.json",
+    "test:local": "pnpm -r test:local",
+    "test:ci": "pnpm -r test:ci",
+    "test:mqtt": "pnpm --filter @doorcloud/backend test:mqtt",
     "models:test": "tsx scripts/test-onnx-inference.ts",
-    "photos:backup": "tsx bin/door-cloud.ts backup",
-    "benchmark:embeddings": "npx tsx scripts/embed-bfw.ts",
-    "benchmark:analyze": "NODE_OPTIONS=--max-old-space-size=4096 npx tsx scripts/analyze-bias.ts",
+    "benchmark:embeddings": "tsx scripts/embed-bfw.ts",
+    "benchmark:analyze": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/analyze-bias.ts",
     "benchmark:plots": ".venv/bin/python3 scripts/plot-bias-analysis.py",
     "benchmark:plots-benchmark": ".venv/bin/python3 scripts/histogram_for_metrics.py",
-    "preservice": "node scripts/ensure-services.mjs && node scripts/openwa/sync-api-key.mjs --optional",
-    "service": "nodemon --exitcrash",
-    "start": "NODE_PATH=dist node dist/index.js",
-    "release": "commit-and-tag-version",
-    "test:local": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:ci": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:mqtt": "scripts/mosquitto/run-integration-tests.sh",
-    "test:mqtt:integration": "vitest run test/mqtt.integration.test.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-    "openwa:qr": "node scripts/openwa/qr-sign-in.mjs",
-    "openwa:sync-api-key": "node scripts/openwa/sync-api-key.mjs",
-    "pub": "nodemon --exec \"DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts\"",
-    "door-cloud": "tsx bin/door-cloud.ts"
+    "release": "commit-and-tag-version"
   },
-  "author": "AnthonyLzq <sluzquinosa@uni.pe>",
   "license": "MIT",
   "devDependencies": {
-    "@biomejs/biome": "^2.5.4",
-    "@total-typescript/shoehorn": "^0.1.2",
-    "@types/debug": "^4.1.7",
-    "@types/http-errors": "^2.0.1",
-    "@types/node": "^22.20.1",
-    "@types/yargs": "^17.0.35",
     "commit-and-tag-version": "^12.6.1",
-    "dotenv": "^16.0.3",
-    "nodemon": "^2.0.20",
     "tsx": "^4.23.1",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.0",
-    "@fastify/multipart": "^10.1.0",
-    "@fastify/static": "^8.3.0",
-    "@tensorflow/tfjs-node": "4.10.0",
     "@vladmandic/human": "^3.0.3",
-    "debug": "^4.3.4",
+    "dotenv": "^16.0.3",
     "fastify": "^5.10.0",
-    "fastify-type-provider-zod": "7.0.0",
-    "http-errors": "^2.0.0",
-    "mqtt": "^5.15.2",
     "onnxruntime-node": "^1.17.0",
-    "pino-pretty": "^9.1.1",
     "sharp": "^0.33.0",
-    "yargs": "^17.7.3",
-    "zod": "^4.4.3"
-  },
-  "nodemonConfig": {
-    "watch": [
-      ".env",
-      "src"
-    ],
-    "ext": "ts",
-    "ignore": [
-      "src/**/*.test.ts"
-    ],
-    "exec": "DEBUG=DoorCloud:* tsx -r dotenv/config ./src/index.ts"
+    "yargs": "^17.7.3"
   },
   "engines": {
     "node": ">=22.20.0 <23",
     "pnpm": ">=10.30.1 <11"
   },
-  "directories": {
-    "test": "test"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AnthonyLzq/DoorCloud-backend.git"
   },
-  "keywords": [
-    "mqqt"
-  ],
   "bugs": {
     "url": "https://github.com/AnthonyLzq/DoorCloud-backend/issues"
   },
@@ -105,8 +59,5 @@
       "commit": true,
       "bump": true
     }
-  },
-  "bin": {
-    "door-cloud": "bin/door-cloud.ts"
   }
 }

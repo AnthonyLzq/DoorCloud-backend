@@ -1,0 +1,545 @@
+/**
+ * PythonManager - IPC communication manager with Python process
+ *
+ * This module implements communication between Node.js and a Python process
+ * to run face recognition models not available in ONNX Runtime.
+ *
+ * ## Communication Architecture
+ *
+ * Communication uses stdin/stdout pipes with a JSON-line protocol
+ * with ID correlation. See docs/adr/001-python-ipc-communication.md
+ * for full architectural decision details.
+ *
+ * ## Communication Flow
+ *
+ * ```
+ * 1. Node.js spawns Python process with stdio: ['pipe', 'pipe', 'pipe']
+ * 2. Python prints "READY" to stdout
+ * 3. Node.js detects "READY" and marks process as ready
+ * 4. Node.js sends JSON request to stdin (with unique ID)
+ * 5. Python reads stdin, processes, writes JSON response to stdout (with same ID)
+ * 6. Node.js reads stdout, parses JSON, correlates by ID, resolves Promise
+ * ```
+ *
+ * ## Messaging Protocol
+ *
+ * ### Request (Node.js -> Python via stdin)
+ * ```json
+ * {"id":1,"method":"load_model","args":["test-model",{"type":"dlib","path":"..."}]}
+ * ```
+ *
+ * ### Response (Python -> Node.js via stdout)
+ * ```json
+ * // Success:
+ * {"id":1,"success":true,"model":"test-model"}
+ *
+ * // Error:
+ * {"id":1,"error":"Missing model type or path"}
+ * ```
+ *
+ * ## Features
+ *
+ * - **ID Correlation**: Each request has a unique ID to correlate with response
+ * - **Timeout**: 30 seconds default, configurable
+ * - **Buffering**: Accumulates data until newline is found
+ * - **Concurrency**: Multiple requests can be pending simultaneously
+ * - **Typing**: Schema validation with Zod
+ * - **Auto-restart**: Up to 3 attempts if Python process crashes
+ *
+ * ## Usage
+ *
+ * ```typescript
+ * const manager = new PythonManager()
+ * await manager.start()
+ *
+ * // Load model
+ * await manager.call('load_model', 'my-model', {
+ *   type: 'dlib',
+ *   path: 'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
+ * })
+ *
+ * // Get embedding
+ * const embedding = await manager.call('get_embedding', imageBase64, 'my-model')
+ *
+ * await manager.stop()
+ * ```
+ *
+ * @see {@link file://./python-schemas.ts} - Validation schemas
+ * @see {@link file://../../../../scripts/face_recognition_server.py} - Python server
+ * @see {@link file://../../../../docs/adr/001-python-ipc-communication.md} - Full ADR
+ */
+
+import { type ChildProcess, spawn } from 'node:child_process'
+import { EventEmitter } from 'node:events'
+import { existsSync } from 'node:fs'
+import { getPythonBin, pythonServerScript } from 'config/paths'
+import { type PythonRequest, PythonResponseSchema } from './python-schemas'
+
+interface PendingRequest {
+  resolve: (value: unknown) => void
+  reject: (error: Error) => void
+  timeout: NodeJS.Timeout
+  method: string
+}
+
+export class PythonManager extends EventEmitter {
+  private process: ChildProcess | null = null
+  private scriptPath: string
+  private venvPath: string
+  private ready: boolean = false
+  private restartAttempts: number = 0
+  private maxRestartAttempts: number = 3
+  private restartDelay: number = 1000
+  private requestId: number = 0
+  private pendingRequests: Map<number, PendingRequest> = new Map()
+  private stdoutBuffer: string = ''
+  private defaultTimeout: number = 30000
+  private metrics: Map<string, { totalLatency: number; requestCount: number }> =
+    new Map()
+
+  constructor() {
+    super()
+    // Module-relative (D2): the IPC server ships with the backend package and
+    // the venv lives at the repo root (shared benchmark tooling); neither
+    // depends on the process cwd.
+    this.scriptPath = pythonServerScript
+    this.venvPath = getPythonBin()
+  }
+
+  async start(): Promise<void> {
+    if (this.process) {
+      throw new Error('Python process already running')
+    }
+
+    if (!existsSync(this.scriptPath)) {
+      throw new Error(
+        `Python server script not found: ${this.scriptPath}. ` +
+          'The face recognition IPC server must ship with the backend.'
+      )
+    }
+
+    console.log(
+      `[PythonManager] Starting Python process: ${this.venvPath} ${this.scriptPath}`
+    )
+
+    this.process = spawn(this.venvPath, [this.scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+
+    this.process.on('error', error => {
+      const processError = new Error(`Python process error: ${error.message}`)
+      processError.name = 'PythonProcessError'
+      console.error(`[PythonManager] ${processError.message}`)
+      this.emit('error', processError)
+      this.handleCrash()
+    })
+
+    this.process.on('exit', (code, signal) => {
+      this.ready = false
+      const exitMessage = `Python process exited with code: ${code}, signal: ${signal}`
+      console.log(`[PythonManager] ${exitMessage}`)
+      this.emit('exit', code, signal)
+
+      if (code !== 0 && code !== null) {
+        this.handleCrash()
+      }
+    })
+
+    this.process.stderr?.on('data', data => {
+      const stderrMessage = data.toString().trim()
+      if (stderrMessage) {
+        console.error(`[PythonManager] stderr: ${stderrMessage}`)
+        this.emit('stderr', stderrMessage)
+      }
+    })
+
+    this.process.stdout?.on('data', data => {
+      this.handleStdout(data.toString())
+    })
+
+    // Wait for READY signal
+    await this.waitForReady()
+    this.restartAttempts = 0
+    console.log('[PythonManager] Python process ready')
+  }
+
+  async stop(): Promise<void> {
+    if (!this.process) {
+      return
+    }
+
+    console.log('[PythonManager] Stopping Python process...')
+
+    // Reject all pending requests with detailed error
+    for (const [_id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timeout)
+      const error = new Error(
+        `Python process stopped while waiting for response to method: ${pending.method}`
+      )
+      error.name = 'PythonProcessStopped'
+      pending.reject(error)
+    }
+    this.pendingRequests.clear()
+    this.stdoutBuffer = ''
+
+    return new Promise(resolve => {
+      this.process!.once('exit', code => {
+        console.log(`[PythonManager] Python process exited with code: ${code}`)
+        this.process = null
+        this.ready = false
+        resolve()
+      })
+
+      this.process!.kill('SIGTERM')
+
+      // Force kill after 5 seconds
+      setTimeout(() => {
+        if (this.process) {
+          console.warn('[PythonManager] Force killing Python process (SIGKILL)')
+          this.process.kill('SIGKILL')
+        }
+      }, 5000)
+    })
+  }
+
+  isReady(): boolean {
+    return this.ready
+  }
+
+  private async waitForReady(): Promise<void> {
+    const maxWait = 30000
+    const checkInterval = 50
+    const startTime = Date.now()
+
+    return new Promise((resolve, reject) => {
+      const check = () => {
+        if (this.ready) {
+          resolve()
+          return
+        }
+
+        if (Date.now() - startTime >= maxWait) {
+          reject(
+            new Error(
+              'Python process did not send READY signal within 30 seconds'
+            )
+          )
+          return
+        }
+
+        setTimeout(check, checkInterval)
+      }
+
+      check()
+    })
+  }
+
+  private handleCrash(): void {
+    this.process = null
+    this.ready = false
+
+    // Reject all pending requests with detailed error
+    for (const [_id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timeout)
+      const error = new Error(
+        `Python process crashed while waiting for response to method: ${pending.method}`
+      )
+      error.name = 'PythonProcessCrashed'
+      this.emit('error', error)
+      pending.reject(error)
+    }
+    this.pendingRequests.clear()
+
+    if (this.restartAttempts < this.maxRestartAttempts) {
+      this.restartAttempts++
+      const restartMessage = `Restarting Python process (attempt ${this.restartAttempts}/${this.maxRestartAttempts})`
+      console.log(`[PythonManager] ${restartMessage}`)
+      this.emit('restart', this.restartAttempts)
+
+      setTimeout(() => {
+        this.start().catch(error => {
+          const startError = new Error(
+            `Failed to restart Python process: ${error.message}`
+          )
+          startError.name = 'PythonRestartFailed'
+          this.emit('error', startError)
+        })
+      }, this.restartDelay * this.restartAttempts)
+    } else {
+      const maxRestartsError = new Error(
+        `Python process exceeded maximum restart attempts (${this.maxRestartAttempts})`
+      )
+      maxRestartsError.name = 'PythonMaxRestartsExceeded'
+      console.error(`[PythonManager] ${maxRestartsError.message}`)
+      this.emit('max-restarts-exceeded', maxRestartsError)
+    }
+  }
+
+  /**
+   * Procesa datos recibidos desde stdout del proceso Python
+   *
+   * Este método implementa la recepción y correlación de respuestas:
+   * 1. Acumula datos en stdoutBuffer hasta encontrar newlines
+   * 2. Procesa cada línea completa:
+   *    - Detecta señal "READY" para marcar el proceso como listo
+   *    - Parsea líneas JSON como responses
+   *    - Valida el schema con Zod
+   *    - Correlaciona por ID con pendingRequests
+   *    - Resuelve o rechaza la Promise correspondiente
+   *
+   * @param data - Datos recibidos desde stdout (puede contener múltiples líneas)
+   *
+   * @private
+   */
+  private handleStdout(data: string): void {
+    console.log('[PythonManager] Received stdout:', JSON.stringify(data))
+    this.stdoutBuffer += data
+    const lines = this.stdoutBuffer.split('\n')
+
+    // Keep the last incomplete line in the buffer
+    this.stdoutBuffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (line.trim() === '') continue
+
+      // Check for READY signal
+      if (line.trim() === 'READY') {
+        console.log('[PythonManager] READY signal detected')
+        this.ready = true
+        this.emit('ready')
+        continue
+      }
+
+      // Skip non-JSON lines
+      if (!line.trim().startsWith('{')) continue
+
+      try {
+        const parsed = JSON.parse(line)
+        const response = PythonResponseSchema.parse(parsed)
+        const id = response.id
+
+        if (this.pendingRequests.has(id)) {
+          const pending = this.pendingRequests.get(id)!
+          clearTimeout(pending.timeout)
+          this.pendingRequests.delete(id)
+
+          if ('error' in response && response.error) {
+            const error = new Error(response.error)
+            error.name = 'PythonServerError'
+            pending.reject(error)
+          } else {
+            // Extract result from response
+            const result = response.result ?? response
+            pending.resolve(result)
+          }
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error)
+        const errorDetails = {
+          line: line.substring(0, 200), // Truncate long lines
+          parseError: errorMessage,
+          timestamp: new Date().toISOString()
+        }
+
+        this.emit(
+          'error',
+          new Error(`Failed to parse Python response: ${errorMessage}`)
+        )
+
+        // Log detailed error for debugging
+        console.error('[PythonManager] Parse error details:', errorDetails)
+      }
+    }
+  }
+
+  /**
+   * Envía un request al proceso Python y espera la respuesta
+   *
+   * Este método implementa el protocolo de comunicación IPC:
+   * 1. Genera un ID único para el request
+   * 2. Crea una Promise y la guarda en pendingRequests con el ID
+   * 3. Serializa el request a JSON y lo escribe en stdin
+   * 4. Configura un timeout para rechazar la Promise si no hay respuesta
+   * 5. Cuando llega la respuesta en stdout, handleStdout() correlaciona por ID
+   *    y resuelve/rechaza la Promise correspondiente
+   *
+   * @param method - Nombre del método a ejecutar en Python (ej: 'load_model', 'get_embedding')
+   * @param args - Arguments for the method (serialized as JSON array)
+   * @returns Promise with the Python method result
+   * @throws Error if Python process is not ready
+   * @throws Error if request times out (30s default)
+   * @throws Error if stdin write fails
+   *
+   * @example
+   * ```typescript
+   * // Load model
+   * await manager.call('load_model', 'my-model', {
+   *   type: 'dlib',
+   *   path: 'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
+   * })
+   *
+   * // Get embedding
+   * const embedding = await manager.call('get_embedding', imageBase64, 'my-model')
+   * ```
+   */
+  async call(method: string, ...args: unknown[]): Promise<unknown> {
+    if (!this.process || !this.ready) {
+      throw new Error('Python process not ready')
+    }
+
+    const id = ++this.requestId
+    const request: PythonRequest = { id, method, args }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        const pending = this.pendingRequests.get(id)
+        if (pending) {
+          this.pendingRequests.delete(id)
+          const error = new Error(
+            `Request timeout after ${this.defaultTimeout}ms for method: ${method}`
+          )
+          error.name = 'PythonRequestTimeout'
+          this.emit('error', error)
+          pending.reject(error)
+        }
+      }, this.defaultTimeout)
+
+      this.pendingRequests.set(id, { resolve, reject, timeout, method })
+
+      const json = `${JSON.stringify(request)}\n`
+      this.process!.stdin!.write(json, error => {
+        if (error) {
+          clearTimeout(timeout)
+          this.pendingRequests.delete(id)
+          const writeError = new Error(
+            `Failed to write to Python process stdin: ${error.message}`
+          )
+          writeError.name = 'PythonWriteError'
+          this.emit('error', writeError)
+          reject(writeError)
+        }
+      })
+    })
+  }
+
+  /**
+   * Loads a face recognition model in the Python process
+   *
+   * @param name - Unique name to identify the model
+   * @param config - Model configuration (type, path, etc.)
+   * @returns Promise with the load result
+   *
+   * @example
+   * ```typescript
+   * await manager.loadModel('dlib-model', {
+   *   type: 'dlib',
+   *   path: 'models/dlib/dlib_face_recognition_resnet_model_v1.dat'
+   * })
+   * ```
+   */
+  async loadModel(
+    name: string,
+    config: { type: string; path: string }
+  ): Promise<unknown> {
+    const startTime = performance.now()
+    const result = await this.call('load_model', name, config)
+    const loadLatency = performance.now() - startTime
+
+    // Initialize metrics for this model (load time not counted in inference metrics)
+    if (!this.metrics.has(name)) {
+      this.metrics.set(name, { totalLatency: 0, requestCount: 0 })
+    }
+
+    console.log(
+      `[PythonManager] Model ${name} loaded in ${loadLatency.toFixed(2)}ms`
+    )
+
+    return result
+  }
+
+  /**
+   * Lists all models loaded in the Python process
+   *
+   * @returns Promise with array of model names
+   */
+  async listModels(): Promise<string[]> {
+    const result = await this.call('list_models')
+    const response = result as { models?: string[] }
+    return response.models ?? []
+  }
+
+  /**
+   * Gets metrics for a specific model
+   *
+   * Metrics include average latency (including IPC overhead) and
+   * number of processed requests.
+   *
+   * @param modelName - Model name
+   * @returns Model metrics or null if no data available
+   */
+  getMetrics(
+    modelName: string
+  ): { avgLatency: number; requestCount: number } | null {
+    const metric = this.metrics.get(modelName)
+    if (!metric || metric.requestCount === 0) {
+      return null
+    }
+
+    return {
+      avgLatency: metric.totalLatency / metric.requestCount,
+      requestCount: metric.requestCount
+    }
+  }
+
+  /**
+   * Gets the face embedding from an image using a specific model
+   *
+   * @param imageBase64 - Image in base64 format
+   * @param modelName - Model name to use
+   * @returns Promise with the embedding (array of numbers)
+   */
+  async getEmbedding(
+    imageBase64: string,
+    modelName: string
+  ): Promise<number[]> {
+    const startTime = performance.now()
+    const result = await this.call('get_embedding', imageBase64, modelName)
+    const latency = performance.now() - startTime
+
+    // Update metrics (includes IPC overhead)
+    const metric = this.metrics.get(modelName)
+    if (metric) {
+      metric.totalLatency += latency
+      metric.requestCount++
+    }
+
+    const response = result as { embedding?: number[] }
+    return response.embedding ?? []
+  }
+
+  sendRequest(request: object): void {
+    if (!this.process || !this.ready) {
+      throw new Error('Python process not ready')
+    }
+
+    // Ensure request has an ID for response correlation
+    const requestWithId = {
+      id: ++this.requestId,
+      ...request
+    }
+
+    const json = `${JSON.stringify(requestWithId)}\n`
+    this.process.stdin!.write(json)
+  }
+
+  onStdout(callback: (data: string) => void): void {
+    if (!this.process) {
+      throw new Error('Python process not started')
+    }
+
+    this.process.stdout!.on('data', data => {
+      callback(data.toString())
+    })
+  }
+}

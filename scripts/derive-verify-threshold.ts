@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process'
 import { createReadStream, existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createInterface } from 'node:readline'
-import { calculateAllMetrics } from '../src/services/benchmark/metrics'
-import { cosineSimilarity } from '../src/services/face-recognition/cosine-similarity'
+import { calculateAllMetrics } from '../apps/backend/src/services/benchmark/metrics'
+import { cosineSimilarity } from '../apps/backend/src/services/face-recognition/cosine-similarity'
 
 const EMBEDDINGS_PATH = resolve(
   process.cwd(),

@@ -97,7 +97,7 @@ async function main() {
     return
   }
 
-  const { FaceRecognitionService } = require('../src/services/face-recognition')
+  const { FaceRecognitionService } = require('../apps/backend/src/services/face-recognition')
   const service = new FaceRecognitionService()
   await service.init()
   const approach = getArg('approach')

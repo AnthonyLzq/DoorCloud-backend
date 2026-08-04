@@ -8,6 +8,37 @@ importers:
 
   .:
     dependencies:
+      '@vladmandic/human':
+        specifier: ^3.0.3
+        version: 3.3.6
+      dotenv:
+        specifier: ^16.0.3
+        version: 16.6.1
+      fastify:
+        specifier: ^5.10.0
+        version: 5.10.0
+      onnxruntime-node:
+        specifier: ^1.17.0
+        version: 1.27.0
+      sharp:
+        specifier: ^0.33.0
+        version: 0.33.5
+      yargs:
+        specifier: ^17.7.3
+        version: 17.7.3
+    devDependencies:
+      commit-and-tag-version:
+        specifier: ^12.6.1
+        version: 12.7.3
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  apps/backend:
+    dependencies:
       '@fastify/cors':
         specifier: ^11.3.0
         version: 11.3.0
@@ -72,9 +103,6 @@ importers:
       '@types/yargs':
         specifier: ^17.0.35
         version: 17.0.35
-      commit-and-tag-version:
-        specifier: ^12.6.1
-        version: 12.7.3
       dotenv:
         specifier: ^16.0.3
         version: 16.6.1

@@ -1,7 +1,7 @@
 import { Human } from '@vladmandic/human'
-import { runBenchmark } from '../src/services/benchmark/runner'
-import { BenchmarkStorage } from '../src/services/benchmark/storage'
-import { generateLeaderboard } from '../src/services/benchmark/leaderboard'
+import { runBenchmark } from '../apps/backend/src/services/benchmark/runner'
+import { BenchmarkStorage } from '../apps/backend/src/services/benchmark/storage'
+import { generateLeaderboard } from '../apps/backend/src/services/benchmark/leaderboard'
 import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 

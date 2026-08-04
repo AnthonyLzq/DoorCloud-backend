@@ -7,7 +7,7 @@ import {
 import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
 import { existsSync } from 'node:fs'
-import { cosineSimilarity } from '../src/services/face-recognition/cosine-similarity'
+import { cosineSimilarity } from '../apps/backend/src/services/face-recognition/cosine-similarity'
 
 const BFW_CSV = resolve(
   process.cwd(),

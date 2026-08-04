@@ -12,7 +12,7 @@ import {
   DETECTOR_MODEL_NAME,
   ONNXProvider,
   RECOGNITION_MODEL_NAME
-} from '../src/services/face-recognition/onnx-provider'
+} from '../apps/backend/src/services/face-recognition/onnx-provider'
 
 const BFW_DATASET_ROOT = resolve(
   process.cwd(),

@@ -5,7 +5,7 @@
  */
 
 import sharp from 'sharp'
-import { ONNXProvider } from '../src/services/face-recognition/onnx-provider'
+import { ONNXProvider } from '../apps/backend/src/services/face-recognition/onnx-provider'
 
 async function main() {
   console.log('Testing ONNX Inference with Real Models\n')

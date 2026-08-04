@@ -1,6 +1,6 @@
 import { Human } from '@vladmandic/human'
-import { runBenchmark } from '../src/services/benchmark/runner'
-import { BenchmarkStorage } from '../src/services/benchmark/storage'
+import { runBenchmark } from '../apps/backend/src/services/benchmark/runner'
+import { BenchmarkStorage } from '../apps/backend/src/services/benchmark/storage'
 
 // Monkey-patch for tfjs-node compat with Node.js 24
 const nodeUtil = require('util') as {

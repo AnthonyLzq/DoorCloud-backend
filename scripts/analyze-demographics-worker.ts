@@ -7,7 +7,7 @@ import {
 } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
-import { calculateAllMetrics } from '../src/services/benchmark/metrics'
+import { calculateAllMetrics } from '../apps/backend/src/services/benchmark/metrics'
 
 const EMBED_DIR = resolve(process.cwd(), 'metrics/embeddings')
 const BFW_CSV = resolve(
