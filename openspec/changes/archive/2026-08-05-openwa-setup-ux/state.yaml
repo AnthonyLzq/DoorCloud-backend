@@ -1,0 +1,16 @@
+schema: spec-driven
+change: openwa-setup-ux
+created: 2026-08-05
+status: superseded
+superseded_by: monorepo-config-web
+current_phase: superseded
+phases:
+  explore: skipped
+  propose: completed
+  spec: skipped
+  design: skipped
+  tasks: skipped
+  apply: skipped
+  verify: skipped
+  archive: completed
+completed_specs: []

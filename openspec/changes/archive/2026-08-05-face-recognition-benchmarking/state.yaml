@@ -1,0 +1,17 @@
+schema: spec-driven
+change: face-recognition-benchmarking
+created: 2024-01-17
+status: archived
+superseded_by: null
+current_phase: archive
+phases:
+  explore: skipped
+  propose: completed
+  spec: skipped
+  design: skipped
+  tasks: skipped
+  apply: skipped
+  verify: skipped
+  archive: completed
+completed_specs: null
+archive_reason: "Planning-only artifact. The hybrid benchmark system and demographic bias analysis were built and delivered outside this change's SDD spec flow (see apps/backend/src/services/face-recognition and docs/benchmark-analysis.md)."
