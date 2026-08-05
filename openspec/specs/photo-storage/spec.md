@@ -3,48 +3,58 @@
 ## Overview
 
 Local-disk photo storage that replaces the Supabase `photos` bucket. Photos are
-written under `PHOTOS_DIR`, listed per user folder, and served over a signed
-photo URL route so the existing URL contract keeps working for `verify()` and
-OpenWA `send-image`. A backup CLI copies `PHOTOS_DIR` to a local folder or a
-webhook endpoint.
+written under `PHOTOS_DIR`; each person folder is an identity
+(`PHOTOS_DIR/{Person}/...`), no-match photos sink into `unidentified/`, and
+folder/photo CRUD primitives back the admin API. Photos are served over a
+signed photo URL route so the existing URL contract keeps working for
+`verify()` and OpenWA `send-image`. A backup CLI copies `PHOTOS_DIR` to a local
+folder or a webhook endpoint.
 
 ## Requirements
 
 ### RF-1: Store photos on local disk
 
-The system MUST write uploaded photos to disk under `PHOTOS_DIR`, preserving
-the current `{name}-{id}/{fieldname}-{uuid}.{ext}` layout for verified photos
-and the numeric-prefix layout for no-match photos.
+The system MUST write uploaded photos to disk under `PHOTOS_DIR`. Reference
+photos SHALL be stored in the person's folder (folder name IS identity:
+`PHOTOS_DIR/{Person}/...`); no-match photos SHALL be written to the
+`unidentified/` sink folder instead of the owner folder.
 
 #### Scenario: Upload writes to disk
 
 - GIVEN `PHOTOS_DIR` is configured and writable
-- WHEN `uploadPhotos` stores an uploaded file
-- THEN the file SHALL be written under `PHOTOS_DIR/{name}-{id}/...`
+- WHEN an uploaded photo is stored
+- THEN it SHALL be written under `PHOTOS_DIR/{Person}/...`
 
-#### Scenario: No-match photo naming
+#### Scenario: No-match photo sink
 
-- GIVEN a verified photo does not match the user
-- WHEN the incoming photo is stored
-- THEN its filename SHALL start with a numeric timestamp
+- GIVEN a verified door photo does not match any person
+- WHEN the photo is stored
+- THEN it SHALL be written under `PHOTOS_DIR/unidentified/...`
 
 ### RF-2: List stored photos
 
-The system MUST list a user's stored photos from `PHOTOS_DIR/{name}-{id}`,
-excluding no-match files (numeric filename prefix). When the user folder does
-not exist yet, listing MUST return an empty list instead of failing.
+The system MUST list a person's reference photos from `PHOTOS_DIR/{Person}`, and
+SHALL hide any legacy numeric-prefix files still present in person folders. When
+the person folder does not exist, listing SHALL return an empty list.
 
 #### Scenario: Reference list excludes no-match
 
-- GIVEN a user folder contains matched and no-match photos
-- WHEN photos are listed for verification
+- GIVEN a person folder contains reference and legacy no-match photos
+- WHEN photos are listed
 - THEN only non-numeric-prefix files SHALL be returned
 
-#### Scenario: Missing user folder
+#### Scenario: Missing person folder
 
-- GIVEN the user folder does not exist yet
+- GIVEN the person folder does not exist yet
 - WHEN photos are listed
 - THEN an empty list SHALL be returned
+
+#### Scenario: Legacy files flagged for migration
+
+- GIVEN the owner folder contains legacy timestamp-prefixed files from before this change
+- WHEN `list()` hides them and `listDirectories()` runs
+- THEN they SHALL remain hidden from verification
+- AND the operator SHALL be able to move them to `unidentified/` via `movePhoto`
 
 ### RF-3: Generate public signed URLs
 
@@ -155,6 +165,46 @@ The CLI MUST report per-file success/failure and SHOULD include an
 - GIVEN the endpoint responds with a non-2xx status
 - WHEN the CLI posts a file
 - THEN the CLI SHALL report the failure and exit non-zero
+
+### RF-8: Unidentified sink excluded from known persons
+
+`listDirectories()` SHALL exclude the `unidentified/` folder from known persons; unmatched photos SHALL be reachable only through the unidentified primitives.
+
+#### Scenario: Tray list excludes person identity
+
+- GIVEN `unidentified/` contains photos
+- WHEN `listDirectories()` runs
+- THEN `unidentified` SHALL NOT appear as a person
+
+### RF-9: Folder primitives
+
+The system SHALL provide `createFolder`, `renameFolder`, and `deleteFolder` primitives operating under `PHOTOS_DIR` with recursive delete support.
+
+#### Scenario: Delete removes subtree
+
+- GIVEN a person folder with photos
+- WHEN `deleteFolder` runs
+- THEN the whole subtree SHALL be removed
+
+### RF-10: Photo primitives
+
+The system SHALL provide `deletePhoto` and `movePhoto` primitives; `movePhoto` SHALL move, not copy, the file into a target person folder.
+
+#### Scenario: Move relocates file
+
+- GIVEN `unidentified/x.jpg`
+- WHEN `movePhoto` moves it to `{Person}/`
+- THEN the file SHALL exist only in the target folder
+
+### RF-11: Containment guarantee
+
+All new primitives SHALL resolve paths through the existing `#safeJoin` containment check and SHALL reject traversal or absolute segments.
+
+#### Scenario: Traversal rejected
+
+- GIVEN a filename or folder name containing `../` or an absolute path
+- WHEN a primitive runs
+- THEN the operation SHALL fail and MUST NOT touch paths outside `PHOTOS_DIR`
 
 ## Non-Goals
 

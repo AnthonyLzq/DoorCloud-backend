@@ -1,0 +1,19 @@
+schema: spec-driven
+change: monorepo-config-web
+created: 2026-08-03
+status: archived
+current_phase: archived
+phases:
+  explore: completed
+  propose: completed
+  spec: completed
+  design: completed
+  tasks: completed
+  apply: completed
+  verify: completed
+  archive: completed
+completed_specs:
+  - web-front
+  - photo-admin-api
+  - photo-storage
+  - user-config
