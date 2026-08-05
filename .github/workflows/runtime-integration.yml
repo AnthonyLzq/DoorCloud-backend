@@ -1,0 +1,143 @@
+name: Runtime integration (manual)
+
+# Manual gate: downloads the ~774MB face-recognition models (cached) and runs
+# the REAL Python + ONNX integration suites plus a container boot smoke. This
+# does NOT run on push — the per-push unit suite is hermetic (see test:ci).
+on:
+  workflow_dispatch:
+    inputs:
+      docker_smoke:
+        description: 'Also build the image and boot the container'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  python-models-integration:
+    name: Real Python + ONNX integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: apps/backend/requirements.txt
+
+      - name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @doorcloud/shared build
+
+      - name: Restore models cache
+        id: models-cache
+        uses: actions/cache@v4
+        with:
+          path: apps/backend/models
+          key: doorcloud-models-v1-${{ hashFiles('apps/backend/scripts/download-models.sh') }}
+
+      - name: Download models (on cache miss)
+        if: steps.models-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @doorcloud/backend models:download
+
+      - name: Install Python deps (root .venv)
+        run: ./apps/backend/scripts/install-python-deps.sh
+
+      - name: Run real integration suites
+        run: pnpm --filter @doorcloud/backend test:integration
+        env:
+          PYTHON_BIN: ${{ github.workspace }}/.venv/bin/python3
+
+  docker-boot-smoke:
+    name: Docker build + boot smoke
+    runs-on: ubuntu-latest
+    if: ${{ inputs.docker_smoke == true }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore models cache
+        id: models-cache
+        uses: actions/cache@v4
+        with:
+          path: apps/backend/models
+          key: doorcloud-models-v1-${{ hashFiles('apps/backend/scripts/download-models.sh') }}
+
+      - name: Download models (on cache miss)
+        if: steps.models-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @doorcloud/backend models:download
+
+      - name: Start Mosquitto broker
+        run: |
+          docker compose up -d mosquitto
+          timeout=30
+          counter=0
+          until docker compose exec -T mosquitto mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -W 1 2>/dev/null || [ $counter -eq $timeout ]; do
+            sleep 1
+            counter=$((counter + 1))
+          done
+          [ $counter -eq $timeout ] && { echo "Mosquitto not healthy"; exit 1; }
+
+      - name: Build image
+        run: docker build -t doorcloud:manual -f Dockerfile .
+
+      - name: Boot the container
+        run: |
+          docker run -d --name doorcloud-smoke -p 1996:1996 \
+            --add-host=host.docker.internal:host-gateway \
+            -e NODE_ENV=development \
+            -e MQTT_HOST=host.docker.internal \
+            -e MQTT_PORT=1883 \
+            -e MQTT_USER=doorcloud-backend \
+            -e MQTT_PASS=doorcloud-backend-local \
+            -e PHOTOS_DIR=/tmp/dc-photos \
+            -e PHOTOS_BASE_URL=http://localhost:1996/photos \
+            -e PHOTOS_URL_SECRET=smoke-photo-url-secret-value \
+            -e MODELS_CDN_URL=https://models.example.com \
+            -e USER_NAME=Anthony \
+            -e SETUP_TOKEN=smoke-secret-token \
+            -v "${{ github.workspace }}/apps/backend/models:/app/apps/backend/models:ro" \
+            doorcloud:manual
+
+      - name: Wait for boot and smoke-check HTTP
+        run: |
+          sleep 20
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/")
+          [ "$code" = "200" ] || { echo "GET / -> $code"; exit 1; }
+          setup=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/setup")
+          [ "$setup" = "200" ] || { echo "GET /setup -> $setup"; exit 1; }
+          auth=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/admin/photos/persons")
+          [ "$auth" = "401" ] || { echo "admin w/o token -> $auth (expected 401)"; exit 1; }
+
+      - name: Show boot logs on failure
+        if: failure()
+        run: docker logs doorcloud-smoke || true
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f doorcloud-smoke || true
