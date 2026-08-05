@@ -22,7 +22,8 @@
     "openwa:qr": "node scripts/openwa/qr-sign-in.mjs",
     "openwa:sync-api-key": "node scripts/openwa/sync-api-key.mjs",
     "pub": "nodemon --exec \"DEBUG=DoorCloud:* tsx -r dotenv/config src/pub.ts\"",
-    "door-cloud": "tsx bin/door-cloud.ts"
+    "door-cloud": "tsx bin/door-cloud.ts",
+    "test:integration": "vitest run test/python-manager-ipc.integration.test.ts test/python-manager-models.integration.test.ts test/onnx-provider.integration.test.ts"
   },
   "author": "AnthonyLzq <sluzquinosa@uni.pe>",
   "license": "MIT",

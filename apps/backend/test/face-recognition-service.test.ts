@@ -1,6 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { VERIFY_FETCH_TIMEOUT_MS } from '../src/config/constants'
 import { FaceRecognitionService } from '../src/services/face-recognition'
+
+// Hermetic unit suite: the real Python IPC process (venv + models) is not
+// available in CI. The ONNX provider is spied per-test below; the Python
+// manager is replaced with a no-op stub so hybrid-init never spawns a child.
+vi.mock('../src/services/face-recognition/python-manager', () => ({
+  PythonManager: class MockPythonManager {
+    start = vi.fn().mockResolvedValue(undefined)
+    stop = vi.fn().mockResolvedValue(undefined)
+    isReady = vi.fn().mockReturnValue(false)
+    loadModel = vi.fn().mockResolvedValue({})
+    unloadModel = vi.fn().mockResolvedValue(undefined)
+    listModels = vi.fn().mockResolvedValue([])
+    getEmbedding = vi.fn().mockResolvedValue(new Float32Array(0))
+    getMetrics = vi.fn().mockReturnValue(null)
+  }
+}))
 
 describe('FaceRecognitionService', () => {
   let service: FaceRecognitionService
@@ -190,6 +206,7 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['pythonManager'], 'getMetrics').mockReturnValue(
         mockMetrics
       )
+      vi.spyOn(service['pythonManager'], 'isReady').mockReturnValue(true)
       vi.spyOn(service['onnxProvider'], 'hasModel').mockReturnValue(false)
 
       const metrics = service.getMetrics('python-model')
