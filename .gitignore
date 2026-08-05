@@ -170,3 +170,9 @@ metrics/roc-pipeline/
 # SQLite app state (runtime data, created on first use)
 data/app-state.db
 apps/backend/data/app-state.db
+
+# Playwright artifacts (browser runs, screenshots, reports)
+test-results/
+playwright-report/
+apps/web/test-results/
+apps/web/playwright-report/

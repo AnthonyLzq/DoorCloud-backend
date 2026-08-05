@@ -1,0 +1,40 @@
+# OpenWA Setup Page UX (auto-poll + auto-load QR) - State
+
+## Status
+
+**Phase**: Superseded
+**Created**: 2026-08-05
+**Last Updated**: 2026-08-05
+**Superseded By**: `monorepo-config-web`
+
+## Change Overview
+
+Improve the `/setup` page UX: loading state + double-start guard, auto-poll
+(~3s, capped ~20), auto-load QR when ready, page-load handling, failure caps
+and manual recovery. The intended pairing UX is now implemented in the Preact
+SPA shipped by `monorepo-config-web` (`apps/web`), specifically the `Setup`
+view driven by `apps/web/src/controller/setup-controller.ts` (WF-1..6), which
+replaces the old `renderSetupHtml` page. No further work is planned on this
+change.
+
+## Current Phase
+
+- [x] Proposal
+- [ ] Specs (skip - superseded)
+- [ ] Design (skip - superseded)
+- [ ] Tasks (skip - superseded)
+- [ ] Implementation (skip - superseded)
+
+## Superseded By
+
+- `openspec/changes/monorepo-config-web/` - Preact SPA absorbs the setup UX
+  (`views/Setup.tsx` + `createSetupController`) and deletes `renderSetupHtml`.
+
+## Dependencies
+
+- OpenWA endpoints `/setup/openwa/status|start|qr` (unchanged; consumed by the SPA)
+- The old change is not archived, so the proposal/exploration remain discoverable.
+
+## Risk Level
+
+**Low** - superseded; no pending implementation. Observability only.

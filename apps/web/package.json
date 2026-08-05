@@ -14,7 +14,8 @@
     "lint:fix": "biome check --write src/ test/",
     "format": "biome format --write src/ test/",
     "test:local": "vitest run",
-    "test:ci": "vitest run"
+    "test:ci": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@doorcloud/shared": "workspace:*",
@@ -23,7 +24,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
+    "@playwright/test": "^1.54.0",
+    "@preact/compat": "^18.3.1",
     "@preact/preset-vite": "^2.10.6",
+    "@testing-library/preact": "^3.2.4",
+    "happy-dom": "^18.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"

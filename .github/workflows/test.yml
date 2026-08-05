@@ -1,33 +1,33 @@
-name: Tests - doorcloud backend
+name: Tests - doorcloud
 
 on: [push]
 
 jobs:
   test:
-    environment: Test
-    name: Testing doorcloud backend
+    name: Unit tests, typecheck and web build
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js
+      - name: Set up Node.js (pnpm via packageManager field)
         uses: actions/setup-node@v4
         with:
           node-version: 22.20.0
-
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.30.1 --activate
+          cache: pnpm
 
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run test
+      # @doorcloud/shared ships its built dist (gitignored), so a fresh
+      # checkout must build it before the consumers typecheck/test/build.
+      - name: Build shared package
+        run: pnpm --filter @doorcloud/shared build
+
+      - name: Run workspace tests
         run: pnpm test:ci
         env:
           MQTT_USER: ${{ secrets.MQTT_USER }}
@@ -39,29 +39,31 @@ jobs:
       - name: Run typecheck
         run: pnpm typecheck
 
+      - name: Build the web SPA
+        run: pnpm --filter @doorcloud/web build
+
   mqtt-integration:
     name: MQTT integration tests with Mosquitto
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js (pnpm via packageManager field)
         uses: actions/setup-node@v4
         with:
           node-version: 22.20.0
-
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.30.1 --activate
+          cache: pnpm
 
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared package
+        run: pnpm --filter @doorcloud/shared build
+
       - name: Generate Mosquitto password file
-        run: ./scripts/mosquitto/create-password-file.sh
+        run: ./apps/backend/scripts/mosquitto/create-password-file.sh
 
       - name: Start Mosquitto broker
         run: |
@@ -81,7 +83,7 @@ jobs:
           echo "Mosquitto is ready"
 
       - name: Run MQTT integration tests
-        run: pnpm test:mqtt:integration
+        run: pnpm --filter @doorcloud/backend test:mqtt:integration
         env:
           MQTT_USER: doorcloud-backend
           MQTT_PASS: doorcloud-backend-local
@@ -95,3 +97,31 @@ jobs:
         run: |
           docker compose down -v
           docker system prune -f
+
+  e2e:
+    name: Web SPA smoke (Playwright)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (pnpm via packageManager field)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: pnpm
+
+      - name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @doorcloud/shared build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @doorcloud/web exec playwright install --with-deps chromium
+
+      # The config webServer builds the SPA and serves it with vite preview;
+      # the spec stubs /setup and /admin, so no backend or MQTT is required.
+      - name: Run Playwright smoke tests
+        run: pnpm --filter @doorcloud/web test:e2e

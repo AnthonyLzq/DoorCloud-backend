@@ -1,14 +1,26 @@
 import type { JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { createAdminController } from '../controller/admin-controller'
-import { api } from '../instance'
+import {
+  type AdminApi,
+  createAdminController
+} from '../controller/admin-controller'
+import { api as defaultApi } from '../instance'
 
 // WF-7..9: persons CRUD (owner protected), per-person photo management and
 // the unidentified tray (list / delete / promote). All mutations go through
 // the signals controller so the state stays testable without DOM.
-const controller = createAdminController({ api })
 
-const Admin = (): JSX.Element => {
+export type AdminViewApi = AdminApi
+
+export interface AdminProps {
+  /** Optional API to inject for tests; defaults to the real instance. */
+  api?: AdminViewApi
+}
+
+const Admin = ({ api: injectedApi }: AdminProps = {}): JSX.Element => {
+  const [controller] = useState(() =>
+    createAdminController({ api: injectedApi ?? defaultApi })
+  )
   const state = controller.state.value
   const [newName, setNewName] = useState('')
   const [promoteTarget, setPromoteTarget] = useState<string>('')
@@ -29,7 +41,7 @@ const Admin = (): JSX.Element => {
   const rename = (name: string): void => {
     const next = globalThis.prompt(`Rename "${name}" to`, name)
 
-    if (next && next.trim() && next.trim() !== name)
+    if (next?.trim() && next.trim() !== name)
       controller.renamePerson(name, next.trim())
   }
 

@@ -50,6 +50,7 @@ Chain strategy: size-exception
 
 ## Phase 4: Wrap (M4)
 
-- [ ] 4.1 CI workflows -> pnpm --filter/-r (test:local, typecheck, lint)
-- [ ] 4.2 README + docs/ai monorepo layout; Pi .env + deploy doc (WEB_DIST)
-- [ ] 4.3 Mark openwa-setup-ux superseded (state.yaml); M4 gate: CI green
+- [x] 4.1 CI workflows -> pnpm --filter/-r (test:local, typecheck, lint)
+- [x] 4.2 README + docs/ai monorepo layout; Pi .env + deploy doc (WEB_DIST)
+- [x] 4.3 Mark openwa-setup-ux superseded (state.yaml); M4 gate: CI green
+- [x] 4.4 UI component tests (Admin/Setup views) + Playwright smoke e2e; CI job

@@ -335,6 +335,28 @@ If OpenWA is managed by a separate Compose project, set
 `OPENWA_COMPOSE_SERVICE` to the service name that exposes `/app/data/.api-key`,
 or paste the key in `/setup`.
 
+## Monorepo web app
+
+The repository is a pnpm workspace: the Fastify backend in `apps/backend`
+(`@doorcloud/backend`), the config web app in `apps/web` (`@doorcloud/web`,
+Preact + hash routing), and the shared zod DTOs in `packages/shared`
+(`@doorcloud/shared`, built `dist`).
+
+The SPA is served same-origin by the backend and replaces the old
+`renderSetupHtml` page:
+
+- `/` and `/setup` serve `apps/web/dist` through `@fastify/static`; the
+  `/admin/*` and `/setup/*` API routes always take precedence. Set `WEB_DIST`
+  to serve the build from another folder (default `apps/web/dist`).
+- `#/setup` drives the OpenWA pairing flow (3s poll, auto-QR, failure caps).
+- `#/admin` is the photo admin (Bearer `SETUP_TOKEN` in localStorage): person
+  CRUD, per-person photos, and the `unidentified/` tray (promote/remove).
+
+`pnpm install` at the repo root wires the workspace; `pnpm -r test:local`,
+`pnpm typecheck` and `pnpm lint` run across every package. `@doorcloud/shared`
+ships its built `dist`, so a fresh checkout must `pnpm --filter
+@doorcloud/shared build` before building the backend or web consumers.
+
 ## Benchmark and Demographic Bias Analysis
 
 The repository includes a reproducible benchmark and demographic bias analysis pipeline for the face recognition models. See [`docs/benchmark-analysis.md`](docs/benchmark-analysis.md) for the full thesis-like report (methodology, results, figures, LaTeX tables, and Appendix A with per-model bias tables).

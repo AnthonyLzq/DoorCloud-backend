@@ -165,10 +165,10 @@
 ### Flow Diagram
 
 ```
-1. User accesses setup page
-   └─▶ GET /setup
-   └─▶ Returns HTML UI
-   
+1. User opens the web app (Preact SPA, hash routing)
+   └─▶ GET / or /setup → serves apps/web/dist via @fastify/static
+   └─▶ renderSetupHtml removed; the SPA Setup view drives pairing
+
 2. User configures OpenWA
    └─▶ POST /setup/config
    └─▶ Saves: OPENWA_API_KEY, OPENWA_BASE_URL, etc.
@@ -176,11 +176,11 @@
 3. User starts session
    └─▶ POST /setup/start
    └─▶ Calls OpenWA API to start session
-   
+    
 4. User loads QR code
    └─▶ GET /setup/qr
    └─▶ Returns QR image for WhatsApp scan
-   
+    
 5. User sends test message
    └─▶ POST /setup/test
    └─▶ Sends test message via WhatsApp
@@ -190,37 +190,44 @@
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/setup` | Setup UI |
+| GET | `/` , `/setup` | SPA (setup + photo admin, hash routed) |
 | POST | `/setup/config` | Save configuration |
 | POST | `/setup/start` | Start OpenWA session |
 | GET | `/setup/qr` | Get QR code |
 | POST | `/setup/test` | Send test message |
 | GET | `/setup/status` | Get session status |
+| GET/POST | `/admin/photos/persons` | List/create persons (Bearer `SETUP_TOKEN`) |
+| GET/POST/DELETE | `/admin/photos/persons/{name}/photos` | Per-person photo list/upload/delete |
+| GET/DELETE/POST | `/admin/photos/unidentified[...]` | Unidentified tray list/delete/promote |
 
 ## Key Files by Flow
 
 ### MQTT Photo Flow
-- `src/network/mqtt/routes/photo.ts` - Main handler
-- `src/network/mqtt/topics.ts` - Topic definitions
-- `src/network/mqtt/photoPayloads.ts` - Payload schemas
-- `src/services/user.ts` - User service
-- `test/mqtt.integration.test.ts` - Integration tests
+- `apps/backend/src/network/mqtt/routes/photo.ts` - Main handler
+- `apps/backend/src/network/mqtt/topics.ts` - Topic definitions
+- `apps/backend/src/network/mqtt/photoPayloads.ts` - Payload schemas
+- `apps/backend/src/services/user.ts` - User service
+- `apps/backend/test/mqtt.integration.test.ts` - Integration tests
 
 ### Python IPC Flow
-- `src/services/face-recognition/python-manager.ts` - IPC manager
-- `src/services/face-recognition/python-schemas.ts` - Zod schemas
-- `scripts/face_recognition_server.py` - Python server
-- `test/python-manager.test.ts` - Unit tests
-- `test/python-manager-ipc.test.ts` - IPC tests
+- `apps/backend/src/services/face-recognition/python-manager.ts` - IPC manager
+- `apps/backend/src/services/face-recognition/python-schemas.ts` - Zod schemas
+- `apps/backend/scripts/face_recognition_server.py` - Python server
+- `apps/backend/test/python-manager.test.ts` - Unit tests
+- `apps/backend/test/python-manager-ipc.test.ts` - IPC tests
 
 ### HTTP Setup Flow
-- `src/network/http/routes/setup.ts` - Setup routes
-- `src/integrations/whatsapp/setup.ts` - WhatsApp setup
-- `src/integrations/whatsapp/openwa.ts` - OpenWA client
+- `apps/backend/src/network/http/routes/setup.ts` - Setup routes + SPA serving
+- `apps/backend/src/network/http/routes/admin-photos.ts` - Photo admin API
+- `apps/backend/src/integrations/whatsapp/setup.ts` - WhatsApp setup
+- `apps/backend/src/integrations/whatsapp/openwa.ts` - OpenWA client
+- `apps/web/src/views/Setup.tsx` - SPA pairing view
+- `apps/web/src/views/Admin.tsx` - SPA photo admin view
+- `apps/web/src/controller/` - signals controllers (setup + admin)
 
 ### Configuration
-- `src/config/env.ts` - Environment validation
-- `.env.example` - Required variables
+- `apps/backend/src/config/env.ts` - Environment validation
+- `apps/backend/.env.example` - Required variables
 
 ## ONNX Provider Flow
 
@@ -354,9 +361,12 @@ URLs are built from `PHOTOS_BASE_URL` so the fetch-by-URL contract used by
 
 | Concern | Value |
 |---------|-------|
-| Layout | `{name}-{id}/{fieldname}-{uuid}.{ext}` (verified); numeric-timestamp prefix (no-match) |
-| Storage | `src/storage/photos.ts` - `PhotoStorage` (upload/list/getUrl) |
-| Serving | `@fastify/static` at `/photos` rooted at `PHOTOS_DIR` |
+| Layout | `PHOTOS_DIR/{Person}/{fieldname}-{uuid}.{ext}` (known); `PHOTOS_DIR/unidentified/{uuid}.{ext}` (no-match tray) |
+| Person folders | The folder name IS the identity; verified door photos store back in-folder |
+| Unidentified tray | `unidentified/` is excluded from `listDirectories()`; promote moves it into a person folder |
+| Storage | `apps/backend/src/storage/photos.ts` - `PhotoStorage` (upload/list/getUrl) + admin primitives |
+| Admin | `/admin/photos/*` (Bearer `SETUP_TOKEN`) lists/creates/renames/deletes persons, photos and tray |
+| Serving | `@fastify/static` at `/photos` rooted at `PHOTOS_DIR`; SPA at `/` + `/setup` |
 | URLs | `{PHOTOS_BASE_URL}/{relative-path}` |
 
 ### User Config

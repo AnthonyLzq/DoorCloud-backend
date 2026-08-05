@@ -1,25 +1,50 @@
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
+import type { Api } from '../api'
 import {
   createSetupController,
   MAX_POLLS
 } from '../controller/setup-controller'
-import { api } from '../instance'
+import { api as defaultApi } from '../instance'
 
 // Setup view (WF-1..6): page-load status check, Start with double-start
 // guard, auto-poll up to 20 status checks, auto-QR, manual recovery via
 // "Load QR" and "Refresh status", plus the OpenWA config form that the SPA
 // absorbed from the old renderSetupHtml page.
-export const Setup = (): JSX.Element => {
+
+// The subset of the API the Setup view drives; typed separately from the
+// full Api so tests can inject a fake without stubbing admin methods.
+export interface SetupViewApi {
+  getSetupStatus: Api['getSetupStatus']
+  startSetupSession: Api['startSetupSession']
+  getSetupQr: Api['getSetupQr']
+  saveSetupConfig: Api['saveSetupConfig']
+  sendSetupTest: Api['sendSetupTest']
+}
+
+export interface SetupProps {
+  /** Optional API to inject for tests; defaults to the real instance. */
+  api?: SetupViewApi
+  /** Optional timers to inject for tests; default to the real globals. */
+  setTimeout?: typeof setTimeout
+  clearTimeout?: typeof clearTimeout
+}
+
+export const Setup = ({
+  api: injectedApi,
+  setTimeout: setTimeoutImpl,
+  clearTimeout: clearTimeoutImpl
+}: SetupProps = {}): JSX.Element => {
+  const apiImpl = injectedApi ?? defaultApi
   const [controller] = useState(() =>
     createSetupController({
       api: {
-        getStatus: api.getSetupStatus,
-        start: api.startSetupSession,
-        getQr: api.getSetupQr
+        getStatus: apiImpl.getSetupStatus,
+        start: apiImpl.startSetupSession,
+        getQr: apiImpl.getSetupQr
       },
-      setTimeout,
-      clearTimeout
+      setTimeout: setTimeoutImpl ?? setTimeout,
+      clearTimeout: clearTimeoutImpl ?? clearTimeout
     })
   )
   const [chatId, setChatId] = useState('')
@@ -42,7 +67,7 @@ export const Setup = (): JSX.Element => {
   const saveConfig = async (): Promise<void> => {
     setFormMessage('')
     try {
-      const result = await api.saveSetupConfig({
+      const result = await apiImpl.saveSetupConfig({
         ...(chatId.trim() ? { OPENWA_CHAT_ID: chatId.trim() } : {})
       })
       setFormMessage(`Saved: ${result.saved.join(', ')}`)
@@ -56,7 +81,7 @@ export const Setup = (): JSX.Element => {
   const sendTest = async (): Promise<void> => {
     setFormMessage('')
     try {
-      await api.sendSetupTest({
+      await apiImpl.sendSetupTest({
         ...(imageUrl.trim() ? { imageUrl: imageUrl.trim() } : {})
       })
       setFormMessage('Test message sent')

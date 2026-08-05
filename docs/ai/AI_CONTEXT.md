@@ -20,7 +20,7 @@ Prefer targeted search with `rg` before reading whole files.
 HTTP route -> MQTT publish -> Python IPC -> Face recognition -> MQTT response
 ```
 
-Files:
+Files (all under `apps/backend`):
 - `src/network/http/routes/setup.ts` - HTTP entry point
 - `src/network/mqtt/routes/photo.ts` - MQTT handler
 - `src/services/face-recognition/python-manager.ts` - IPC manager
@@ -51,10 +51,25 @@ Protocol: JSON-line over stdin/stdout pipes. All Python prints must use `flush=T
 
 ### HTTP Routes
 
-Files:
-- `src/network/http/routes/setup.ts` - Setup endpoints
+Files (all under `apps/backend`):
+- `src/network/http/routes/setup.ts` - Setup endpoints; serves the SPA
+- `src/network/http/routes/admin-photos.ts` - Photo admin API (Bearer `SETUP_TOKEN`)
 - `src/services/user.ts` - User service
 - `src/storage/photos.ts` - Local photo storage (disk)
+
+### Web app (SPA)
+
+`apps/web` is a Preact SPA served same-origin by the backend (hash routing),
+absorbing the old `renderSetupHtml` page and adding the photo admin:
+
+- `src/views/Setup.tsx` - pairing flow driven by `createSetupController`
+- `src/views/Admin.tsx` - person CRUD + unidentified tray (owner protected)
+- Talks to `/setup/*` and `/admin/photos/*` (Bearer `SETUP_TOKEN` from localStorage)
+- Built to `apps/web/dist`; served via `@fastify/static` at `/` and `/setup`
+  (`WEB_DIST` env, default `apps/web/dist`); the `/admin/*` API wins over static
+
+`packages/shared` holds the zod DTOs (`@doorcloud/shared`) both sides validate
+against (consumed as built `dist` via `workspace:*`).
 
 ### WhatsApp Integration
 
@@ -64,19 +79,21 @@ Files:
 
 ## Critical files (do not refactor without tests)
 
-- `src/services/face-recognition/python-manager.ts` (434 lines, IPC critical)
-- `src/services/face-recognition/onnx-provider.ts` (ONNX runtime)
-- `src/network/mqtt/mqtt.ts` (MQTT client)
-- `scripts/face_recognition_server.py` (Python IPC server)
+- `apps/backend/src/services/face-recognition/python-manager.ts` (434 lines, IPC critical)
+- `apps/backend/src/services/face-recognition/onnx-provider.ts` (ONNX runtime)
+- `apps/backend/src/network/mqtt/mqtt.ts` (MQTT client)
+- `apps/backend/scripts/face_recognition_server.py` (Python IPC server)
 
 ## Architecture overview
 
-- **HTTP**: Fastify routes in `src/network/http/`
-- **MQTT**: Client in `src/network/mqtt/`
+- **HTTP**: Fastify routes in `apps/backend/src/network/http/`
+- **MQTT**: Client in `apps/backend/src/network/mqtt/`
 - **Face recognition**: Hybrid ONNX (Node.js) + Python process
-- **WhatsApp**: OpenWA integration in `src/integrations/whatsapp/`
-- **Storage**: Photos on disk via `src/storage/photos.ts` served at `/photos`; user state via `src/storage/state.ts` (SQLite)
-- **Config**: Environment validation in `src/config/env.ts`
+- **WhatsApp**: OpenWA integration in `apps/backend/src/integrations/whatsapp/`
+- **Web app**: Preact SPA in `apps/web` (setup + photo admin)
+- **Shared DTOs**: zod schemas in `packages/shared` (`@doorcloud/shared`)
+- **Storage**: Photos on disk via `apps/backend/src/storage/photos.ts` served at `/photos`; user state via `src/storage/state.ts` (SQLite)
+- **Config**: Environment validation in `apps/backend/src/config/env.ts`
 
 ## Local storage
 
@@ -88,12 +105,17 @@ Photos:
   `listDirectories()` + `list()` in `src/storage/photos.ts`; `user.ts` builds
   reference photos with a Promise.all over folders
 - Matched door photos are stored back into that person's folder
-  (`{foundName}-{uuid}.{ext}`); unmatched go to `PHOTOS_DIR/{USER_NAME}` with
-  a numeric-timestamp prefix (never re-used as reference)
+  (`{foundName}-{uuid}.{ext}`); unmatched photos go to the reserved
+  `PHOTOS_DIR/unidentified/` tray (`UNIDENTIFIED_FOLDER`, `{uuid}.{ext}`) and
+  are excluded from `listDirectories()` — a person folder never re-uses them
+- The admin photo API (`/admin/photos/*`, Bearer `SETUP_TOKEN`) lists/creates/
+  renames/deletes persons and photos and can promote tray photos into a
+  person folder (move); the owner folder (`USER_NAME`) can never be renamed
+  or deleted from the UI
 - Uploads keep the client file name (sanitized + uuid); served statically at
   `GET /photos/*`; URLs built from `PHOTOS_BASE_URL`
 - `src/storage/photos.ts` - `PhotoStorage` interface
-  (upload/list/listDirectories/getUrl)
+  (upload/list/listDirectories/getUrl) + tray primitives
 
 User config and state:
 - Single user from `USER_NAME` (`src/config/user.ts`); `USER_PHONE` optional;
