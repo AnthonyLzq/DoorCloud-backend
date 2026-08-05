@@ -38,15 +38,15 @@ Chain strategy: size-exception
 
 ## Phase 3: Feature — Web App + Admin API (M3)
 
-- [ ] 3.1 Scaffold apps/web: Preact+Vite, hash routing (D5), signals (D6), proxy; auth.ts (Bearer, 401 prompt WF-2)
-- [ ] 3.2 RED: controller test (cap 20, stop qr/connected/session:null, 3-failure, double-start) -> createSetupController + Setup view (auto-QR, Start disabled) (WF-1..6)
-- [ ] 3.3 RED: photo-storage-admin.test (traversal, move, rm, owner) -> photos.ts primitives (folder CRUD, delete/movePhoto, listUnidentified, safeJoin, tray excluded)
-- [ ] 3.4 RED: admin-photos.test (401/400/409/403/confirm/promote) -> routes/admin-photos.ts (PA-1..6), per-route multipart 20/20MB (D8)
-- [ ] 3.5 user.ts no-match -> unidentified/ {uuid}.{ext} (RF-1) + RED: owner untouched
-- [ ] 3.6 RED: migration.test (/^\d/ moved, idempotent) -> storage/migrations.ts migrateLegacyUnidentified()
-- [ ] 3.7 server.ts: @fastify/static /assets/ + GET /, /setup (D7); API before static
-- [ ] 3.8 Admin view: persons CRUD (owner protected), photos, tray (WF-7..9) + store tests
-- [ ] 3.9 Delete renderSetupHtml; M3 gate: suite + manual CRUD + QR e2e
+- [x] 3.1 Scaffold apps/web: Preact+Vite, hash routing (D5), signals (D6), proxy; auth.ts (Bearer, 401 prompt WF-2)
+- [x] 3.2 RED: controller test (cap 20, stop qr/connected/session:null, 3-failure, double-start) -> createSetupController + Setup view (auto-QR, Start disabled) (WF-1..6)
+- [x] 3.3 RED: photo-storage-admin.test (traversal, move, rm, owner) -> photos.ts primitives (folder CRUD, delete/movePhoto, listUnidentified, safeJoin, tray excluded)
+- [x] 3.4 RED: admin-photos.test (401/400/409/403/confirm/promote) -> routes/admin-photos.ts (PA-1..6), per-route multipart 20/20MB (D8)
+- [x] 3.5 user.ts no-match -> unidentified/ {uuid}.{ext} (RF-1) + RED: owner untouched
+- [x] 3.6 RED: migration.test (/^\d/ moved, idempotent) -> storage/migrations.ts migrateLegacyUnidentified()
+- [x] 3.7 server.ts: @fastify/static /assets/ + GET /, /setup (D7); API before static
+- [x] 3.8 Admin view: persons CRUD (owner protected), photos, tray (WF-7..9) + store tests
+- [x] 3.9 Delete renderSetupHtml; M3 gate: suite + manual CRUD + QR e2e
 
 ## Phase 4: Wrap (M4)
 

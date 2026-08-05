@@ -1,0 +1,36 @@
+{
+  "name": "@doorcloud/web",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.1",
+  "description": "DoorCloud config SPA (OpenWA setup + photo admin)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "lint": "biome check src/ test/",
+    "lint:fix": "biome check --write src/ test/",
+    "format": "biome format --write src/ test/",
+    "test:local": "vitest run",
+    "test:ci": "vitest run"
+  },
+  "dependencies": {
+    "@doorcloud/shared": "workspace:*",
+    "@preact/signals": "^2.10.1",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
+    "@preact/preset-vite": "^2.10.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22.20.0 <23",
+    "pnpm": ">=10.30.1 <11"
+  },
+  "license": "MIT"
+}

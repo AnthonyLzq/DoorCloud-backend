@@ -4,6 +4,7 @@ import {
   mkdir,
   readdir,
   rename,
+  rm,
   stat,
   unlink,
   writeFile
@@ -22,6 +23,11 @@ const TMP_UPLOAD_SUFFIX = '.tmp-'
 // Orphaned temp files older than this are considered crash leftovers (not
 // concurrent uploads) and are removed by the next upload to the same folder.
 const TMP_ORPHAN_AGE_MS = 60_000
+
+// RF-1/RF-8: the no-match sink folder is excluded from known persons; it is
+// only reachable through the unidentified primitives (listUnidentified,
+// deletePhoto, movePhoto, upload).
+export const UNIDENTIFIED_FOLDER = 'unidentified'
 
 const signPhotoPath = (
   secret: string,
@@ -71,6 +77,26 @@ export interface PhotoStorage {
    * @returns Absolute filesystem path
    */
   resolvePath(relativePath: string): string
+
+  // RF-9: folder primitives for the photo admin (PA-4). All paths resolve
+  // through the containment check; the reserved unidentified tray folder
+  // cannot be created, renamed, or deleted through them.
+  createFolder(name: string): Promise<void>
+  renameFolder(from: string, to: string): Promise<void>
+  deleteFolder(name: string): Promise<void>
+
+  // RF-10: photo primitives for the admin API and the unidentified tray.
+  // movePhoto SHALL move, never copy.
+  deletePhoto(folder: string, filename: string): Promise<void>
+  movePhoto(
+    fromFolder: string,
+    filename: string,
+    toFolder: string
+  ): Promise<string>
+
+  // RF-8: raw tray listing; only .tmp- upload leftovers are hidden, so the
+  // numeric-prefix sink files show up for promote/delete.
+  listUnidentified(): Promise<string[]>
 }
 
 export class DiskPhotoStorage implements PhotoStorage {
@@ -103,6 +129,65 @@ export class DiskPhotoStorage implements PhotoStorage {
       throw new Error('Path escapes PHOTOS_DIR')
 
     return fullPath
+  }
+
+  #assertNotReserved(name: string): void {
+    if (name === UNIDENTIFIED_FOLDER)
+      throw new Error(`Folder name "${UNIDENTIFIED_FOLDER}" is reserved`)
+  }
+
+  async createFolder(name: string): Promise<void> {
+    this.#assertNotReserved(name)
+    await mkdir(this.#safeJoin(name), { recursive: true })
+  }
+
+  async renameFolder(from: string, to: string): Promise<void> {
+    this.#assertNotReserved(to)
+    await rename(this.#safeJoin(from), this.#safeJoin(to))
+  }
+
+  async deleteFolder(name: string): Promise<void> {
+    this.#assertNotReserved(name)
+    await rm(this.#safeJoin(name), { force: true, recursive: true })
+  }
+
+  async deletePhoto(folder: string, filename: string): Promise<void> {
+    await unlink(this.#safeJoin(folder, filename))
+  }
+
+  async movePhoto(
+    fromFolder: string,
+    filename: string,
+    toFolder: string
+  ): Promise<string> {
+    // The tray is a valid photo DESTINATION (migration, promote); the
+    // reservation only protects folder-level primitives (create/rename/
+    // delete) so no known person can be named "unidentified".
+    const sourcePath = this.#safeJoin(fromFolder, filename)
+    const targetPath = this.#safeJoin(toFolder, filename)
+
+    await mkdir(dirname(targetPath), { recursive: true })
+    await rename(sourcePath, targetPath)
+
+    return `${toFolder}/${filename}`
+  }
+
+  async listUnidentified(): Promise<string[]> {
+    let entries: Dirent[]
+
+    try {
+      entries = await readdir(this.#safeJoin(UNIDENTIFIED_FOLDER), {
+        withFileTypes: true
+      })
+    } catch (error) {
+      if (isNotFoundError(error)) return []
+      throw error
+    }
+
+    return entries
+      .filter(entry => entry.isFile())
+      .map(entry => entry.name)
+      .filter(name => !name.includes(TMP_UPLOAD_SUFFIX))
   }
 
   async upload(
@@ -194,7 +279,10 @@ export class DiskPhotoStorage implements PhotoStorage {
       throw error
     }
 
-    return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+    return entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .filter(name => name !== UNIDENTIFIED_FOLDER)
   }
 
   getUrl(relativePath: string): string {

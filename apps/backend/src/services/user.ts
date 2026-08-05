@@ -10,7 +10,7 @@ import {
   sendPhotoDetectionResultThroughWhatsapp
 } from 'integrations'
 import { faceRecognitionService } from 'services/face-recognition'
-import { DiskPhotoStorage } from 'storage/photos'
+import { DiskPhotoStorage, UNIDENTIFIED_FOLDER } from 'storage/photos'
 import { getUserState, type UserState } from 'storage/state'
 import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
 
@@ -130,12 +130,13 @@ class UserServices {
     )
 
     // Matched door photos accumulate in the person's folder (they reinforce
-    // the reference set); unmatched ones go to the owner folder with a
-    // timestamp prefix so they are never re-listed as reference photos
-    const uploadFolder = foundName ?? name
+    // the reference set); unmatched ones go to the unidentified tray
+    // (RF-1): the tray is excluded from known persons, so the owner folder
+    // only ever holds the owner's own reference photos
+    const uploadFolder = foundName ?? UNIDENTIFIED_FOLDER
     const uploadName = foundName
       ? `${foundName}-${crypto.randomUUID()}.${format}`
-      : `${getTimestamp()}-${crypto.randomUUID()}.${format}`
+      : `${crypto.randomUUID()}.${format}`
 
     const uploadPath = await this.#photoStorage.upload(
       uploadFolder,

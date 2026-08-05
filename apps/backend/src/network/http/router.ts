@@ -9,9 +9,10 @@ import type {
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 
 import { response } from './response'
-import { Home, Setup, User } from './routes'
+import { AdminPhotos, Setup, User } from './routes'
 
-const routes = [Home, Setup, User]
+// Home is gone: the Preact SPA owns GET / and /setup (design D7).
+const routes = [Setup, User, AdminPhotos]
 type ZodFastifyInstance = FastifyInstance<
   RawServerDefault,
   RawRequestDefaultExpression<RawServerDefault>,

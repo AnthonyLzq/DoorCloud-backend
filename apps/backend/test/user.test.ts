@@ -40,7 +40,8 @@ vi.mock('../src/storage/photos', () => ({
     list = mocks.listPhotos
     listDirectories = mocks.listDirectories
     getUrl = mocks.getPhotoUrl
-  }
+  },
+  UNIDENTIFIED_FOLDER: 'unidentified'
 }))
 vi.mock('../src/storage/state', () => ({
   getUserState: () => ({
@@ -131,7 +132,7 @@ beforeEach(() => {
   mocks.getPhotoUrl.mockImplementation(
     (path: string) => `https://example.com/photos/${path}`
   )
-  mocks.uploadPhoto.mockResolvedValue('John/2026-01-01T00:00:00.000Z-uuid.jpg')
+  mocks.uploadPhoto.mockResolvedValue('unidentified/uuid.jpg')
   mocks.getLastMessage.mockReturnValue(new Date(Date.now() - 2 * 36e5))
 })
 
@@ -240,21 +241,20 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
     )
   })
 
-  it('writes a no-match photo locally with a timestamp-uuid name and sends its URL', async () => {
+  it('sinks a no-match photo to the unidentified tray with a uuid name, never the owner folder', async () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
     await us.sendPhotoThroughWhatsapp('jpg', Buffer.from('photo'))
 
     expect(mocks.uploadPhoto).toHaveBeenCalledWith(
-      'John',
-      expect.stringMatching(/^2026-01-01T00:00:00\.000Z-[0-9a-f-]{36}\.jpg$/),
+      'unidentified',
+      expect.stringMatching(/^[0-9a-f-]{36}\.jpg$/),
       Buffer.from('photo')
     )
     expect(mocks.sendPhotoDetectionResultThroughWhatsapp).toHaveBeenCalledWith(
       expect.objectContaining({
-        imageUrl:
-          'https://example.com/photos/John/2026-01-01T00:00:00.000Z-uuid.jpg',
+        imageUrl: 'https://example.com/photos/unidentified/uuid.jpg',
         success: false
       })
     )

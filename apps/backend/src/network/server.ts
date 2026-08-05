@@ -1,9 +1,11 @@
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { extname } from 'node:path'
+import { extname, resolve } from 'node:path'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import fastifyStatic from '@fastify/static'
 import { getEnv } from 'config/env'
+import { repoRoot } from 'config/paths'
 import fastify, { type FastifyInstance } from 'fastify'
 import {
   serializerCompiler,
@@ -11,6 +13,7 @@ import {
   type ZodTypeProvider
 } from 'fastify-type-provider-zod'
 import { faceRecognitionService } from 'services/face-recognition'
+import { migrateLegacyUnidentified } from 'storage/migrations'
 import { DiskPhotoStorage } from 'storage/photos'
 import { applyRoutes } from './http'
 import { mqttConnection } from './mqtt'
@@ -32,6 +35,7 @@ class Server {
   #app: FastifyInstance
   #mqqtConnection: Awaited<ReturnType<typeof mqttConnection>> | undefined
   #faceRecognitionService: typeof faceRecognitionService
+  #photoStorage!: DiskPhotoStorage
 
   constructor() {
     const { NODE_ENV } = getEnv()
@@ -68,6 +72,7 @@ class Server {
       urlSecret: PHOTOS_URL_SECRET,
       urlTtlMs: PHOTO_URL_TTL_MS
     })
+    this.#photoStorage = photoStorage
 
     this.#app.register(cors, {
       origin: CORS_ORIGINS ?? true
@@ -123,6 +128,24 @@ class Server {
     this.#app.setValidatorCompiler(validatorCompiler)
     this.#app.setSerializerCompiler(serializerCompiler)
     applyRoutes(this.#app.withTypeProvider<ZodTypeProvider>())
+
+    // D7: the Preact SPA owns the root pages. Registered AFTER the API
+    // routes so /api/*, /setup/* and /photos/* are never shadowed. The
+    // static root points at the dist/assets folder because @fastify/static
+    // strips the prefix before resolving the file: /assets/foo.js -> root/foo.js.
+    const webDist = getEnv().WEB_DIST ?? resolve(repoRoot, 'apps/web/dist')
+
+    this.#app.register(fastifyStatic, {
+      root: resolve(webDist, 'assets'),
+      prefix: '/assets/',
+      wildcard: true
+    })
+    this.#app.get('/', (_request, reply) =>
+      reply.sendFile('index.html', webDist)
+    )
+    this.#app.get('/setup', (_request, reply) =>
+      reply.sendFile('index.html', webDist)
+    )
   }
 
   public get app(): FastifyInstance {
@@ -141,6 +164,19 @@ class Server {
       await this.#faceRecognitionService.init({ mode: 'onnx' })
       this.#startMqtt()
       await this.#mqqtConnection?.start()
+
+      // RF-1 migration: relocate legacy timestamp-prefixed no-match photos
+      // to the unidentified tray. Warn-only — a broken migration must never
+      // take down the door.
+      try {
+        const moved = await migrateLegacyUnidentified(this.#photoStorage)
+
+        if (moved > 0)
+          this.#app.log.info({ moved }, 'Legacy unidentified photos migrated')
+      } catch (error) {
+        this.#app.log.warn({ err: error }, 'Legacy migration skipped')
+      }
+
       await this.#app.listen({
         host: HOST,
         port: PORT
