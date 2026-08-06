@@ -176,3 +176,8 @@ test-results/
 playwright-report/
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Turborepo cache (runtime data, regenerable; never commit)
+.turbo/
+apps/*/.turbo/
+packages/*/.turbo/

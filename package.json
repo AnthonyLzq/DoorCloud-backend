@@ -12,13 +12,13 @@
   },
   "description": "DoorCloud monorepo root (orchestrator)",
   "scripts": {
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
     "lint:fix": "pnpm -r lint:fix",
     "format": "pnpm -r format",
-    "typecheck": "pnpm -r typecheck && tsc --noEmit -p tsconfig.json",
+    "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "test:local": "pnpm -r test:local",
-    "test:ci": "pnpm -r test:ci",
+    "test:ci": "turbo run test:ci",
     "test:mqtt": "pnpm --filter @doorcloud/backend test:mqtt",
     "models:test": "tsx scripts/test-onnx-inference.ts",
     "benchmark:embeddings": "tsx scripts/embed-bfw.ts",
@@ -31,6 +31,7 @@
   "devDependencies": {
     "commit-and-tag-version": "^12.6.1",
     "tsx": "^4.23.1",
+    "turbo": "2.10.8",
     "typescript": "^7.0.2"
   },
   "dependencies": {
