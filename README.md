@@ -220,8 +220,8 @@ an Alpine image.
 
 ### Compose (recommended)
 
-The root `compose.yaml` defines a `doorcloud` service (image
-`doorcloud:production`) beside `mosquitto` and `openwa` on one network. The
+The root `compose.yaml` defines a `doorcloud` service (image `doorcloud`)
+beside `mosquitto` and `openwa` on one network. The
 backend connects to the broker via `MQTT_HOST=mosquitto` (plaintext
 `MQTT_PROTOCOL=mqtt`), serves the SPA, exposes `GET /healthz` for liveness, and
 is wired to a HEALTHCHECK with `restart: unless-stopped`.
@@ -257,7 +257,7 @@ period, then exits 0. `docker stop` triggers this path.
 ```bash
 docker compose build doorcloud
 # or directly
-docker build -t doorcloud:production .
+docker build -t doorcloud .
 ```
 
 ### Docker env handoff

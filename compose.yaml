@@ -2,7 +2,7 @@ services:
   doorcloud:
     build:
       context: .
-    image: doorcloud:production
+    image: doorcloud
     container_name: doorcloud
     restart: unless-stopped
     ports:
