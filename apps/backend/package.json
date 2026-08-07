@@ -6,6 +6,7 @@
   "description": "Backend for DoorCloud",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "dev": "nodemon --exitcrash",
     "lint": "biome check src/ bin/",
     "lint:fix": "biome check --write src/ bin/",
     "format": "biome format --write src/ bin/",
