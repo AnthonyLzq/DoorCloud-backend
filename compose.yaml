@@ -1,4 +1,56 @@
 services:
+  doorcloud:
+    build:
+      context: .
+    image: doorcloud-backend:production
+    container_name: doorcloud-backend
+    restart: unless-stopped
+    ports:
+      - '${DOORCLOUD_PORT:-1996}:1996'
+    env_file:
+      - .env
+    environment:
+      # CD-7: the backend joins the same compose network as mosquitto/openwa,
+      # so MQTT host resolves to the broker container service name.
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 1996
+      MQTT_HOST: mosquitto
+      # CD-7: env.ts defaults to mqtts (TLS); mosquitto here is plaintext.
+      MQTT_PROTOCOL: mqtt
+      MQTT_PORT: 1883
+      # CD-8: state DB lives on a mounted volume so last_message_at survives
+      # container recreation.
+      STATE_DB_PATH: /data/state/app-state.db
+      MODELS_DIR: /app/apps/backend/models
+      # CD-10: every env.ts-required var must be supplied (via env_file or
+      # here): MQTT_*, PHOTOS_*, PHOTOS_URL_SECRET, USER_NAME, MODELS_CDN_URL,
+      # and CORS_ORIGINS in production. See README Docker section.
+    volumes:
+      # CD-8: photos persist across container recreation.
+      - doorcloud-photos:${PHOTOS_DIR:-/data/photos}
+      # CD-8: SQLite state persists (STATE_DB_PATH points inside this mount).
+      - doorcloud-state:/data/state
+      # CD-9: ONNX models are mounted :ro at runtime, never baked into the
+      # image (keeps the image small; models swappable without a rebuild).
+      # MODELS_SOURCE is the HOST path; it binds to the container MODELS_DIR.
+      - ${MODELS_SOURCE:-./apps/backend/models}:/app/apps/backend/models:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:1996/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      openwa:
+        condition: service_healthy
+
   openwa:
     image: ghcr.io/rmyndharis/openwa:latest
     restart: unless-stopped
@@ -53,6 +105,8 @@ services:
       start_period: 5s
 
 volumes:
+  doorcloud-photos:
+  doorcloud-state:
   openwa-data:
   mosquitto-data:
   mosquitto-log:

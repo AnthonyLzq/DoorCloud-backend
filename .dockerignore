@@ -17,6 +17,12 @@ infra/mosquitto/passwordfile
 *.md
 LICENSE
 
+# Turborepo cache (never part of the build context)
+.turbo/
+apps/*/.turbo/
+packages/*/.turbo/
+node_modules/.cache/turbo
+
 vitest.config.mts
 nodemon.json
 *.log
