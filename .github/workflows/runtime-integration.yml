@@ -41,8 +41,8 @@ jobs:
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build shared package
-        run: pnpm --filter @doorcloud/shared build
+      - name: Build shared package via turbo
+        run: pnpm exec turbo run build --filter=@doorcloud/shared
 
       - name: Restore models cache
         id: models-cache
@@ -124,11 +124,17 @@ jobs:
             -v "${{ github.workspace }}/apps/backend/models:/app/apps/backend/models:ro" \
             doorcloud:manual
 
-      - name: Wait for boot and smoke-check HTTP
+      - name: Wait for boot and smoke-check HTTP (/healthz poll)
         run: |
-          sleep 20
-          code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/")
-          [ "$code" = "200" ] || { echo "GET / -> $code"; exit 1; }
+          code=""
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/healthz" || true)
+            [ "$code" = "200" ] && break
+            sleep 1
+          done
+          [ "$code" = "200" ] || { echo "GET /healthz -> $code after 60s"; exit 1; }
+          root=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/")
+          [ "$root" = "200" ] || { echo "GET / -> $root"; exit 1; }
           setup=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/setup")
           [ "$setup" = "200" ] || { echo "GET /setup -> $setup"; exit 1; }
           auth=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1996/admin/photos/persons")

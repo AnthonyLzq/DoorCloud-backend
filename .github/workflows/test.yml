@@ -22,12 +22,7 @@ jobs:
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile
 
-      # @doorcloud/shared ships its built dist (gitignored), so a fresh
-      # checkout must build it before the consumers typecheck/test/build.
-      - name: Build shared package
-        run: pnpm --filter @doorcloud/shared build
-
-      - name: Run workspace tests
+      - name: Run workspace tests (turbo orders shared build first)
         run: pnpm test:ci
         env:
           MQTT_USER: ${{ secrets.MQTT_USER }}
@@ -39,8 +34,8 @@ jobs:
       - name: Run typecheck
         run: pnpm typecheck
 
-      - name: Build the web SPA
-        run: pnpm --filter @doorcloud/web build
+      - name: Build all packages via turbo
+        run: pnpm build
 
   mqtt-integration:
     name: MQTT integration tests with Mosquitto
@@ -59,8 +54,8 @@ jobs:
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build shared package
-        run: pnpm --filter @doorcloud/shared build
+      - name: Build shared package via turbo
+        run: pnpm exec turbo run build --filter=@doorcloud/shared
 
       - name: Generate Mosquitto password file
         run: ./apps/backend/scripts/mosquitto/create-password-file.sh
@@ -115,8 +110,8 @@ jobs:
       - name: Install Node.js dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build shared package
-        run: pnpm --filter @doorcloud/shared build
+      - name: Build shared package via turbo
+        run: pnpm exec turbo run build --filter=@doorcloud/shared
 
       - name: Install Playwright browsers
         run: pnpm --filter @doorcloud/web exec playwright install --with-deps chromium
