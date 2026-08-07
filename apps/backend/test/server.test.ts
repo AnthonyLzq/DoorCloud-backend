@@ -126,6 +126,29 @@ describe('Server lifecycle (RF-5)', () => {
     expect(mocks.frsShutdown).toHaveBeenCalledTimes(1)
     expect(mocks.mqttConnection).not.toHaveBeenCalled()
   })
+
+  it('GET /healthz returns 200 without auth (CD-1)', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+    await Server.start()
+
+    const res = await Server.app.inject({ method: 'GET', url: '/healthz' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ status: 'ok' })
+    expect(res.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('stop() is idempotent and releases sessions once (CD-2)', async () => {
+    const Server = await startServer()
+
+    await Server.stop()
+    await Server.stop()
+    await Server.stop()
+
+    expect(mocks.frsShutdown).toHaveBeenCalledTimes(1)
+    expect(mocks.mqttConnection.mock.results[0].value.stop).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('Signed photo serving (RF-4)', () => {

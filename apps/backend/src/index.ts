@@ -28,6 +28,22 @@ process.on('unhandledRejection', reason => {
   shutdownWithError('unhandledRejection', reason)
 })
 
+// CD-2: graceful SIGTERM shutdown. The container orchestrator sends SIGTERM to
+// stop the service; drain in-flight work within a grace period, then exit 0.
+// A bounded force-exit fallback keeps the process from hanging past the
+// container stop timeout.
+process.on('SIGTERM', () => {
+  const forceExitTimer = setTimeout(() => process.exit(1), 10_000)
+  forceExitTimer.unref()
+
+  Server.stop()
+    .then(() => process.exit(0))
+    .catch(cleanupError => {
+      console.error('[fatal] SIGTERM cleanup failed:', cleanupError)
+      process.exit(1)
+    })
+})
+
 Server.start().catch(error => {
   shutdownWithError('server start failed', error)
 })

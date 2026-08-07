@@ -36,6 +36,7 @@ class Server {
   #mqqtConnection: Awaited<ReturnType<typeof mqttConnection>> | undefined
   #faceRecognitionService: typeof faceRecognitionService
   #photoStorage!: DiskPhotoStorage
+  #stopping = false
 
   constructor() {
     const { NODE_ENV } = getEnv()
@@ -129,6 +130,13 @@ class Server {
     this.#app.setSerializerCompiler(serializerCompiler)
     applyRoutes(this.#app.withTypeProvider<ZodTypeProvider>())
 
+    // CD-1: liveness probe for container healthchecks. Registered before the
+    // static/SPA routes so it is never shadowed, requires no auth, and leaks
+    // no environment, model, photo, or user data.
+    this.#app.get('/healthz', (_request, reply) => {
+      reply.code(200).send({ status: 'ok' })
+    })
+
     // D7: the Preact SPA owns the root pages. Registered AFTER the API
     // routes so /api/*, /setup/* and /photos/* are never shadowed. The
     // static root points at the dist/assets folder because @fastify/static
@@ -189,6 +197,12 @@ class Server {
   }
 
   public async stop(): Promise<void> {
+    // CD-2: idempotent stop — a second SIGTERM (or a stop during an in-flight
+    // shutdown) must never double-close MQTT, the face-recognition service, or
+    // the HTTP server. The flag stays set: this server is single-lifecycle.
+    if (this.#stopping) return
+
+    this.#stopping = true
     await this.#stopInternal()
   }
 
