@@ -2,8 +2,8 @@ services:
   doorcloud:
     build:
       context: .
-    image: doorcloud-backend:production
-    container_name: doorcloud-backend
+    image: doorcloud:production
+    container_name: doorcloud
     restart: unless-stopped
     ports:
       - '${DOORCLOUD_PORT:-1996}:1996'
