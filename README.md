@@ -209,22 +209,94 @@ Photos already on disk can be re-uploaded to the bucket via the backup CLI.
 
 ## Docker
 
-The image uses the current Node 22 Alpine 3.23 line, upgrades Alpine packages at
-build time, and keeps pnpm pinned to the project baseline:
+The project runs as a single production container: the Fastify backend serves
+the Preact SPA (`apps/web/dist`) **same-origin** from `/`, `/setup` and
+`/assets/*`, so no separate web/nginx container is needed. The image is built
+through the **Turborepo** task graph (shared -> backend -> web).
+
+The image uses `node:22-bookworm-slim` (glibc). Onnxruntime-node ships glibc-only
+prebuilt binaries, so an Alpine/musl base cannot `dlopen` it at boot. It is NOT
+an Alpine image.
+
+### Compose (recommended)
+
+The root `compose.yaml` defines a `doorcloud` service (image
+`doorcloud:production`) beside `mosquitto` and `openwa` on one network. The
+backend connects to the broker via `MQTT_HOST=mosquitto` (plaintext
+`MQTT_PROTOCOL=mqtt`), serves the SPA, exposes `GET /healthz` for liveness, and
+is wired to a HEALTHCHECK with `restart: unless-stopped`.
 
 ```bash
-docker build -t doorcloud-backend .
-docker run --env-file .env -p 1996:1996 \
-  -v /var/lib/doorcloud/photos:/var/lib/doorcloud/photos \
-  -v /var/lib/doorcloud/state:/var/lib/doorcloud/state \
-  -e STATE_DB_PATH=/var/lib/doorcloud/state/app-state.db \
-  doorcloud-backend
+# 1. environment (required by env.ts; see "Docker env handoff" below). The
+#    template lives at apps/backend/.env.example — copy values you need into a
+#    root .env consumed by compose's env_file.
+cp apps/backend/.env.example .env
+# 2. run the stack
+docker compose up -d
+# 3. verify
+curl http://localhost:1996/healthz   # -> {"status":"ok"}
+curl http://localhost:1996/          # -> SPA HTML (200)
 ```
 
-Mount the host directory for `PHOTOS_DIR` so stored photos persist across
-container restarts. The SQLite state file lives under `data/app-state.db` by
-default; in Docker, set `STATE_DB_PATH` to a path inside a mounted volume (as
-above) so `last_message_at` also survives container recreation.
+Persistent state lives on named volumes:
+
+- `PHOTOS_DIR` (default `/data/photos`) -> volume `doorcloud-photos`
+- SQLite state -> `STATE_DB_PATH=/data/state/app-state.db` -> volume
+  `doorcloud-state` (so `last_message_at` survives recreation)
+- ONNX models are mounted `:ro` at runtime from the host `MODELS_SOURCE`
+  (default `./apps/backend/models`) into `MODELS_DIR=/app/apps/backend/models`;
+  the ~774MB models are NEVER baked into the image, so they stay swappable
+  without a rebuild.
+
+Graceful shutdown: the backend handles `SIGTERM` — it drains in-flight work
+(MQTT close -> face-recognition shutdown -> HTTP close) within a 10s grace
+period, then exits 0. `docker stop` triggers this path.
+
+### Build the image manually
+
+```bash
+docker compose build doorcloud
+# or directly
+docker build -t doorcloud:production .
+```
+
+### Docker env handoff
+
+`env.ts` validates the environment at boot; the container fails fast if
+anything required is missing. Required in production:
+
+```dotenv
+MQTT_HOST=mosquitto
+MQTT_PROTOCOL=mqtt          # env.ts defaults to mqtts (TLS); use mqtt for the compose broker
+MQTT_PORT=1883
+MQTT_USER=<backend broker user>
+MQTT_PASS=<backend broker password>
+PHOTOS_DIR=/data/photos
+PHOTOS_BASE_URL=http://<host>:1996/photos
+PHOTOS_URL_SECRET=replace-with-a-32-char-random-string  # >= 16 chars, not a placeholder
+USER_NAME=<owner display name>
+MODELS_CDN_URL=<cdn url the models were downloaded from>
+CORS_ORIGINS=<comma-separated allowed origins>   # required when NODE_ENV=production
+```
+
+Optional, depending on feature use:
+
+```dotenv
+USER_PHONE=51999999999@c.us
+OPENWA_BASE_URL=http://openwa:2785
+OPENWA_API_KEY=<your key>
+OPENWA_SESSION_ID=main
+OPENWA_CHAT_ID=51999999999@c.us
+SETUP_TOKEN=<token for /admin/*>
+STATE_DB_PATH=/data/state/app-state.db
+HOST=0.0.0.0
+PORT=1996
+```
+
+If `CORS_ORIGINS` is missing while `NODE_ENV=production`, `env.ts` rejects the
+config at boot; supply it via `environment` or `env_file`. The Compose
+`doorcloud` service already sets `MQTT_HOST=mosquitto` and
+`MQTT_PROTOCOL=mqtt`; keep `.env` as the source of truth for secrets.
 
 ## Local Mosquitto broker
 
