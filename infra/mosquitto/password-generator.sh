@@ -12,6 +12,7 @@ mkdir -p "$(dirname "$target")"
 rm -f "$target"
 mosquitto_passwd -b -c "$target" "$backend_user" "$backend_pass"
 mosquitto_passwd -b "$target" "$device_user" "$device_pass"
+chown mosquitto:mosquitto "$target" 2>/dev/null || true
 chmod 600 "$target"
 echo "[doorcloud] passwordfile generated for: $backend_user, $device_user"
 
