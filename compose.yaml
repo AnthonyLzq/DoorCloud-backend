@@ -22,13 +22,39 @@ services:
       # CD-7: env.ts defaults to mqtts (TLS); mosquitto here is plaintext.
       MQTT_PROTOCOL: mqtt
       MQTT_PORT: 1883
+      # Runtime values resolved from Coolify app env (or local .env) at compose
+      # config time. These satisfy env.ts validation inside the container; the
+      # env_file optional .env is only a local-dev convenience (CD-10).
+      MQTT_USER: ${MQTT_USER:-doorcloud-backend}
+      MQTT_PASS: ${MQTT_PASS:-doorcloud-backend-local}
+      MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
+      MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-doorcloud-prod}
+      MQTT_CLEAN: ${MQTT_CLEAN:-true}
+      MQTT_KEEPALIVE: ${MQTT_KEEPALIVE:-60}
+      MQTT_RECONNECT_PERIOD: ${MQTT_RECONNECT_PERIOD:-1000}
+      MQTT_CONNECT_TIMEOUT: ${MQTT_CONNECT_TIMEOUT:-30000}
+      MQTT_QOS: ${MQTT_QOS:-0}
+      PHOTOS_DIR: /data/photos
+      PHOTOS_BASE_URL: ${PHOTOS_BASE_URL:-https://doorcloud.noirsystems.net/photos}
+      PHOTOS_URL_SECRET: ${PHOTOS_URL_SECRET:?PHOTOS_URL_SECRET is required}
+      PHOTO_URL_TTL_MS: ${PHOTO_URL_TTL_MS:-300000}
+      USER_NAME: ${USER_NAME:?USER_NAME is required}
+      USER_PHONE: ${USER_PHONE:-}
+      OPENWA_BASE_URL: ${OPENWA_BASE_URL:-http://openwa:2785}
+      OPENWA_API_KEY: ${OPENWA_API_KEY:-}
+      OPENWA_SESSION_ID: ${OPENWA_SESSION_ID:-main}
+      OPENWA_CHAT_ID: ${OPENWA_CHAT_ID:-}
+      OPENWA_SSRF_ALLOWED_HOSTS: ${OPENWA_SSRF_ALLOWED_HOSTS:-}
+      MODELS_CDN_URL: ${MODELS_CDN_URL:?MODELS_CDN_URL is required}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
       # CD-8: state DB lives on a mounted volume so last_message_at survives
       # container recreation.
       STATE_DB_PATH: /data/state/app-state.db
       MODELS_DIR: /app/apps/backend/models
-      # CD-10: every env.ts-required var must be supplied (via env_file or
-      # here): MQTT_*, PHOTOS_*, PHOTOS_URL_SECRET, USER_NAME, MODELS_CDN_URL,
-      # and CORS_ORIGINS in production. See README Docker section.
+      # FACE_VERIFY_* defaults match the backend .env.example.
+      FACE_VERIFY_THRESHOLD: ${FACE_VERIFY_THRESHOLD:-0.3435}
+      FACE_VERIFY_MAX_PHOTOS: ${FACE_VERIFY_MAX_PHOTOS:-10}
     volumes:
       # CD-8: photos persist across container recreation. Literal target:
       # Coolify's compose security parser rejects '${}' in volume targets.
