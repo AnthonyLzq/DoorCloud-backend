@@ -6,7 +6,7 @@ services:
     container_name: doorcloud
     restart: unless-stopped
     ports:
-      - '${DOORCLOUD_PORT:-1996}:1996'
+      - '1996:1996'
     env_file:
       # Remote orchestrators (Coolify) supply the same vars as app-level env;
       # the local .env is optional so a fresh clone deploys without it.
@@ -30,8 +30,9 @@ services:
       # here): MQTT_*, PHOTOS_*, PHOTOS_URL_SECRET, USER_NAME, MODELS_CDN_URL,
       # and CORS_ORIGINS in production. See README Docker section.
     volumes:
-      # CD-8: photos persist across container recreation.
-      - doorcloud-photos:${PHOTOS_DIR:-/data/photos}
+      # CD-8: photos persist across container recreation. Literal target:
+      # Coolify's compose security parser rejects '${}' in volume targets.
+      - doorcloud-photos:/data/photos
       # CD-8: SQLite state persists (STATE_DB_PATH points inside this mount).
       - doorcloud-state:/data/state
       # CD-9/CD-11: ONNX models live in a named volume; the entrypoint
@@ -58,7 +59,7 @@ services:
     image: ghcr.io/rmyndharis/openwa:latest
     restart: unless-stopped
     ports:
-      - '${OPENWA_PORT:-2785}:2785'
+      - '2785:2785'
     environment:
       NODE_ENV: production
       PORT: 2785
@@ -84,7 +85,7 @@ services:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - '${MOSQUITTO_PORT:-1883}:1883'
+      - '1883:1883'
     environment:
       MOSQUITTO_BACKEND_PASSWORD: ${MQTT_PASS:-doorcloud-backend-local}
       MOSQUITTO_BACKEND_USER: ${MQTT_USER:-doorcloud-backend}
