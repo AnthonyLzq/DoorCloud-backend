@@ -31,10 +31,10 @@ services:
       - doorcloud-photos:${PHOTOS_DIR:-/data/photos}
       # CD-8: SQLite state persists (STATE_DB_PATH points inside this mount).
       - doorcloud-state:/data/state
-      # CD-9: ONNX models are mounted :ro at runtime, never baked into the
-      # image (keeps the image small; models swappable without a rebuild).
-      # MODELS_SOURCE is the HOST path; it binds to the container MODELS_DIR.
-      - ${MODELS_SOURCE:-./apps/backend/models}:/app/apps/backend/models:ro
+      # CD-9/CD-11: ONNX models live in a named volume; the entrypoint
+      # provisions it on first boot (downloaded, not baked into the image).
+      # No host path required, so a fresh remote deploy boots without a bind.
+      - doorcloud-models:/app/apps/backend/models
     healthcheck:
       test:
         - CMD
@@ -85,12 +85,19 @@ services:
     environment:
       MOSQUITTO_BACKEND_PASSWORD: ${MQTT_PASS:-doorcloud-backend-local}
       MOSQUITTO_BACKEND_USER: ${MQTT_USER:-doorcloud-backend}
+      MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
+      MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
     volumes:
       - ./infra/mosquitto/aclfile:/mosquitto/config/aclfile:ro
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ./infra/mosquitto/passwordfile:/mosquitto/config/passwordfile:ro
+      - ./infra/mosquitto/password-generator.sh:/mosquitto/config/password-generator.sh:ro
+      - doorcloud-mosquitto-pass:/mosquitto/config-private
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
+    entrypoint:
+      - /bin/sh
+      - /mosquitto/config/password-generator.sh
+      - /mosquitto/config/mosquitto.conf
     healthcheck:
       test:
         - CMD-SHELL
@@ -107,6 +114,8 @@ services:
 volumes:
   doorcloud-photos:
   doorcloud-state:
+  doorcloud-models:
+  doorcloud-mosquitto-pass:
   openwa-data:
   mosquitto-data:
   mosquitto-log:

@@ -1,0 +1,49 @@
+name: Sync production env to Coolify
+
+# Pushes the stored production dotenv (gitignored .env.prod) into the Coolify
+# managed app doorcloud. Triggered manually or whenever the env file / this
+# workflow changes on master. COOLIFY_TOKEN and DOORCLOUD_ENV_PROD secrets.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.env.prod'
+      - '.github/workflows/sync-env.yml'
+
+jobs:
+  sync-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Coolify CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify-cli/main/scripts/install.sh | bash
+
+      - name: Add Coolify context
+        run: |
+          coolify context add noirsystems https://coolify.noirsystems.net "${COOLIFY_TOKEN}" -f
+          coolify context use noirsystems
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+
+      - name: Sync production env to app
+        run: |
+          echo "${DOORCLOUD_ENV_PROD}" > .env.prod
+          coolify app env sync mf3fhnumnhc0h66r8fkh1bsk --file .env.prod --runtime
+        env:
+          DOORCLOUD_ENV_PROD: ${{ secrets.DOORCLOUD_ENV_PROD }}
+
+      - name: Redeploy Coolify app
+        run: coolify deploy uuid mf3fhnumnhc0h66r8fkh1bsk --force
