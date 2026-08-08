@@ -92,12 +92,12 @@ services:
       MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
       MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
     volumes:
-      - ./infra/mosquitto/aclfile:/mosquitto/config/aclfile:ro
-      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ./infra/mosquitto/password-generator.sh:/mosquitto/config/password-generator.sh:ro
       - doorcloud-mosquitto-pass:/mosquitto/config-private
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
+      - ./infra/mosquitto/aclfile:/mosquitto/config/aclfile:ro
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./infra/mosquitto/password-generator.sh:/mosquitto/config/password-generator.sh:ro
     entrypoint:
       - /bin/sh
       - /mosquitto/config/password-generator.sh
