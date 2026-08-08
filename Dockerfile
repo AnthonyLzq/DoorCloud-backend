@@ -42,11 +42,24 @@ COPY apps/web/package.json ./apps/web/package.json
 
 RUN pnpm install --frozen-lockfile --prod
 
+# Production image exposes the backend scripts so the first-boot entrypoint can
+# provision the ONNX models volume. tsx is installed globally (keeps devDeps,
+# tsx, out of the runtime dependency tree) so `tsx download-models.prod.ts`
+# runs like dev/CI do.
+RUN npm install --global tsx \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends unzip \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY apps/backend/scripts/face_recognition_server.py \
   ./apps/backend/scripts/face_recognition_server.py
+COPY apps/backend/scripts/download-models.prod.ts \
+  ./apps/backend/scripts/download-models.prod.ts
+COPY apps/backend/scripts/entrypoint.sh \
+  ./apps/backend/scripts/entrypoint.sh
 COPY apps/backend/requirements.txt ./apps/backend/requirements.txt
 
 # CD-3: dist-root lock. The runtime paths resolve from the compiled module
@@ -60,6 +73,7 @@ WORKDIR /app/apps/backend/dist
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:1996/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
-# CD-2: the backend handles SIGTERM (graceful drain then exit 0). pnpm start
-# keeps signal handling: exec into node so PID 1 is the app process.
-CMD ["node", "index.js"]
+# CD-2: the backend handles SIGTERM (graceful drain then exit 0). The entrypoint
+# provisions the models volume on first boot, then `exec node index.js` so PID 1
+# is the app process (entrypoint.sh keeps signal handling intact).
+ENTRYPOINT ["bash", "/app/apps/backend/scripts/entrypoint.sh"]

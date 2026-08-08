@@ -14,6 +14,11 @@ metrics
 venv
 infra/mosquitto/passwordfile
 
+# Face recognition models: provisioned at runtime (entrypoint) into a volume,
+# never part of the build context (774MB+ local, gitignored).
+models
+apps/backend/models
+
 *.md
 LICENSE
 

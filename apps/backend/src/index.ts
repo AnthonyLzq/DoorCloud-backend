@@ -1,8 +1,10 @@
 import { Server } from './network'
 import { validateModels } from './services/face-recognition/model-validator'
+import { validateModelsProd } from './services/face-recognition/model-validator.prod'
 
-// Validate face recognition models before starting the server
-validateModels()
+// Validate face recognition models before starting (prod profile for prod)
+if (process.env.NODE_ENV === 'production') validateModelsProd()
+else validateModels()
 
 const shutdownWithError = (reason: string, error: unknown): void => {
   console.error(`[fatal] ${reason}:`, error)

@@ -12,6 +12,7 @@
     "format": "biome format --write src/ bin/",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "models:download": "./scripts/download-models.sh",
+    "models:download:prod": "tsx scripts/download-models.prod.ts",
     "photos:backup": "tsx bin/door-cloud.ts backup",
     "preservice": "node scripts/ensure-services.mjs && node scripts/openwa/sync-api-key.mjs --optional",
     "service": "nodemon --exitcrash",
