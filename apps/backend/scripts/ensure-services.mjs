@@ -10,7 +10,7 @@ const COMPOSE_FILE = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '..',
   '..',
-  'compose.yaml'
+  'docker-compose.yaml'
 )
 
 const runDockerCompose = args =>

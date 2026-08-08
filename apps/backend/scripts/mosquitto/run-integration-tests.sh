@@ -7,7 +7,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # The backend runs from apps/backend; compose.yaml lives at the repo root.
-COMPOSE="docker compose -f ../../compose.yaml"
+COMPOSE="docker compose -f ../../docker-compose.yaml"
 
 cleanup() {
   $COMPOSE down --volumes >/dev/null 2>&1 || true

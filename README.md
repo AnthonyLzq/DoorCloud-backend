@@ -220,7 +220,7 @@ an Alpine image.
 
 ### Compose (recommended)
 
-The root `compose.yaml` defines a `doorcloud` service (image `doorcloud`)
+The root `docker-compose.yaml` defines a `doorcloud` service (image `doorcloud`)
 beside `mosquitto` and `openwa` on one network. The
 backend connects to the broker via `MQTT_HOST=mosquitto` (plaintext
 `MQTT_PROTOCOL=mqtt`), serves the SPA, exposes `GET /healthz` for liveness, and
@@ -243,10 +243,10 @@ Persistent state lives on named volumes:
 - `PHOTOS_DIR` (default `/data/photos`) -> volume `doorcloud-photos`
 - SQLite state -> `STATE_DB_PATH=/data/state/app-state.db` -> volume
   `doorcloud-state` (so `last_message_at` survives recreation)
-- ONNX models are mounted `:ro` at runtime from the host `MODELS_SOURCE`
-  (default `./apps/backend/models`) into `MODELS_DIR=/app/apps/backend/models`;
-  the ~774MB models are NEVER baked into the image, so they stay swappable
-  without a rebuild.
+- ONNX models live in the named volume `doorcloud-models` mounted at
+  `MODELS_DIR=/app/apps/backend/models`. The entrypoint provisions them on
+  first boot (downloads the production set, ~130MB); models are NEVER baked
+  into the image, so they stay swappable without a rebuild.
 
 Graceful shutdown: the backend handles `SIGTERM` — it drains in-flight work
 (MQTT close -> face-recognition shutdown -> HTTP close) within a 10s grace
