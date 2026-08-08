@@ -8,7 +8,10 @@ services:
     ports:
       - '${DOORCLOUD_PORT:-1996}:1996'
     env_file:
-      - .env
+      # Remote orchestrators (Coolify) supply the same vars as app-level env;
+      # the local .env is optional so a fresh clone deploys without it.
+      - path: .env
+        required: false
     environment:
       # CD-7: the backend joins the same compose network as mosquitto/openwa,
       # so MQTT host resolves to the broker container service name.
