@@ -276,18 +276,18 @@ export class PythonManager extends EventEmitter {
   }
 
   /**
-   * Procesa datos recibidos desde stdout del proceso Python
+   * Processes data received from the Python process stdout
    *
-   * Este método implementa la recepción y correlación de respuestas:
-   * 1. Acumula datos en stdoutBuffer hasta encontrar newlines
-   * 2. Procesa cada línea completa:
-   *    - Detecta señal "READY" para marcar el proceso como listo
-   *    - Parsea líneas JSON como responses
-   *    - Valida el schema con Zod
-   *    - Correlaciona por ID con pendingRequests
-   *    - Resuelve o rechaza la Promise correspondiente
+   * This method implements response reception and correlation:
+   * 1. Accumulates data in stdoutBuffer until newlines are found
+   * 2. Processes each complete line:
+   *    - Detects the "READY" signal to mark the process as ready
+   *    - Parses JSON lines as responses
+   *    - Validates the schema with Zod
+   *    - Correlates by ID with pendingRequests
+   *    - Resolves or rejects the corresponding Promise
    *
-   * @param data - Datos recibidos desde stdout (puede contener múltiples líneas)
+   * @param data - Data received from stdout (may contain multiple lines)
    *
    * @private
    */
@@ -354,17 +354,17 @@ export class PythonManager extends EventEmitter {
   }
 
   /**
-   * Envía un request al proceso Python y espera la respuesta
+   * Sends a request to the Python process and waits for the response
    *
-   * Este método implementa el protocolo de comunicación IPC:
-   * 1. Genera un ID único para el request
-   * 2. Crea una Promise y la guarda en pendingRequests con el ID
-   * 3. Serializa el request a JSON y lo escribe en stdin
-   * 4. Configura un timeout para rechazar la Promise si no hay respuesta
-   * 5. Cuando llega la respuesta en stdout, handleStdout() correlaciona por ID
-   *    y resuelve/rechaza la Promise correspondiente
+   * This method implements the IPC communication protocol:
+   * 1. Generates a unique ID for the request
+   * 2. Creates a Promise and stores it in pendingRequests under the ID
+   * 3. Serializes the request to JSON and writes it to stdin
+   * 4. Sets a timeout to reject the Promise if there is no response
+   * 5. When the response arrives on stdout, handleStdout() correlates by ID
+   *    and resolves or rejects the corresponding Promise
    *
-   * @param method - Nombre del método a ejecutar en Python (ej: 'load_model', 'get_embedding')
+   * @param method - Name of the method to execute in Python (e.g. 'load_model', 'get_embedding')
    * @param args - Arguments for the method (serialized as JSON array)
    * @returns Promise with the Python method result
    * @throws Error if Python process is not ready

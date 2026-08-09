@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { PythonManager } from '../src/services/face-recognition/python-manager'
 
-// Schema para validar respuesta de list_models
+// Schema to validate the list_models response
 const ListModelsResponseSchema = z.object({
   id: z.number(),
   success: z.boolean(),

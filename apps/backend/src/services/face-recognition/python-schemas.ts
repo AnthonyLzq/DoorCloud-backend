@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Schema para respuesta del servidor Python (flexible)
+// Schema for the Python server response (flexible)
 export const PythonResponseSchema = z.object({
   id: z.number(),
   error: z.string().optional(),
@@ -12,14 +12,14 @@ export const PythonResponseSchema = z.object({
   embedding_size: z.number().optional()
 })
 
-// Schema para request al servidor Python
+// Schema for requests to the Python server
 export const PythonRequestSchema = z.object({
   id: z.number(),
   method: z.string(),
   args: z.array(z.unknown())
 })
 
-// Tipos inferidos
+// Inferred types
 export type PythonResponse = z.infer<typeof PythonResponseSchema>
 export type PythonRequest = z.infer<typeof PythonRequestSchema>
 export type PythonErrorResponse = { id: number; error: string }

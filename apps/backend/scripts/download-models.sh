@@ -33,7 +33,7 @@ if [ ! -f "$MODELS_DIR/insightface/det_10g.onnx" ] || [ ! -f "$MODELS_DIR/insigh
   echo "✓ InsightFace buffalo_l downloaded"
 fi
 
-# InsightFace buffalo_m (512D embeddings, más ligero) - 276MB
+# InsightFace buffalo_m (512D embeddings, lighter) - 276MB
 if [ ! -f "$MODELS_DIR/insightface/det_2.5g.onnx" ] || [ ! -f "$MODELS_DIR/insightface/buffalo_m_r50.onnx" ]; then
   echo "Downloading InsightFace buffalo_m (276MB)..."
   curl -L -o "$MODELS_DIR/insightface/buffalo_m.zip" \
@@ -44,7 +44,7 @@ if [ ! -f "$MODELS_DIR/insightface/det_2.5g.onnx" ] || [ ! -f "$MODELS_DIR/insig
   echo "✓ InsightFace buffalo_m downloaded"
 fi
 
-# InsightFace buffalo_s (512D embeddings, más rápido) - 128MB
+# InsightFace buffalo_s (512D embeddings, faster) - 128MB
 if [ ! -f "$MODELS_DIR/insightface/det_500m.onnx" ] || [ ! -f "$MODELS_DIR/insightface/buffalo_s_mbtf.onnx" ]; then
   echo "Downloading InsightFace buffalo_s (128MB)..."
   curl -L -o "$MODELS_DIR/insightface/buffalo_s.zip" \

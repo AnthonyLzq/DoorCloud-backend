@@ -2,9 +2,9 @@ import { getEnv } from 'config/env'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
 /**
- * Middleware para autenticar endpoints de setup
- * Valida el header Authorization: Bearer <SETUP_TOKEN>
- * Si SETUP_TOKEN no está configurado, permite el acceso (para desarrollo local)
+ * Middleware to authenticate setup endpoints
+ * Validates the Authorization header: Bearer <SETUP_TOKEN>
+ * If SETUP_TOKEN is not configured, access is allowed (local development)
  */
 export const setupAuthMiddleware = async (
   request: FastifyRequest,
@@ -12,7 +12,7 @@ export const setupAuthMiddleware = async (
 ): Promise<void> => {
   const { SETUP_TOKEN } = getEnv()
 
-  // Si no hay SETUP_TOKEN configurado, permitir acceso (desarrollo local)
+  // If SETUP_TOKEN is not configured, allow access (local development)
   if (!SETUP_TOKEN) {
     return
   }

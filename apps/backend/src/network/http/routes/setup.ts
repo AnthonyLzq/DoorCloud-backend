@@ -35,7 +35,7 @@ const Setup = (server: ZodFastifyInstance): void => {
   // GET /setup (HTML) is served by the SPA (see server.ts D7) — the API
   // handlers below are the backend half of the setup flow.
 
-  // GET /setup/openwa/status - Requiere autenticación
+  // GET /setup/openwa/status - Requires authentication
   server.get(
     '/setup/openwa/status',
     { preHandler: setupAuthMiddleware },
@@ -52,7 +52,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   )
 
-  // POST /setup/config - Requiere autenticación
+  // POST /setup/config - Requires authentication
   server.post(
     '/setup/config',
     {
@@ -68,7 +68,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   )
 
-  // POST /setup/openwa/start - Requiere autenticación
+  // POST /setup/openwa/start - Requires authentication
   server.post(
     '/setup/openwa/start',
     { preHandler: setupAuthMiddleware },
@@ -85,7 +85,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   )
 
-  // GET /setup/openwa/qr - Requiere autenticación
+  // GET /setup/openwa/qr - Requires authentication
   server.get(
     '/setup/openwa/qr',
     { preHandler: setupAuthMiddleware },
@@ -102,7 +102,7 @@ const Setup = (server: ZodFastifyInstance): void => {
     }
   )
 
-  // POST /setup/openwa/send-test - Requiere autenticación
+  // POST /setup/openwa/send-test - Requires authentication
   server.post(
     '/setup/openwa/send-test',
     {
