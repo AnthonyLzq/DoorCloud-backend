@@ -1,0 +1,63 @@
+name: Deploy to Coolify
+
+# Redeploys the doorcloud app on every push to master (and manually).
+# Coolify has no GitHub webhook configured for this repo, so the GitHub
+# Actions pipeline is the deploy trigger. COOLIFY_TOKEN secret required.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'docs/**'
+      - 'openspec/**'
+      - '.github/workflows/*'
+
+jobs:
+  deploy:
+    name: Redeploy doorcloud on Coolify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Coolify CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify-cli/main/scripts/install.sh | bash
+
+      - name: Add Coolify context
+        run: |
+          coolify context add noirsystems https://coolify.noirsystems.net "${COOLIFY_TOKEN}" -f
+          coolify context use noirsystems
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+
+      - name: Trigger deploy
+        id: trigger
+        run: |
+          output=$(coolify deploy uuid mf3fhnumnhc0h66r8fkh1bsk --force)
+          echo "$output"
+          deployment_uuid=$(echo "$output" | grep -oE '[a-z0-9]{20,}' | head -1)
+          if [ -z "$deployment_uuid" ]; then
+            echo "::error::Could not extract deployment UUID from Coolify output"
+            exit 1
+          fi
+          echo "deployment_uuid=$deployment_uuid" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deployment to finish
+        env:
+          DEPLOYMENT_UUID: ${{ steps.trigger.outputs.deployment_uuid }}
+        run: |
+          for i in $(seq 1 100); do
+            output=$(coolify deploy get "$DEPLOYMENT_UUID" || true)
+            status=$(echo "$output" | sed -n '4p' | awk -F'│' '{gsub(/ /,"",$5); print $5}')
+            echo "progress $i: status=$status"
+            case "$status" in
+              finished) echo "deploy finished OK"; exit 0 ;;
+              failed|cancelled|canceled) echo "::error::Deploy $DEPLOYMENT_UUID ended as $status"; exit 1 ;;
+              *) sleep 15 ;;
+            esac
+          done
+          echo "::error::Timed out waiting for deployment $DEPLOYMENT_UUID"
+          exit 1
