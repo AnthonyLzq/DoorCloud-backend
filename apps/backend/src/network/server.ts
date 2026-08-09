@@ -16,6 +16,7 @@ import { faceRecognitionService } from 'services/face-recognition'
 import { migrateLegacyUnidentified } from 'storage/migrations'
 import { DiskPhotoStorage } from 'storage/photos'
 import { applyRoutes } from './http'
+import { webAuthMiddleware } from './http/middleware/web-auth'
 import { mqttConnection } from './mqtt'
 
 const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
@@ -129,6 +130,11 @@ class Server {
     this.#app.setValidatorCompiler(validatorCompiler)
     this.#app.setSerializerCompiler(serializerCompiler)
     applyRoutes(this.#app.withTypeProvider<ZodTypeProvider>())
+
+    // Global Basic Auth for the web surfaces (SPA, /setup, /assets).
+    // Registered before the static routes so GET / and GET /setup are
+    // covered; /healthz and /photos/* are exempted inside the middleware.
+    this.#app.addHook('preHandler', webAuthMiddleware)
 
     // CD-1: liveness probe for container healthchecks. Registered before the
     // static/SPA routes so it is never shadowed, requires no auth, and leaks

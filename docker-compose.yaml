@@ -48,6 +48,9 @@ services:
       OPENWA_SSRF_ALLOWED_HOSTS: ${OPENWA_SSRF_ALLOWED_HOSTS:-}
       MODELS_CDN_URL: ${MODELS_CDN_URL:?MODELS_CDN_URL is required}
       SETUP_TOKEN: ${SETUP_TOKEN:-}
+      # Optional Basic Auth for the SPA (defense in depth); unset = open access.
+      WEB_AUTH_USER: ${WEB_AUTH_USER:-}
+      WEB_AUTH_PASS: ${WEB_AUTH_PASS:-}
       # CD-8: state DB lives on a mounted volume so last_message_at survives
       # container recreation.
       STATE_DB_PATH: /data/state/app-state.db

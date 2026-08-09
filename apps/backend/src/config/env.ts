@@ -166,6 +166,9 @@ const envSchema = z
     OPENWA_SESSION_ID: optionalString('OPENWA_SESSION_ID').default('main'),
     OPENWA_CHAT_ID: optionalString('OPENWA_CHAT_ID'),
     SETUP_TOKEN: optionalString('SETUP_TOKEN'),
+    // Basic Auth for the web SPA in production; no credentials = open access (dev)
+    WEB_AUTH_USER: optionalString('WEB_AUTH_USER'),
+    WEB_AUTH_PASS: optionalString('WEB_AUTH_PASS'),
     // D7: Preact SPA dist dir; defaults to <repo>/apps/web/dist via paths.ts
     WEB_DIST: optionalString('WEB_DIST'),
     MODELS_CDN_URL: requiredString('MODELS_CDN_URL').url(
