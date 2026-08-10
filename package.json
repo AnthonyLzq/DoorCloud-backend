@@ -6,9 +6,19 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "onnxruntime-node",
-      "sharp",
-      "@tensorflow/tfjs-node"
-    ]
+      "sharp"
+    ],
+    "overrides": {
+      "ip-address": "^10.4.0",
+      "adm-zip": "^0.6.0",
+      "semver@~7.0.0": "7.8.5",
+      "find-my-way@^9.6.0": "9.7.0",
+      "fast-uri@^3.0.0": "3.1.5",
+      "fast-uri@^4.0.0": "4.1.2",
+      "brace-expansion@^1.1.7": "1.1.18",
+      "brace-expansion@^2.0.1": "2.1.4",
+      "nanoid@^3.3.16": "3.3.18"
+    }
   },
   "description": "DoorCloud monorepo root (orchestrator)",
   "scripts": {
@@ -37,9 +47,9 @@
   "dependencies": {
     "@vladmandic/human": "^3.0.3",
     "dotenv": "^16.0.3",
-    "fastify": "^5.10.0",
+    "fastify": "^5.11.3",
     "onnxruntime-node": "^1.17.0",
-    "sharp": "^0.33.0",
+    "sharp": "^0.35.3",
     "yargs": "^17.7.3"
   },
   "engines": {
