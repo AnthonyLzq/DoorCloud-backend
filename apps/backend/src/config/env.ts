@@ -199,6 +199,26 @@ const envSchema = z
       path: ['CORS_ORIGINS']
     }
   )
+  // AUTH-1: production fails closed on missing auth secrets. Dev behavior is
+  // unchanged: unset vars still allow open access for local development.
+  .refine(data => data.NODE_ENV !== 'production' || Boolean(data.SETUP_TOKEN), {
+    message: 'SETUP_TOKEN is required in production environment',
+    path: ['SETUP_TOKEN']
+  })
+  .refine(
+    data => data.NODE_ENV !== 'production' || Boolean(data.WEB_AUTH_USER),
+    {
+      message: 'WEB_AUTH_USER is required in production environment',
+      path: ['WEB_AUTH_USER']
+    }
+  )
+  .refine(
+    data => data.NODE_ENV !== 'production' || Boolean(data.WEB_AUTH_PASS),
+    {
+      message: 'WEB_AUTH_PASS is required in production environment',
+      path: ['WEB_AUTH_PASS']
+    }
+  )
 
 type Env = z.infer<typeof envSchema>
 
