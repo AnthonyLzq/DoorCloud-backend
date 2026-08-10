@@ -41,11 +41,11 @@ Chain strategy: stacked-to-main
 
 | ID | Task (objective) | Files | Deps | Verify / Done |
 |----|-------------------|-------|------|---------------|
-| T2.1 | RED: env tests — prod without SETUP_TOKEN/WEB_AUTH_* throws; dev unchanged | apps/backend/test/env.test.ts (new) | — | `pnpm test:local` fails (AUTH-1 scenarios) |
-| T2.2 | Gate env: zod refine requires SETUP_TOKEN/WEB_AUTH_USER/WEB_AUTH_PASS when NODE_ENV=production | apps/backend/src/config/env.ts | T2.1 | `NODE_ENV=production pnpm start` aborts; suite green |
-| T2.3 | RED: auth tests — invalid/missing token → 401 (was 403); constant-time compare; length mismatch no throw | apps/backend/test/setup-routes.test.ts, web-auth.test.ts | — | `pnpm test:local` fails (AUTH-2/3) |
-| T2.4 | Shared `safeEqual` in `middleware/auth.ts` (extract web-auth hash-compare); setup-auth adopts it + 403→401; web-auth reuses helper | apps/backend/src/network/http/middleware/{auth.ts,setup-auth.ts,web-auth.ts} | T2.3 | `pnpm test:local` green; AUTH-2/3 scenarios |
-| T2.5 | Compose `${VAR:?}` for SETUP_TOKEN/WEB_AUTH_* (shell boundary RED: missing secret aborts) | docker-compose.yaml | T2.2 | `docker compose config` fails without vars; AUTH-1 compose scenario |
+| [x] T2.1 | RED: env tests — prod without SETUP_TOKEN/WEB_AUTH_* throws; dev unchanged | apps/backend/test/env.test.ts (new) | — | DONE: 3 prod-missing tests failed before gate, pass after; dev-unset behavior asserted (AUTH-1) |
+| [x] T2.2 | Gate env: zod refine requires SETUP_TOKEN/WEB_AUTH_USER/WEB_AUTH_PASS when NODE_ENV=production | apps/backend/src/config/env.ts | T2.1 | DONE: 3 refines fail closed; `NODE_ENV=production` tsx probe aborts without vars, parses with; suite green |
+| [x] T2.3 | RED: auth tests — invalid/missing token → 401 (was 403); constant-time compare; length mismatch no throw | apps/backend/test/setup-routes.test.ts, web-auth.test.ts | — | DONE: +6 tests; wrong/short token failed RED at 403, green after (AUTH-2/3) |
+| [x] T2.4 | Shared `safeEqual` in `middleware/auth.ts` (extract web-auth hash-compare); setup-auth adopts it + 403→401; web-auth reuses helper | apps/backend/src/network/http/middleware/{auth.ts,setup-auth.ts,web-auth.ts} | T2.3 | DONE: auth.ts safeEqual (sha256+timingSafeEqual); setup-auth 401; web-auth imports helper; unit tests in web-auth.test.ts |
+| [x] T2.5 | Compose `${VAR:?}` for SETUP_TOKEN/WEB_AUTH_* (shell boundary RED: missing secret aborts) | docker-compose.yaml | T2.2 | DONE: `${SETUP_TOKEN:?}`, `${WEB_AUTH_USER:?}`, `${WEB_AUTH_PASS:?}`; `docker compose --env-file /dev/null config` exit 1 without, exit 0 with |
 
 ## Slice 3: HTTP Hardening (SEC-05/09)
 
