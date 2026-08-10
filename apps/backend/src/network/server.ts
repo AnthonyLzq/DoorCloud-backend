@@ -1,6 +1,4 @@
-import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
-import { extname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
@@ -21,17 +19,6 @@ import { webAuthMiddleware } from './http/middleware/web-auth'
 import { mqttConnection } from './mqtt'
 
 const ENVIRONMENTS_WITHOUT_PRETTY_PRINT = ['production', 'ci']
-
-const PHOTO_CONTENT_TYPES: Record<string, string> = {
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif'
-}
-
-const contentTypeFor = (path: string): string =>
-  PHOTO_CONTENT_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream'
 
 class Server {
   #app: FastifyInstance
@@ -121,47 +108,6 @@ class Server {
       reply.header('X-Frame-Options', 'DENY')
 
       done()
-    })
-
-    this.#app.get<{
-      Params: { signature: string; expiresAt: string; '*': string }
-    }>('/photos/:signature/:expiresAt/*', async (request, reply) => {
-      const { signature, expiresAt } = request.params
-      const path = request.params['*']
-      const expiresAtNumber = Number(expiresAt)
-
-      if (!Number.isFinite(expiresAtNumber))
-        return reply.code(400).send({ error: 'Invalid path' })
-
-      if (!photoStorage.isUrlValid(path, signature, expiresAtNumber))
-        return reply.code(404).send({ error: 'Not found' })
-
-      let fullPath: string
-      try {
-        // Centralized containment check (rejects traversal and absolute paths)
-        fullPath = photoStorage.resolvePath(path)
-      } catch {
-        return reply.code(400).send({ error: 'Invalid path' })
-      }
-
-      try {
-        // Map missing files and directories to 404 instead of a stream 500
-        const file = await stat(fullPath)
-        if (!file.isFile()) return reply.code(404).send({ error: 'Not found' })
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          'code' in error &&
-          (error as { code?: unknown }).code === 'ENOENT'
-        )
-          return reply.code(404).send({ error: 'Not found' })
-
-        throw error
-      }
-
-      return reply
-        .type(contentTypeFor(fullPath))
-        .send(createReadStream(fullPath))
     })
 
     this.#app.setValidatorCompiler(validatorCompiler)

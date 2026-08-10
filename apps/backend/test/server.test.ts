@@ -1,21 +1,12 @@
-import { createHmac } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-const PHOTO_URL_SECRET = 'test-photo-url-secret'
-
-const signedPhotoUrl = (path: string, expiresAt = Date.now() + 30_000) =>
-  `/photos/${createHmac('sha256', PHOTO_URL_SECRET)
-    .update(`${expiresAt}:${path}`)
-    .digest('hex')}/${expiresAt}/${path}`
 
 const mocks = vi.hoisted(() => ({
   getEnv: vi.fn(),
   mqttConnection: vi.fn(),
   applyRoutes: vi.fn(),
-  humanInit: vi.fn(),
   frsInit: vi.fn(),
   frsShutdown: vi.fn()
 }))
@@ -28,9 +19,6 @@ vi.mock('../src/network/mqtt', () => ({
 }))
 vi.mock('../src/network/http', () => ({
   applyRoutes: mocks.applyRoutes
-}))
-vi.mock('../src/lib', () => ({
-  init: mocks.humanInit
 }))
 vi.mock('../src/services/face-recognition', () => ({
   FaceRecognitionService: class {
@@ -64,7 +52,7 @@ beforeEach(() => {
     PORT: 0,
     PHOTOS_DIR: photosDir,
     PHOTOS_BASE_URL: 'http://localhost:1996/photos',
-    PHOTOS_URL_SECRET: PHOTO_URL_SECRET,
+    PHOTOS_URL_SECRET: 'test-photo-url-secret',
     PHOTO_URL_TTL_MS: 300_000
   })
   mocks.mqttConnection.mockReturnValue({
@@ -94,7 +82,6 @@ describe('Server lifecycle (RF-5)', () => {
 
     expect(mocks.frsInit).toHaveBeenCalledTimes(1)
     expect(mocks.frsInit).toHaveBeenCalledWith({ mode: 'onnx' })
-    expect(mocks.humanInit).not.toHaveBeenCalled()
   })
 
   it('stop() releases the face recognition service sessions', async () => {
@@ -147,71 +134,9 @@ describe('Server lifecycle (RF-5)', () => {
     await Server.stop()
 
     expect(mocks.frsShutdown).toHaveBeenCalledTimes(1)
-    expect(mocks.mqttConnection.mock.results[0].value.stop).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('Signed photo serving (RF-4)', () => {
-  it('serves a signed URL and rejects unsigned, tampered, expired, traversal, and absolute URLs', async () => {
-    const { Server } = await import('../src/network/server.js')
-    currentServer = Server
-    await Server.start()
-    const inject = async (url: string) =>
-      (await Server.app.inject({ method: 'GET', url })).statusCode
-
-    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
-    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
-    writeFileSync(join(tmpRoot, 'secret.txt'), 'TOP-SECRET')
-
-    const urls = [
-      signedPhotoUrl('Ana-42/selfie.jpg'),
-      '/photos/Ana-42/selfie.jpg',
-      `/photos/${'f'.repeat(64)}/${Date.now() + 30_000}/Ana-42/selfie.jpg`,
-      signedPhotoUrl('Ana-42/selfie.jpg', Date.now() - 1_000),
-      signedPhotoUrl('../secret.txt'),
-      signedPhotoUrl('/etc/passwd')
-    ]
-    const statuses = await Promise.all(urls.map(inject))
-
-    expect(statuses[0]).toBe(200)
-    expect(statuses.slice(1, 4)).toEqual([404, 404, 404])
-    expect(statuses.slice(4).every(s => s >= 400)).toBe(true)
-  })
-
-  it('returns 404 for a validly signed URL whose file was removed', async () => {
-    const { Server } = await import('../src/network/server.js')
-    currentServer = Server
-    await Server.start()
-
-    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
-    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
-
-    const url = signedPhotoUrl('Ana-42/selfie.jpg')
-    expect((await Server.app.inject({ method: 'GET', url })).statusCode).toBe(
-      200
-    )
-
-    rmSync(join(photosDir, 'Ana-42', 'selfie.jpg'))
-
-    const response = await Server.app.inject({ method: 'GET', url })
-    expect(response.statusCode).toBe(404)
-    expect(response.headers['content-type']).toMatch(/application\/json/)
-  })
-
-  it('serves photos with the correct content type', async () => {
-    const { Server } = await import('../src/network/server.js')
-    currentServer = Server
-    await Server.start()
-
-    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
-    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
-
-    const url = signedPhotoUrl('Ana-42/selfie.jpg')
-    const response = await Server.app.inject({ method: 'GET', url })
-
-    expect(response.statusCode).toBe(200)
-    expect(response.headers['content-type']).toMatch(/^image\/jpeg/)
-    expect(response.body).toBe('photo-content')
+    expect(
+      mocks.mqttConnection.mock.results[0].value.stop
+    ).toHaveBeenCalledTimes(1)
   })
 })
 
