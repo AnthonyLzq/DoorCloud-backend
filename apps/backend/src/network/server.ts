@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { getEnv } from 'config/env'
 import { repoRoot } from 'config/paths'
@@ -38,6 +39,7 @@ class Server {
   #faceRecognitionService: typeof faceRecognitionService
   #photoStorage!: DiskPhotoStorage
   #stopping = false
+  #configPromise: Promise<void>
 
   constructor() {
     const { NODE_ENV } = getEnv()
@@ -56,10 +58,13 @@ class Server {
             }
           }
     })
-    this.#config()
+    // Plugin registers must be awaited before routes are mounted:
+    // @fastify/rate-limit installs an onRoute hook, so a fire-and-forget
+    // register would leave the global limiter detached from the routes.
+    this.#configPromise = this.#config()
   }
 
-  #config() {
+  async #config(): Promise<void> {
     const {
       CORS_ORIGINS,
       PHOTOS_DIR,
@@ -76,14 +81,46 @@ class Server {
     })
     this.#photoStorage = photoStorage
 
-    this.#app.register(cors, {
+    await this.#app.register(cors, {
       origin: CORS_ORIGINS ?? true
     })
-    this.#app.register(multipart, {
+    await this.#app.register(multipart, {
       limits: {
         fields: 3,
         files: 3
       }
+    })
+
+    // SEC-05: global rate limiting. /healthz (liveness) and /photos/*
+    // (signed URLs fetched by OpenWA/WhatsApp) are exempt; everything else
+    // is limited per IP to bound brute-force and abuse.
+    await this.#app.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: 60_000,
+      allowList: (request, _key) => {
+        const { url } = request
+
+        return url === '/healthz' || url.startsWith('/photos')
+      },
+      enableDraftSpec: false
+    })
+
+    // SEC-09: defense-in-depth response headers. CSP img-src carries the
+    // PHOTOS_BASE_URL origin because signed photo URLs may be cross-origin.
+    this.#app.addHook('onSend', (_request, reply, _payload, done) => {
+      const photosOrigin = new URL(getEnv().PHOTOS_BASE_URL).origin
+
+      reply.header(
+        'Content-Security-Policy',
+        `default-src 'self'; script-src 'self'; img-src 'self' ${photosOrigin}; ` +
+          "style-src 'self'; object-src 'none'; base-uri 'self'; " +
+          "frame-ancestors 'none'; form-action 'self'"
+      )
+      reply.header('X-Content-Type-Options', 'nosniff')
+      reply.header('X-Frame-Options', 'DENY')
+
+      done()
     })
 
     this.#app.get<{
@@ -149,7 +186,7 @@ class Server {
     // strips the prefix before resolving the file: /assets/foo.js -> root/foo.js.
     const webDist = getEnv().WEB_DIST ?? resolve(repoRoot, 'apps/web/dist')
 
-    this.#app.register(fastifyStatic, {
+    await this.#app.register(fastifyStatic, {
       root: resolve(webDist, 'assets'),
       prefix: '/assets/',
       wildcard: true
@@ -174,6 +211,9 @@ class Server {
     const { HOST, PORT } = getEnv()
 
     try {
+      // Wait for plugin registration (route hooks need the awaits done).
+      await this.#configPromise
+
       // Fail fast: if face recognition cannot start, do not open ports or MQTT
       await this.#faceRecognitionService.init({ mode: 'onnx' })
       this.#startMqtt()

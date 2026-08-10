@@ -155,6 +155,7 @@ describe('Signed photo serving (RF-4)', () => {
   it('serves a signed URL and rejects unsigned, tampered, expired, traversal, and absolute URLs', async () => {
     const { Server } = await import('../src/network/server.js')
     currentServer = Server
+    await Server.start()
     const inject = async (url: string) =>
       (await Server.app.inject({ method: 'GET', url })).statusCode
 
@@ -180,6 +181,7 @@ describe('Signed photo serving (RF-4)', () => {
   it('returns 404 for a validly signed URL whose file was removed', async () => {
     const { Server } = await import('../src/network/server.js')
     currentServer = Server
+    await Server.start()
 
     mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
     writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
@@ -199,6 +201,7 @@ describe('Signed photo serving (RF-4)', () => {
   it('serves photos with the correct content type', async () => {
     const { Server } = await import('../src/network/server.js')
     currentServer = Server
+    await Server.start()
 
     mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
     writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
@@ -209,5 +212,48 @@ describe('Signed photo serving (RF-4)', () => {
     expect(response.statusCode).toBe(200)
     expect(response.headers['content-type']).toMatch(/^image\/jpeg/)
     expect(response.body).toBe('photo-content')
+  })
+})
+
+describe('HTTP hardening (REQ-6/7) — security headers and rate limit', () => {
+  it('adds security headers on responses: CSP, nosniff, frame-ancestors', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+    await Server.start()
+
+    const res = await Server.app.inject({ method: 'GET', url: '/healthz' })
+
+    expect(res.statusCode).toBe(200)
+
+    const csp = res.headers['content-security-policy'] as string
+    expect(csp).toBeDefined()
+    expect(csp).not.toContain('unsafe-inline')
+    expect(csp).toContain("img-src 'self'")
+    expect(res.headers['x-content-type-options']).toBe('nosniff')
+    expect(res.headers['x-frame-options']).toBe('DENY')
+  })
+
+  it('rate limits bursts on protected routes but exempts /healthz', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+    await Server.start()
+
+    // /healthz is exempt: a burst never gets rate-limited.
+    for (let i = 0; i < 20; i++) {
+      const res = await Server.app.inject({ method: 'GET', url: '/healthz' })
+      expect(res.statusCode).toBe(200)
+    }
+
+    // Protected paths exceed the per-window max and answer 429. The root
+    // SPA route is a real (non-exempt) route: applyRoutes is mocked in this
+    // suite, so /setup/* and /admin/* would 404 without hitting the global
+    // rate-limit hook (Fastify 404s bypass instance hooks).
+    const burst = await Promise.all(
+      Array.from({ length: 130 }, () =>
+        Server.app.inject({ method: 'GET', url: '/' })
+      )
+    )
+    const got429 = burst.some(res => res.statusCode === 429)
+    expect(got429).toBe(true)
   })
 })
