@@ -1,18 +1,8 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
 import { getEnv } from 'config/env'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { safeEqual } from './auth'
 
 const REALM = 'DoorCloud'
-
-/**
- * Constant-time comparison: hashes both sides before comparing so the value
- * lengths are never leaked through the response timing.
- */
-const safeEqual = (expected: string, actual: string): boolean => {
-  const expectedHash = createHash('sha256').update(expected).digest()
-  const actualHash = createHash('sha256').update(actual).digest()
-  return timingSafeEqual(expectedHash, actualHash)
-}
 
 // Exempt paths: container liveness and signed photo URLs consumed by
 // OpenWA/WhatsApp. Everything else requires Basic credentials.

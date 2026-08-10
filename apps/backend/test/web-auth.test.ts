@@ -6,6 +6,7 @@ vi.mock('../src/config/env', () => ({
 }))
 
 import { getEnv } from '../src/config/env'
+import { safeEqual } from '../src/network/http/middleware/auth'
 import { webAuthMiddleware } from '../src/network/http/middleware/web-auth'
 
 const mockGetEnv = getEnv as ReturnType<typeof vi.fn>
@@ -144,5 +145,36 @@ describe('webAuthMiddleware', () => {
 
     expect(setup.statusCode).toBe(401)
     expect(asset.statusCode).toBe(401)
+  })
+
+  test('rejects a short username as 401 without throwing', async () => {
+    mockGetEnv.mockReturnValue({
+      WEB_AUTH_USER: 'admin',
+      WEB_AUTH_PASS: 'secret'
+    })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/',
+      headers: { authorization: basicHeader('a', 'secret') }
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+})
+
+describe('safeEqual (AUTH-3)', () => {
+  test('returns true for equal values', () => {
+    expect(safeEqual('secret', 'secret')).toBe(true)
+  })
+
+  test('returns false for different values of equal length', () => {
+    expect(safeEqual('secret1', 'secret2')).toBe(false)
+  })
+
+  test('returns false for different lengths without throwing', () => {
+    expect(() => safeEqual('long-secret-value', 'short')).not.toThrow()
+    expect(safeEqual('long-secret-value', 'short')).toBe(false)
   })
 })

@@ -88,3 +88,77 @@ describe('POST /setup/config schema validation', () => {
     })
   })
 })
+
+describe('setupAuthMiddleware (AUTH-2/3)', () => {
+  const validPayload = {
+    OPENWA_BASE_URL: 'http://localhost:2785'
+  }
+
+  test('rejects a request without Authorization as 401', async () => {
+    mockGetEnv.mockReturnValue({ SETUP_TOKEN: 'correct-token' })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      payload: validPayload
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toMatchObject({
+      error: true,
+      message: 'Authorization header with Bearer token required'
+    })
+  })
+
+  test('rejects a wrong token as 401 (not 403)', async () => {
+    mockGetEnv.mockReturnValue({ SETUP_TOKEN: 'correct-token' })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      headers: { authorization: 'Bearer wrong-token' },
+      payload: validPayload
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toMatchObject({
+      error: true,
+      message: 'Invalid setup token'
+    })
+  })
+
+  test('rejects a short token as 401 without throwing', async () => {
+    mockGetEnv.mockReturnValue({ SETUP_TOKEN: 'correct-token' })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      headers: { authorization: 'Bearer t' },
+      payload: validPayload
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  test('accepts a valid token', async () => {
+    mockGetEnv.mockReturnValue({ SETUP_TOKEN: 'correct-token' })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      headers: { authorization: 'Bearer correct-token' },
+      payload: {
+        OPENWA_API_KEY: 'saved-key',
+        OPENWA_BASE_URL: 'http://localhost:2785',
+        OPENWA_CHAT_ID: '51999999999@c.us',
+        OPENWA_SESSION_ID: 'main'
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+  })
+})

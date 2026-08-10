@@ -1,5 +1,6 @@
 import { getEnv } from 'config/env'
 import type { FastifyReply, FastifyRequest } from 'fastify'
+import { safeEqual } from './auth'
 
 /**
  * Middleware to authenticate setup endpoints
@@ -29,8 +30,9 @@ export const setupAuthMiddleware = async (
 
   const token = authHeader.substring(7) // Remove 'Bearer ' prefix
 
-  if (token !== SETUP_TOKEN) {
-    reply.code(403).send({
+  // AUTH-2/3: reject with 401 (fail closed) using a constant-time compare
+  if (!safeEqual(SETUP_TOKEN, token)) {
+    reply.code(401).send({
       error: true,
       message: 'Invalid setup token'
     })
