@@ -132,6 +132,14 @@ services:
       MOSQUITTO_BACKEND_USER: ${MQTT_USER:-doorcloud-backend}
       MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
       MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
+      # T5.3: 8883 TLS listener is config-ready. mosquitto 2.x cannot expand
+      # env vars in config files, so password-generator.sh appends the TLS
+      # listener to the rendered config only when all three paths are set.
+      # Provision certs in the image or a volume first; see
+      # infra/mosquitto/mosquitto.conf + docs/device-firmware-mqtt-cutover.md.
+      MOSQUITTO_TLS_CAFILE: ${MOSQUITTO_TLS_CAFILE:-}
+      MOSQUITTO_TLS_CERTFILE: ${MOSQUITTO_TLS_CERTFILE:-}
+      MOSQUITTO_TLS_KEYFILE: ${MOSQUITTO_TLS_KEYFILE:-}
     volumes:
       # Brok config/ACL/password-generator are baked into the image (Coolify
       # cannot bind repo-relative files from a compose app). Only runtime data
