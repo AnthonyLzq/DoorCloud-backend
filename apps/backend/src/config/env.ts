@@ -1,3 +1,4 @@
+import { isOpenWaBaseUrlAllowed } from '@doorcloud/shared'
 import { z } from 'zod'
 import { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS } from './constants'
 
@@ -107,6 +108,21 @@ const commaSeparatedOrigins = (_name: string) =>
     return value
   }, z.array(z.string().trim().min(1)).optional())
 
+const commaSeparatedStringList = (_name: string, defaultValue: string[]) =>
+  z.preprocess(
+    value => {
+      if (value === '' || value === undefined) return undefined
+      if (typeof value === 'string')
+        return value
+          .split(',')
+          .map(item => item.trim())
+          .filter(item => item.length > 0)
+
+      return value
+    },
+    z.array(z.string().trim().min(1)).default(defaultValue)
+  )
+
 /**
  * Rejects obviously insecure placeholder secrets so a deployment that copies
  * `.env.example` (which documents `replace-with-a-long-random-string`)
@@ -162,6 +178,10 @@ const envSchema = z
         z.string().trim().url('OPENWA_BASE_URL must be a URL').optional()
       )
       .default('http://localhost:2785'),
+    // SECRET-1: hosts allowed as OPENWA_BASE_URL targets (loopback always ok)
+    OPENWA_ALLOWED_HOSTS: commaSeparatedStringList('OPENWA_ALLOWED_HOSTS', [
+      'localhost'
+    ]),
     OPENWA_API_KEY: optionalString('OPENWA_API_KEY'),
     OPENWA_SESSION_ID: optionalString('OPENWA_SESSION_ID').default('main'),
     OPENWA_CHAT_ID: optionalString('OPENWA_CHAT_ID'),
@@ -186,6 +206,18 @@ const envSchema = z
       1
     )
   })
+  // SECRET-1: OPENWA_BASE_URL host must be loopback or in the allowlist.
+  // The allowlist is operator-controlled, so an attacker cannot redirect
+  // OpenWA traffic (and the API key) to an arbitrary host.
+  .refine(
+    data =>
+      isOpenWaBaseUrlAllowed(data.OPENWA_BASE_URL, data.OPENWA_ALLOWED_HOSTS),
+    {
+      message:
+        'OPENWA_BASE_URL host must be loopback or in OPENWA_ALLOWED_HOSTS',
+      path: ['OPENWA_BASE_URL']
+    }
+  )
   .refine(
     data => {
       // In production, CORS_ORIGINS must be configured

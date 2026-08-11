@@ -42,6 +42,9 @@ services:
       USER_NAME: ${USER_NAME:?USER_NAME is required}
       USER_PHONE: ${USER_PHONE:-}
       OPENWA_BASE_URL: ${OPENWA_BASE_URL:-http://openwa:2785}
+      # SECRET-1: the internal OpenWA service name is a trusted base-URL
+      # host (loopback is always allowed for local dev).
+      OPENWA_ALLOWED_HOSTS: ${OPENWA_ALLOWED_HOSTS:-openwa}
       OPENWA_API_KEY: ${OPENWA_API_KEY:-}
       OPENWA_SESSION_ID: ${OPENWA_SESSION_ID:-main}
       OPENWA_CHAT_ID: ${OPENWA_CHAT_ID:-}

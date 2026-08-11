@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  createOpenWaSetupConfigSchema,
   openWaQrSchema,
   openWaSessionSchema,
   openWaSetupConfigResultSchema,
@@ -125,6 +126,38 @@ describe('openWaSetupConfigSchema', () => {
     expect(
       openWaSetupConfigSchema.parse({ OPENWA_API_KEY: '  key  ' })
     ).toEqual({ OPENWA_API_KEY: 'key' })
+  })
+
+  test('rejects a non-HTTPS URL (SECRET-1)', () => {
+    expect(
+      openWaSetupConfigSchema.safeParse({
+        OPENWA_BASE_URL: 'http://wa.example.com'
+      }).success
+    ).toBe(false)
+  })
+
+  test('rejects a non-allowlisted https host (SECRET-1)', () => {
+    expect(
+      openWaSetupConfigSchema.safeParse({
+        OPENWA_BASE_URL: 'https://evil.example.com'
+      }).success
+    ).toBe(false)
+  })
+
+  test('accepts a loopback URL (SECRET-1)', () => {
+    expect(
+      openWaSetupConfigSchema.safeParse({
+        OPENWA_BASE_URL: 'http://127.0.0.1:2785'
+      }).success
+    ).toBe(true)
+  })
+
+  test('accepts an allowlisted https host via the factory (SECRET-1)', () => {
+    const schema = createOpenWaSetupConfigSchema(['wa.example.com'])
+
+    expect(
+      schema.safeParse({ OPENWA_BASE_URL: 'https://wa.example.com' }).success
+    ).toBe(true)
   })
 })
 

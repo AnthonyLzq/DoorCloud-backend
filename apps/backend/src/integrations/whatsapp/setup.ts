@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import type {
-  OpenWaQr,
-  OpenWaSession,
-  OpenWaSetupConfig,
-  OpenWaSetupConfigResult,
-  OpenWaSetupStatus
+import {
+  createOpenWaSetupConfigSchema,
+  DEFAULT_OPENWA_ALLOWED_HOSTS,
+  type OpenWaQr,
+  type OpenWaSession,
+  type OpenWaSetupConfig,
+  type OpenWaSetupConfigResult,
+  type OpenWaSetupStatus
 } from '@doorcloud/shared'
 import { getEnv } from 'config/env'
 import { getEnvFilePath } from 'config/paths'
@@ -230,6 +232,21 @@ const saveOpenWaSetupConfig = ({
     OPENWA_CHAT_ID,
     OPENWA_SESSION_ID
   }
+  // SECRET-1: re-validate with the configured allowlist at the write
+  // boundary (the HTTP route already validated with the default schema).
+  const configSchema = createOpenWaSetupConfigSchema(
+    getEnv().OPENWA_ALLOWED_HOSTS ?? DEFAULT_OPENWA_ALLOWED_HOSTS
+  )
+  const parsed = configSchema.safeParse(values)
+
+  if (!parsed.success) {
+    const message = parsed.error.issues
+      .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+      .join(', ')
+
+    throw new Error(`Invalid OpenWA setup config: ${message}`)
+  }
+
   let envFile = ''
   const saved: string[] = []
 
