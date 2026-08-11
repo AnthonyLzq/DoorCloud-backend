@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["vite/client", "vitest"],
+    "types": ["vite/client", "vitest", "node"],
     "noEmit": true
   },
   "include": ["src", "test", "e2e", "vite.config.ts"]
