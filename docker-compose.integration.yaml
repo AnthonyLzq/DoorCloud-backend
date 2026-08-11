@@ -1,0 +1,10 @@
+# Integration-test overlay (REQ-3): publishes the mosquitto container port on
+# a MOSQUITTO_PORT host port so host-side MQTT integration tests can reach the
+# broker. NOT auto-loaded by compose (only docker-compose.override.yaml is);
+# it is used explicitly by apps/backend/scripts/mosquitto/run-integration-tests.sh
+# and CI via the same -f flags. Production compose never includes it, so CD-13
+# (no 1883/2785 host mappings) holds for the default stack.
+services:
+  mosquitto:
+    ports:
+      - '${MOSQUITTO_PORT:-1884}:1883'
