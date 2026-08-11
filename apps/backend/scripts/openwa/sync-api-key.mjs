@@ -65,6 +65,16 @@ const writeEnvValue = (key, value) => {
 }
 
 const main = () => {
+  // SECRET-2: in production the environment (compose env_file) is the sole
+  // authoritative source of secrets; never persist them to .env at runtime.
+  if (process.env.NODE_ENV === 'production') {
+    console.log(
+      'NODE_ENV=production: skipping .env write; supply OPENWA_API_KEY via env_file'
+    )
+
+    return
+  }
+
   const env = parseEnvFile()
 
   if (env.OPENWA_API_KEY) {

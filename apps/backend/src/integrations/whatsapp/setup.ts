@@ -247,6 +247,10 @@ const saveOpenWaSetupConfig = ({
     throw new Error(`Invalid OpenWA setup config: ${message}`)
   }
 
+  // SECRET-2: in production the environment (compose env_file) is the sole
+  // authoritative source of secrets; never persist them to .env at runtime.
+  if (getEnv().NODE_ENV === 'production') return { saved: [] }
+
   let envFile = ''
   const saved: string[] = []
 
