@@ -26,7 +26,9 @@ services:
       # config time. These satisfy env.ts validation inside the container; the
       # env_file optional .env is only a local-dev convenience (CD-10).
       MQTT_USER: ${MQTT_USER:-doorcloud-backend}
-      MQTT_PASS: ${MQTT_PASS:-doorcloud-backend-local}
+      # CD-13: no default MQTT password fallback; a deploy without MQTT_PASS
+      # must abort instead of shipping with known credentials.
+      MQTT_PASS: ${MQTT_PASS:?MQTT_PASS is required}
       MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
       MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
       MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-doorcloud-prod}
@@ -91,8 +93,8 @@ services:
   openwa:
     image: ghcr.io/rmyndharis/openwa:latest
     restart: unless-stopped
-    ports:
-      - '2785:2785'
+    # CD-13: no host port mapping; the backend reaches OpenWA internally at
+    # openwa:2785, so 2785 stays on the compose network only.
     environment:
       NODE_ENV: production
       PORT: 2785
@@ -120,10 +122,13 @@ services:
     image: doorcloud-mosquitto
     container_name: doorcloud-mosquitto
     restart: unless-stopped
-    ports:
-      - '1883:1883'
+    # CD-13: no host port mapping. The broker is reachable only on the
+    # internal compose network (mosquitto:1883, CD-7); the MQTT integration
+    # harness opts into a host mapping via docker-compose.integration.yaml,
+    # which shares the MOSQUITTO_PORT source (REQ-3).
     environment:
-      MOSQUITTO_BACKEND_PASSWORD: ${MQTT_PASS:-doorcloud-backend-local}
+      # CD-13: no default MQTT password fallback (see doorcloud service).
+      MOSQUITTO_BACKEND_PASSWORD: ${MQTT_PASS:?MQTT_PASS is required}
       MOSQUITTO_BACKEND_USER: ${MQTT_USER:-doorcloud-backend}
       MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
       MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
