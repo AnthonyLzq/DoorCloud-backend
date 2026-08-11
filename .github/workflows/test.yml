@@ -13,6 +13,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+
       - name: Set up Node.js (pnpm via packageManager field)
         uses: actions/setup-node@v4
         with:
@@ -41,9 +46,29 @@ jobs:
     name: MQTT integration tests with Mosquitto
     runs-on: ubuntu-latest
 
+    # Job-level env: compose interpolates the whole file (all services) even
+    # when only mosquitto is started, and every step (including cleanup)
+    # needs the required vars. The overlay publishes the broker on
+    # MOSQUITTO_PORT (REQ-3, same source as run-integration-tests.sh).
+    env:
+      MOSQUITTO_PORT: 1883
+      MQTT_USER: doorcloud-backend
+      MQTT_PASS: doorcloud-backend-local
+      SETUP_TOKEN: dev-setup-token
+      WEB_AUTH_USER: dev
+      WEB_AUTH_PASS: dev
+      PHOTOS_URL_SECRET: dev
+      USER_NAME: Dev
+      MODELS_CDN_URL: https://models.example.com
+
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
 
       - name: Set up Node.js (pnpm via packageManager field)
         uses: actions/setup-node@v4
@@ -76,29 +101,10 @@ jobs:
             exit 1
           fi
           echo "Mosquitto is ready"
-        env:
-          # REQ-3: the integration overlay publishes the broker on
-          # MOSQUITTO_PORT (same source as run-integration-tests.sh).
-          MOSQUITTO_PORT: 1883
-          # CD-13: compose requires MQTT_PASS with no default fallback; the
-          # CI harness supplies the test credentials.
-          MQTT_USER: doorcloud-backend
-          MQTT_PASS: doorcloud-backend-local
-          # Compose interpolates the whole file (all services) even when only
-          # mosquitto is started, so provide dev-only values for the
-          # doorcloud required vars.
-          SETUP_TOKEN: dev-setup-token
-          WEB_AUTH_USER: dev
-          WEB_AUTH_PASS: dev
-          PHOTOS_URL_SECRET: dev
-          USER_NAME: Dev
-          MODELS_CDN_URL: https://models.example.com
 
       - name: Run MQTT integration tests
         run: pnpm --filter @doorcloud/backend test:mqtt:integration
         env:
-          MQTT_USER: doorcloud-backend
-          MQTT_PASS: doorcloud-backend-local
           MQTT_HOST: localhost
           MQTT_PORT: 1883
           MQTT_PROTOCOL: mqtt
@@ -117,6 +123,11 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
 
       - name: Set up Node.js (pnpm via packageManager field)
         uses: actions/setup-node@v4
