@@ -42,6 +42,42 @@ const without = (
   return copy
 }
 
+describe('SECRET-1: OpenWA base-URL allowlist', () => {
+  test('accepts an allowlisted https host', () => {
+    const env = parseEnv({
+      ...baseEnv,
+      OPENWA_ALLOWED_HOSTS: 'wa.example.com',
+      OPENWA_BASE_URL: 'https://wa.example.com'
+    })
+
+    expect(env.OPENWA_BASE_URL).toBe('https://wa.example.com')
+  })
+
+  test('rejects a non-HTTPS URL', () => {
+    expect(() =>
+      parseEnv({
+        ...baseEnv,
+        OPENWA_BASE_URL: 'http://wa.example.com'
+      })
+    ).toThrow('OPENWA_BASE_URL')
+  })
+
+  test('rejects a host that is not allowlisted', () => {
+    expect(() =>
+      parseEnv({
+        ...baseEnv,
+        OPENWA_BASE_URL: 'https://evil.example.com'
+      })
+    ).toThrow('OPENWA_BASE_URL')
+  })
+
+  test('keeps the loopback dev default', () => {
+    const env = parseEnv(baseEnv)
+
+    expect(env.OPENWA_BASE_URL).toBe('http://localhost:2785')
+  })
+})
+
 describe('AUTH-1: production-required auth secrets', () => {
   test('production boots when all auth vars are set', () => {
     const env = parseEnv({ ...prodEnv, ...authVars })

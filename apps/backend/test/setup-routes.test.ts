@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import fastify from 'fastify'
@@ -12,6 +12,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 vi.mock('../src/config/env', () => ({
   getEnv: vi.fn()
 }))
+
+vi.mock('node:fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+
+  return { ...actual, writeFileSync: vi.fn() }
+})
 
 import { getEnv } from '../src/config/env'
 import { Setup } from '../src/network/http/routes/setup'
@@ -86,6 +92,88 @@ describe('POST /setup/config schema validation', () => {
         ]
       }
     })
+  })
+})
+
+describe('SECRET-1: setup schema rejects unsafe OpenWA URLs', () => {
+  test('rejects a non-HTTPS base URL with 400', async () => {
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      payload: { OPENWA_BASE_URL: 'http://wa.example.com' }
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  test('rejects a non-allowlisted https host with 400', async () => {
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      payload: { OPENWA_BASE_URL: 'https://evil.example.com' }
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  test('accepts a loopback dev URL', async () => {
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      payload: { OPENWA_BASE_URL: 'http://localhost:2785' }
+    })
+
+    expect(response.statusCode).toBe(200)
+  })
+})
+
+describe('SECRET-2: production setup does not touch disk', () => {
+  test('does not write the env file when NODE_ENV=production', async () => {
+    mockGetEnv.mockReturnValue({ NODE_ENV: 'production' })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      payload: {
+        OPENWA_API_KEY: 'saved-key',
+        OPENWA_BASE_URL: 'http://localhost:2785',
+        OPENWA_CHAT_ID: '51999999999@c.us',
+        OPENWA_SESSION_ID: 'main'
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(writeFileSync).not.toHaveBeenCalled()
+    expect(response.json()).toMatchObject({
+      error: false,
+      message: { saved: [] }
+    })
+  })
+
+  test('still writes the env file in development', async () => {
+    mockGetEnv.mockReturnValue({ NODE_ENV: 'development' })
+    const app = buildApp()
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/setup/config',
+      payload: {
+        OPENWA_API_KEY: 'saved-key',
+        OPENWA_BASE_URL: 'http://localhost:2785',
+        OPENWA_CHAT_ID: '51999999999@c.us',
+        OPENWA_SESSION_ID: 'main'
+      }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(writeFileSync).toHaveBeenCalled()
   })
 })
 
