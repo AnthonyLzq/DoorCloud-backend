@@ -51,9 +51,9 @@ Chain strategy: stacked-to-main
 
 | ID | Task (objective) | Files | Deps | Verify / Done |
 |----|-------------------|-------|------|---------------|
-| T3.1 | RED: tests — burst on /setup|/admin → 429; /healthz exempt; CSP nosniff frame-ancestors headers; no unsafe-inline | apps/backend/test/server.test.ts | — | `pnpm test:local` fails (REQ-6/7) |
-| T3.2 | Add `@fastify/rate-limit` global in server.ts with allowList `/healthz`, `/photos/*`; onSend hook: CSP img-src PHOTOS_BASE_URL origin + nosniff + frame-ancestors 'none' | apps/backend/src/network/server.ts, apps/backend/package.json | T3.1 | `pnpm test:local` green; curl header check |
-| T3.3 | Verify SPA loads cross-origin PHOTOS_BASE_URL photo under CSP (WF-10); no inline scripts | apps/web/src/** | T3.2 | Playwright smoke or manual load; WF-10 scenarios |
+| [x] T3.1 | RED: tests — burst on /setup|/admin → 429; /healthz exempt; CSP nosniff frame-ancestors headers; no unsafe-inline | apps/backend/test/server.test.ts | T3.2 | DONE: `HTTP hardening (REQ-6/7)` describe in 07286cd — burst 130x on `/` → 429 with `/healthz` exempt; CSP/nosniff/frame-ancestors asserted; no unsafe-inline in emitted CSP |
+| [x] T3.2 | Add `@fastify/rate-limit` global in server.ts with allowList `/healthz`, `/photos/*`; onSend hook: CSP img-src PHOTOS_BASE_URL origin + nosniff + frame-ancestors 'none' | apps/backend/src/network/server.ts, apps/backend/package.json | T3.1 | DONE: `@fastify/rate-limit ^11.2.0` global max 100/60s, allowList `/healthz` + `/photos/*`; onSend CSP `default-src 'self'; script-src 'self'; img-src 'self' <photosOrigin>; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'` + nosniff + X-Frame-Options DENY (07286cd); `pnpm test:local` green |
+| [x] T3.3 | Verify SPA loads cross-origin PHOTOS_BASE_URL photo under CSP (WF-10); no inline scripts | apps/web/src/** | T3.2 | DONE: e2e `csp-photos.spec.ts` (new) — document served with backend-emitted CSP, person photo fetched from `http://localhost:1996` (cross-origin) decodes (naturalWidth>0), no inline `<script>` and zero browser CSP violations; 2/2 e2e pass |
 
 ## Slice 4: Secrets (SEC-07)
 
