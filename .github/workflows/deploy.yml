@@ -24,7 +24,7 @@ jobs:
 
       - name: Install Coolify CLI
         run: |
-          curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify-cli/main/scripts/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify-cli/main/scripts/install.sh | bash -s -- v1.6.2
 
       - name: Add Coolify context
         run: |
