@@ -72,6 +72,21 @@ jobs:
     name: Docker build + boot smoke
     runs-on: ubuntu-latest
     if: ${{ inputs.docker_smoke == true }}
+
+    # Job-level env: compose interpolates the whole file (all services) even
+    # when only mosquitto is started; the integration overlay publishes the
+    # broker on MOSQUITTO_PORT (REQ-3) so the smoke container can reach it.
+    env:
+      MOSQUITTO_PORT: 1883
+      MQTT_USER: doorcloud-backend
+      MQTT_PASS: doorcloud-backend-local
+      SETUP_TOKEN: dev-setup-token
+      WEB_AUTH_USER: dev
+      WEB_AUTH_PASS: dev
+      PHOTOS_URL_SECRET: dev
+      USER_NAME: Dev
+      MODELS_CDN_URL: https://models.example.com
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,14 +119,20 @@ jobs:
 
       - name: Start Mosquitto broker
         run: |
-          docker compose up -d mosquitto
-          timeout=30
+          docker compose -f docker-compose.yaml -f docker-compose.integration.yaml up -d mosquitto
+          echo "Waiting for Mosquitto to be healthy..."
+          timeout=60
           counter=0
-          until docker compose exec -T mosquitto mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -W 1 2>/dev/null || [ $counter -eq $timeout ]; do
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' doorcloud-mosquitto 2>/dev/null)" = "healthy" ] || [ $counter -eq $timeout ]; do
             sleep 1
             counter=$((counter + 1))
           done
-          [ $counter -eq $timeout ] && { echo "Mosquitto not healthy"; exit 1; }
+          if [ $counter -eq $timeout ]; then
+            echo "Mosquitto failed to become healthy within ${timeout}s"
+            docker compose logs mosquitto
+            exit 1
+          fi
+          echo "Mosquitto is ready"
 
       - name: Build image
         run: docker build -t doorcloud:manual -f Dockerfile .

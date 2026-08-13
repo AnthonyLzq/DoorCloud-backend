@@ -88,15 +88,15 @@ jobs:
       - name: Start Mosquitto broker
         run: |
           docker compose -f docker-compose.yaml -f docker-compose.integration.yaml up -d mosquitto
-          echo "Waiting for Mosquitto to be ready..."
-          timeout=30
+          echo "Waiting for Mosquitto to be healthy..."
+          timeout=60
           counter=0
-          until docker compose exec -T mosquitto mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -W 1 2>/dev/null || [ $counter -eq $timeout ]; do
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' doorcloud-mosquitto 2>/dev/null)" = "healthy" ] || [ $counter -eq $timeout ]; do
             sleep 1
             counter=$((counter + 1))
           done
           if [ $counter -eq $timeout ]; then
-            echo "Mosquitto failed to start within ${timeout}s"
+            echo "Mosquitto failed to become healthy within ${timeout}s"
             docker compose logs mosquitto
             exit 1
           fi
