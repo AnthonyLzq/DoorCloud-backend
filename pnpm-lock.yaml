@@ -38,6 +38,9 @@ importers:
         specifier: ^17.7.3
         version: 17.7.3
     devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
       commit-and-tag-version:
         specifier: ^12.6.1
         version: 12.7.3
