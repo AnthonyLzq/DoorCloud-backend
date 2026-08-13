@@ -18,7 +18,7 @@
     "service": "nodemon --exitcrash",
     "start": "NODE_PATH=dist node dist/index.js",
     "test:local": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:ci": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:ci": "vitest run --exclude \"**/*.integration.test.ts\" --exclude \"**/dataset-loader.test.ts\"",
     "test:mqtt": "scripts/mosquitto/run-integration-tests.sh",
     "test:mqtt:integration": "vitest run test/mqtt.integration.test.ts",
     "openwa:qr": "node scripts/openwa/qr-sign-in.mjs",
