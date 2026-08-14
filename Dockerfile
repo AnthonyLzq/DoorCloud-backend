@@ -58,6 +58,8 @@ COPY apps/backend/scripts/face_recognition_server.py \
   ./apps/backend/scripts/face_recognition_server.py
 COPY apps/backend/scripts/download-models.prod.ts \
   ./apps/backend/scripts/download-models.prod.ts
+COPY apps/backend/scripts/download-models.checksum.ts \
+  ./apps/backend/scripts/download-models.checksum.ts
 COPY apps/backend/scripts/entrypoint.sh \
   ./apps/backend/scripts/entrypoint.sh
 COPY apps/backend/requirements.txt ./apps/backend/requirements.txt
@@ -67,6 +69,20 @@ COPY apps/backend/requirements.txt ./apps/backend/requirements.txt
 # and the entrypoint runs `node index.js`. `node dist/index.js` from a dist
 # WORKDIR would resolve to /app/apps/backend/dist/dist/index.js (nonexistent).
 WORKDIR /app/apps/backend/dist
+
+# CD-11: run as a non-root user. doorcloud (uid 1001) owns the writable
+# runtime paths (photos, state, models). Named volumes initialized from these
+# dirs inherit the ownership (copy-up), so a fresh `docker compose up` boots
+# with the app user able to read/write them; the entrypoint re-applies the
+# ownership at boot when it runs as root (pre-existing volumes, migrations).
+RUN mkdir -p /data/photos /data/state /app/apps/backend/models \
+  && useradd --uid 1001 --no-create-home --shell /usr/sbin/nologin doorcloud \
+  && chown -R doorcloud:doorcloud \
+    /data/photos \
+    /data/state \
+    /app/apps/backend/models
+
+USER doorcloud
 
 # CD-1/CD-3: liveness healthcheck wired to /healthz. node -e keeps the image
 # free of a curl layer.
