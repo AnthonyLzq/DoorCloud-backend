@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   listPhotos: vi.fn(),
   listDirectories: vi.fn(),
   getPhotoUrl: vi.fn(),
+  resolvePhotoPath: vi.fn(),
   getLastMessage: vi.fn(),
   setLastMessage: vi.fn(),
   sayHelloThroughWhatsapp: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('../src/storage/photos', () => ({
     list = mocks.listPhotos
     listDirectories = mocks.listDirectories
     getUrl = mocks.getPhotoUrl
+    resolvePath = mocks.resolvePhotoPath
   },
   UNIDENTIFIED_FOLDER: 'unidentified'
 }))
@@ -132,12 +134,15 @@ beforeEach(() => {
   mocks.getPhotoUrl.mockImplementation(
     (path: string) => `https://example.com/photos/${path}`
   )
+  mocks.resolvePhotoPath.mockImplementation(
+    (path: string) => `/tmp/doorcloud-photos/${path}`
+  )
   mocks.uploadPhoto.mockResolvedValue('unidentified/uuid.jpg')
   mocks.getLastMessage.mockReturnValue(new Date(Date.now() - 2 * 36e5))
 })
 
 describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
-  it('routes photos through FaceRecognitionService.verify with static URLs', async () => {
+  it('routes photos through FaceRecognitionService.verify with disk paths', async () => {
     const { UserServices } = await import('../src/services/index.js')
     us = new UserServices(fromPartial(logMock))
 
@@ -149,7 +154,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       [
         {
           name: 'John',
-          url: 'https://example.com/photos/John/selfie-abc123.jpg'
+          path: '/tmp/doorcloud-photos/John/selfie-abc123.jpg'
         }
       ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
@@ -169,7 +174,7 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       [
         {
           name: 'John',
-          url: 'https://example.com/photos/John/selfie-abc123.jpg'
+          path: '/tmp/doorcloud-photos/John/selfie-abc123.jpg'
         }
       ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }
@@ -191,11 +196,11 @@ describe('UserServices.sendPhotoThroughWhatsapp (RF-2, RF-7)', () => {
       [
         {
           name: 'Bryan Ramos',
-          url: 'https://example.com/photos/Bryan Ramos/maria1.jpg'
+          path: '/tmp/doorcloud-photos/Bryan Ramos/maria1.jpg'
         },
         {
           name: 'Diana Kevans',
-          url: 'https://example.com/photos/Diana Kevans/casa.jpg'
+          path: '/tmp/doorcloud-photos/Diana Kevans/casa.jpg'
         }
       ],
       { threshold: DEFAULT_VERIFY_THRESHOLD, maxPhotos: MAX_STORED_PHOTOS }

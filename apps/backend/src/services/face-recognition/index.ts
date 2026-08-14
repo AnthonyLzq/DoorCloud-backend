@@ -1,8 +1,5 @@
-import {
-  DEFAULT_VERIFY_THRESHOLD,
-  MAX_STORED_PHOTOS,
-  VERIFY_FETCH_TIMEOUT_MS
-} from 'config/constants'
+import { readFile } from 'node:fs/promises'
+import { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS } from 'config/constants'
 import { cosineSimilarity } from './cosine-similarity'
 import type { FaceDetection } from './onnx-provider'
 import {
@@ -12,14 +9,17 @@ import {
 } from './onnx-provider'
 import { PythonManager } from './python-manager'
 
-export { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS, VERIFY_FETCH_TIMEOUT_MS }
+export { DEFAULT_VERIFY_THRESHOLD, MAX_STORED_PHOTOS }
 
 const DETECTOR_MODEL_PATH = 'models/insightface/det_500m.onnx'
 const RECOGNITION_MODEL_PATH = 'models/insightface/w600k_mbf.onnx'
 
+// SEC-14/RF-1: a stored photo is an absolute path inside PHOTOS_DIR, never a
+// URL. verify() reads it from local disk so a misconfigured PHOTOS_BASE_URL
+// cannot turn verification into an SSRF vector.
 export interface VerifyStoredPhoto {
   name: string
-  url: string
+  path: string
 }
 
 export interface VerifyResult {
@@ -341,9 +341,10 @@ export class FaceRecognitionService {
    * actionable error.
    *
    * Detects and embeds the highest-scoring probe face, then compares it
-   * against each stored photo (downloaded in parallel with a per-fetch
-   * timeout, capped at `maxPhotos`, default `MAX_STORED_PHOTOS`), returning
-   * the first cosine similarity at or above the threshold.
+   * against each stored photo (read from local disk in parallel, capped at
+   * `maxPhotos`, default `MAX_STORED_PHOTOS`), returning the first cosine
+   * similarity at or above the threshold. Zero HTTP fetches occur during
+   * verification (SEC-14/RF-1).
    *
    * @param image - Probe image buffer
    * @param storedPhotos - Stored user photos to compare against
@@ -394,39 +395,21 @@ export class FaceRecognitionService {
 
     const storedCandidates = storedPhotos.slice(0, maxPhotos)
 
-    const downloadedPhotos = await Promise.allSettled(
+    const readPhotos = await Promise.allSettled(
       storedCandidates.map(async photo => {
-        const controller = new AbortController()
-        const timer = setTimeout(
-          () => controller.abort(),
-          VERIFY_FETCH_TIMEOUT_MS
-        )
         try {
-          const response = await fetch(photo.url, {
-            signal: controller.signal
-          })
-          if (!response.ok) {
-            console.warn(
-              `[FaceRecognitionService] verify: failed to fetch stored photo ${photo.url} (status ${response.status})`
-            )
-            return null
-          }
-          return {
-            photo,
-            storedImage: Buffer.from(await response.arrayBuffer())
-          }
+          const storedImage = await readFile(photo.path)
+          return { photo, storedImage }
         } catch (error) {
           console.warn(
-            `[FaceRecognitionService] verify: error fetching stored photo ${photo.url}: ${error instanceof Error ? error.message : String(error)}`
+            `[FaceRecognitionService] verify: error reading stored photo ${photo.path}: ${error instanceof Error ? error.message : String(error)}`
           )
           return null
-        } finally {
-          clearTimeout(timer)
         }
       })
     )
 
-    for (const result of downloadedPhotos) {
+    for (const result of readPhotos) {
       if (result.status === 'rejected' || !result.value) continue
       const { photo, storedImage } = result.value
 

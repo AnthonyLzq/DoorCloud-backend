@@ -11,11 +11,3 @@
 export const DEFAULT_VERIFY_THRESHOLD = 0.3435
 
 export const MAX_STORED_PHOTOS = 10
-
-/**
- * Timeout (ms) for downloading each stored photo during verification.
- *
- * Stored photo downloads run in parallel and each fetch is bounded by this
- * deadline so a stalled URL cannot hang the verification flow indefinitely.
- */
-export const VERIFY_FETCH_TIMEOUT_MS = 10_000

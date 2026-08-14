@@ -1,6 +1,20 @@
+import { readFile } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { VERIFY_FETCH_TIMEOUT_MS } from '../src/config/constants'
 import { FaceRecognitionService } from '../src/services/face-recognition'
+
+// verify() must read stored photos from local disk (RF-1 scenario 3): the
+// real readFile is replaced so no test ever touches the filesystem, and the
+// producer-side primitives (writeFile etc.) keep their real behavior.
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>(
+    'node:fs/promises'
+  )
+
+  return {
+    ...actual,
+    readFile: vi.fn()
+  }
+})
 
 // Hermetic unit suite: the real Python IPC process (venv + models) is not
 // available in CI. The ONNX provider is spied per-test below; the Python
@@ -248,6 +262,12 @@ describe('FaceRecognitionService', () => {
       }
     }
 
+    beforeEach(() => {
+      // readFile is a module-level mock shared by every test in this
+      // describe; clear its call history so per-test call counts are exact.
+      vi.mocked(readFile).mockClear()
+    })
+
     afterEach(() => {
       vi.restoreAllMocks()
       vi.unstubAllGlobals()
@@ -260,7 +280,7 @@ describe('FaceRecognitionService', () => {
 
       await expect(
         service.verify(Buffer.from('probe-image'), [
-          { name: 'alice', url: 'http://photos.test/alice.jpg' }
+          { name: 'alice', path: '/stored/alice.jpg' }
         ])
       ).rejects.toThrow(
         "verify() requires onnx mode: call init({ mode: 'onnx' })"
@@ -278,7 +298,7 @@ describe('FaceRecognitionService', () => {
       vi.stubGlobal('fetch', fetchSpy)
 
       const result = await service.verify(Buffer.from('probe-image'), [
-        { name: 'alice', url: 'http://photos.test/alice.jpg' }
+        { name: 'alice', path: '/stored/alice.jpg' }
       ])
 
       expect(result).toEqual({ match: false, reason: 'no-face' })
@@ -299,14 +319,11 @@ describe('FaceRecognitionService', () => {
         .spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
-      const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) =>
-        fetchResponse(photoBuffer)
-      )
-      vi.stubGlobal('fetch', fetchSpy)
+      const readSpy = vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
@@ -316,9 +333,8 @@ describe('FaceRecognitionService', () => {
         similarity: 1,
         reason: 'match'
       })
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
-      expect(fetchSpy.mock.calls[0][0]).toBe('http://photos.test/alice.jpg')
-      expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+      expect(readSpy).toHaveBeenCalledTimes(1)
+      expect(readSpy).toHaveBeenCalledWith('/stored/alice.jpg')
       expect(detectSpy).toHaveBeenCalledTimes(2)
       expect(embedSpy).toHaveBeenCalledTimes(2)
     })
@@ -331,14 +347,11 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([0, 1, 0]))
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => fetchResponse(photoBuffer))
-      )
+      vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
@@ -348,7 +361,7 @@ describe('FaceRecognitionService', () => {
       expect(result.similarity).toBe(0)
     })
 
-    it('downloads stored photos in parallel and stops inference after the first match', async () => {
+    it('reads stored photos in parallel and stops inference after the first match', async () => {
       await initOnnx()
       const detectSpy = vi
         .spyOn(service['onnxProvider'], 'detectFaces')
@@ -357,15 +370,14 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
-      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
-      vi.stubGlobal('fetch', fetchSpy)
+      const readSpy = vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
         [
-          { name: 'alice', url: 'http://photos.test/alice.jpg' },
-          { name: 'bob', url: 'http://photos.test/bob.jpg' },
-          { name: 'carol', url: 'http://photos.test/carol.jpg' }
+          { name: 'alice', path: '/stored/alice.jpg' },
+          { name: 'bob', path: '/stored/bob.jpg' },
+          { name: 'carol', path: '/stored/carol.jpg' }
         ],
         { threshold: 0.5 }
       )
@@ -376,9 +388,9 @@ describe('FaceRecognitionService', () => {
         similarity: 1,
         reason: 'match'
       })
-      // Downloads run in parallel for every candidate, but inference stops
-      // at the first match: 1 probe detect + 1 alice detect.
-      expect(fetchSpy).toHaveBeenCalledTimes(3)
+      // Reads run in parallel for every candidate, but inference stops at the
+      // first match: 1 probe detect + 1 alice detect.
+      expect(readSpy).toHaveBeenCalledTimes(3)
       expect(detectSpy).toHaveBeenCalledTimes(2)
     })
 
@@ -390,12 +402,11 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValue(new Float32Array([0, 1, 0]))
-      const fetchSpy = vi.fn(async (_url: string) => fetchResponse(photoBuffer))
-      vi.stubGlobal('fetch', fetchSpy)
+      const readSpy = vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const photos = Array.from({ length: 12 }, (_, index) => ({
         name: `user${index}`,
-        url: `http://photos.test/${index}.jpg`
+        path: `/stored/${index}.jpg`
       }))
 
       const result = await service.verify(Buffer.from('probe-image'), photos, {
@@ -404,9 +415,9 @@ describe('FaceRecognitionService', () => {
 
       expect(result.match).toBe(false)
       expect(result.reason).toBe('no-match')
-      expect(fetchSpy).toHaveBeenCalledTimes(10)
-      expect(fetchSpy.mock.calls[0][0]).toBe('http://photos.test/0.jpg')
-      expect(fetchSpy.mock.calls[9][0]).toBe('http://photos.test/9.jpg')
+      expect(readSpy).toHaveBeenCalledTimes(10)
+      expect(readSpy.mock.calls[0]?.[0]).toBe('/stored/0.jpg')
+      expect(readSpy.mock.calls[9]?.[0]).toBe('/stored/9.jpg')
       expect(detectSpy).toHaveBeenCalledTimes(11)
     })
 
@@ -421,14 +432,11 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['onnxProvider'], 'detectFaces')
         .mockResolvedValueOnce([lowScoreFace, highScoreFace])
         .mockResolvedValueOnce([probeFace])
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => fetchResponse(photoBuffer))
-      )
+      vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
@@ -450,14 +458,13 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
-      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
-      vi.stubGlobal('fetch', fetchSpy)
+      const readSpy = vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
         [
-          { name: 'alice', url: 'http://photos.test/alice.jpg' },
-          { name: 'bob', url: 'http://photos.test/bob.jpg' }
+          { name: 'alice', path: '/stored/alice.jpg' },
+          { name: 'bob', path: '/stored/bob.jpg' }
         ],
         { threshold: 0.5 }
       )
@@ -468,7 +475,7 @@ describe('FaceRecognitionService', () => {
         similarity: 1,
         reason: 'match'
       })
-      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      expect(readSpy).toHaveBeenCalledTimes(2)
     })
 
     it('returns no-match without similarity when no stored photo had a face', async () => {
@@ -480,14 +487,11 @@ describe('FaceRecognitionService', () => {
         service['onnxProvider'],
         'getAlignedEmbedding'
       ).mockResolvedValue(new Float32Array([1, 0, 0]))
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => fetchResponse(photoBuffer))
-      )
+      vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
@@ -504,7 +508,7 @@ describe('FaceRecognitionService', () => {
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
@@ -526,7 +530,7 @@ describe('FaceRecognitionService', () => {
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
@@ -544,14 +548,13 @@ describe('FaceRecognitionService', () => {
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
-      const fetchSpy = vi.fn(async () => fetchResponse(photoBuffer))
-      vi.stubGlobal('fetch', fetchSpy)
+      const readSpy = vi.mocked(readFile).mockResolvedValue(photoBuffer)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
         [
-          { name: 'alice', url: 'http://photos.test/alice.jpg' },
-          { name: 'bob', url: 'http://photos.test/bob.jpg' }
+          { name: 'alice', path: '/stored/alice.jpg' },
+          { name: 'bob', path: '/stored/bob.jpg' }
         ],
         { threshold: 0.5 }
       )
@@ -562,37 +565,63 @@ describe('FaceRecognitionService', () => {
         similarity: 1,
         reason: 'match'
       })
-      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      expect(readSpy).toHaveBeenCalledTimes(2)
     })
 
-    it('aborts stored photo fetches that exceed the timeout (R4)', async () => {
+    it('reads stored photos from local disk and never fetches (RF-1 scenario 3)', async () => {
       await initOnnx()
-      vi.spyOn(service['onnxProvider'], 'detectFaces').mockResolvedValue([
-        probeFace
-      ])
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([probeFace])
       vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
         .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
-      const fetchSpy = vi.fn(
-        (_url: string, init?: RequestInit) =>
-          new Promise((_resolve, reject) => {
-            init?.signal?.addEventListener('abort', () => {
-              reject(new Error('Aborted'))
-            })
-          })
-      )
+      vi.mocked(readFile).mockResolvedValue(photoBuffer)
+      // A hostile PHOTOS_BASE_URL would point stored-photo lookups at an
+      // attacker-controlled host; verify() must never touch the network.
+      const fetchSpy = vi.fn(async () => {
+        throw new Error('unexpected HTTP fetch during verify()')
+      })
       vi.stubGlobal('fetch', fetchSpy)
 
       const result = await service.verify(
         Buffer.from('probe-image'),
-        [{ name: 'alice', url: 'http://photos.test/alice.jpg' }],
+        [{ name: 'alice', path: '/stored/alice.jpg' }],
         { threshold: 0.5 }
       )
 
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
-      expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+      expect(result).toEqual({
+        match: true,
+        name: 'alice',
+        similarity: 1,
+        reason: 'match'
+      })
+      expect(readFile).toHaveBeenCalledWith('/stored/alice.jpg')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('returns no-match when a stored photo file cannot be read (R4)', async () => {
+      await initOnnx()
+      vi.spyOn(service['onnxProvider'], 'detectFaces')
+        .mockResolvedValueOnce([probeFace])
+        .mockResolvedValueOnce([probeFace])
+      vi.spyOn(service['onnxProvider'], 'getAlignedEmbedding')
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+        .mockResolvedValueOnce(new Float32Array([1, 0, 0]))
+      vi.mocked(readFile).mockRejectedValue(new Error('ENOENT: no such file'))
+      const fetchSpy = vi.fn(async () => {
+        throw new Error('unexpected HTTP fetch during verify()')
+      })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const result = await service.verify(
+        Buffer.from('probe-image'),
+        [{ name: 'alice', path: '/stored/missing.jpg' }],
+        { threshold: 0.5 }
+      )
+
       expect(result).toEqual({ match: false, reason: 'no-match' })
-      expect(VERIFY_FETCH_TIMEOUT_MS).toBeGreaterThan(0)
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 

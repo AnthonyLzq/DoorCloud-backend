@@ -97,7 +97,10 @@ class UserServices {
             // The person identity always comes from the parent folder name,
             // never from the file name (photos inside may be named anything)
             name: folder,
-            url: this.#photoStorage.getUrl(`${folder}/${file}`)
+            // RF-1/SEC-14: reference photos are absolute disk paths resolved
+            // through the PHOTOS_DIR containment check; verify() reads them
+            // from local disk instead of fetching signed URLs (no SSRF).
+            path: this.#photoStorage.resolvePath(`${folder}/${file}`)
           }))
         })
       )
