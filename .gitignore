@@ -144,6 +144,10 @@ apps/backend/models/
 .opencode/goals/*.lock/
 .opencode/goals/**/*.lock/
 
+# OpenCode goal runtime state (telemetry, churns every session)
+.opencode/goals/*.json
+.opencode/goals/*.jsonl
+
 # Python cache
 __pycache__/
 scripts/__pycache__/
