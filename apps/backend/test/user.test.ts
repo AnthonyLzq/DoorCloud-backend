@@ -409,7 +409,9 @@ describe('User HTTP routes (RF-3)', () => {
 
     try {
       handlerErrorInRoute(
-        Object.assign(new Error('too large'), { code: 'FST_REQ_FILE_TOO_LARGE' })
+        Object.assign(new Error('too large'), {
+          code: 'FST_REQ_FILE_TOO_LARGE'
+        })
       )
       expect.unreachable()
     } catch (error) {
@@ -446,10 +448,52 @@ describe('User HTTP routes (RF-3)', () => {
     }
 
     try {
+      handlerErrorInRoute(
+        Object.assign(new Error('no form data'), { code: 'FST_NO_FORM_DATA' })
+      )
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(400)
+    }
+
+    try {
+      handlerErrorInRoute(new Error('Unexpected end of multipart data'))
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(400)
+    }
+
+    try {
       handlerErrorInRoute(new CustomError('unsupported', 415))
       expect.unreachable()
     } catch (error) {
       expect((error as { statusCode: number }).statusCode).toBe(415)
+    }
+  })
+
+  it('maps a mismatched multipart boundary to 400 instead of 500 (U-03)', async () => {
+    const app = await buildApp()
+    const boundary = '----doorcloud-test'
+    const body = [
+      `--${boundary}\r\n`,
+      'Content-Disposition: form-data; name="selfie"; filename="a.jpg"\r\n',
+      'Content-Type: image/jpeg\r\n',
+      '\r\n',
+      'photo-bytes',
+      `\r\n--${boundary}--\r\n`
+    ].join('')
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user/upload',
+        headers: { 'content-type': `multipart/form-data; boundary=x` },
+        payload: body
+      })
+
+      expect(res.statusCode).toBe(400)
+    } finally {
+      await app.close()
     }
   })
 
@@ -471,7 +515,9 @@ describe('User HTTP routes (RF-3)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/user/upload',
-        headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+        headers: {
+          'content-type': `multipart/form-data; boundary=${boundary}`
+        },
         payload: body
       })
 
