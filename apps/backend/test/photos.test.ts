@@ -122,4 +122,18 @@ describe('Signed photo serving (RF-4)', () => {
     expect(response.headers['content-type']).toMatch(/^image\/jpeg/)
     expect(response.body).toBe('photo-content')
   })
+
+  test('U-04: serves a Content-Disposition header on signed photo responses', async () => {
+    const app = await buildApp()
+
+    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
+    writeFileSync(join(photosDir, 'Ana-42', 'selfie.jpg'), 'photo-content')
+
+    const url = signedPhotoUrl('Ana-42/selfie.jpg')
+    const response = await app.inject({ method: 'GET', url })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['content-disposition']).toContain('inline')
+    expect(response.headers['content-disposition']).toContain('selfie.jpg')
+  })
 })
