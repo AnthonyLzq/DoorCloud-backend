@@ -77,7 +77,8 @@ vi.mock('node:fs', async () => {
 vi.mock('../src/utils', () => ({
   diffTimeInSeconds: vi.fn(() => 1),
   getTimestamp: vi.fn(() => '2026-01-01T00:00:00.000Z'),
-  randomWait: vi.fn()
+  randomWait: vi.fn(),
+  validateImage: vi.fn(() => ({ ext: 'jpeg', mimetype: 'image/jpeg' }))
 }))
 
 import type { UserServices } from '../src/services/index.js'
@@ -378,6 +379,59 @@ describe('User HTTP routes (RF-3)', () => {
       )
     } finally {
       await app.close()
+    }
+  })
+
+  it('returns 400 (not 500) for a non-multipart upload body (U-03)', async () => {
+    const app = await buildApp()
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user/upload',
+        headers: { 'content-type': 'application/json' },
+        payload: '{}'
+      })
+
+      expect(res.statusCode).toBe(400)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('maps a file over the limit and malformed multipart to 413/400 (U-02/U-03)', async () => {
+    const { handlerErrorInRoute } = await import(
+      '../src/network/http/utils/helpers.js'
+    )
+    const { CustomError } = await import(
+      '../src/network/http/utils/customError.js'
+    )
+
+    try {
+      handlerErrorInRoute(
+        Object.assign(new Error('too large'), { code: 'FST_REQ_FILE_TOO_LARGE' })
+      )
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(413)
+    }
+
+    try {
+      handlerErrorInRoute(
+        Object.assign(new Error('bad', { cause: undefined }), {
+          code: 'FST_INVALID_MULTIPART_CONTENT_TYPE'
+        })
+      )
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(400)
+    }
+
+    try {
+      handlerErrorInRoute(new CustomError('unsupported', 415))
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(415)
     }
   })
 })

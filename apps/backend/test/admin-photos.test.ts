@@ -18,6 +18,9 @@ import { DiskPhotoStorage } from '../src/storage/photos'
 vi.mock('../src/config/env', () => ({
   getEnv: vi.fn()
 }))
+vi.mock('../src/utils', () => ({
+  validateImage: () => ({ ext: 'jpeg', mimetype: 'image/jpeg' })
+}))
 
 const mockGetEnv = getEnv as ReturnType<typeof vi.fn>
 
@@ -422,6 +425,58 @@ describe('Admin photos API (PA-1..6)', () => {
     })
 
     expect(response.statusCode).toBe(404)
+
+    await app.close()
+  })
+
+  test('A-01: creating the owner name (USER_NAME) is rejected with 403', async () => {
+    const app = await buildApp()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/admin/photos/persons',
+      payload: { name: 'Ana' }
+    })
+
+    expect(res.statusCode).toBe(403)
+    expect(res.json()).toMatchObject({ error: true })
+
+    await app.close()
+  })
+
+  test('A-01: renaming another person onto the owner name is rejected with 403', async () => {
+    const app = await buildApp()
+    await storage.createFolder('Bryan')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/admin/photos/persons/Bryan',
+      payload: { name: 'Ana' }
+    })
+
+    expect(res.statusCode).toBe(403)
+    expect(existsSync(join(photosDir, 'Bryan'))).toBe(true)
+
+    await app.close()
+  })
+
+  test('A-02: deleting a photo named "." or ".." is rejected without a 500', async () => {
+    const app = await buildApp()
+    await storage.createFolder('Bryan')
+
+    for (const filename of ['.', '..']) {
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/admin/photos/persons/Bryan/photos/${filename}`
+      })
+
+      // The router rejects these as a route param (404) before the handler
+      // runs, so no filesystem operation (EISDIR) and no 500. The schema
+      // refine is defense-in-depth in case a caller reaches the handler.
+      expect(res.statusCode).toBeGreaterThanOrEqual(400)
+      expect(res.statusCode).toBeLessThan(500)
+      expect(res.json()).toMatchObject({ error: true })
+    }
 
     await app.close()
   })

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { appendFileSync } from 'node:fs'
-import type { MultipartFile } from '@fastify/multipart'
+import type { MultipartFile, MultipartValue } from '@fastify/multipart'
 import { getEnv } from 'config/env'
 import { resolveMetricsPath } from 'config/paths'
 import { getActiveUser } from 'config/user'
@@ -12,7 +12,12 @@ import {
 import { faceRecognitionService } from 'services/face-recognition'
 import { DiskPhotoStorage, UNIDENTIFIED_FOLDER } from 'storage/photos'
 import { getUserState, type UserState } from 'storage/state'
-import { diffTimeInSeconds, getTimestamp, randomWait } from 'utils'
+import {
+  diffTimeInSeconds,
+  getTimestamp,
+  randomWait,
+  validateImage
+} from 'utils'
 
 const MAX_HOUR_DIFFERENCE = 16
 
@@ -41,13 +46,22 @@ class UserServices {
   }
 
   async uploadPhotos(
-    files: AsyncIterableIterator<MultipartFile>
+    files: AsyncIterableIterator<MultipartFile | MultipartValue>
   ): Promise<string[]> {
     const { name } = getActiveUser()
     const paths: string[] = []
 
     for await (const file of files) {
-      const format = file.mimetype.split('/')[1]
+      // Skip non-file parts (fields) so the loop is field-name-agnostic but
+      // never feeds a field value into the image pipeline.
+      if (file.type !== 'file') continue
+
+      const buffer = await file.toBuffer()
+
+      // U-01: derive the stored extension from the verified content, not the
+      // client-declared mimetype (an attacker controls the mimetype header).
+      const { ext } = validateImage(buffer, file.mimetype)
+
       // Keep the client-provided file name (identity lives in the parent
       // folder, not in the file name), sanitized and deduplicated with a uuid
       const originalName = (file.filename || file.fieldname).trim()
@@ -56,8 +70,8 @@ class UserServices {
         'photo'
       const path = await this.#photoStorage.upload(
         name,
-        `${baseName}-${crypto.randomUUID()}.${format}`,
-        await file.toBuffer()
+        `${baseName}-${crypto.randomUUID()}.${ext}`,
+        buffer
       )
 
       paths.push(path)

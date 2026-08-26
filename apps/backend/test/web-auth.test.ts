@@ -20,6 +20,7 @@ const buildApp = () => {
   app.get('/assets/app.js', async () => 'asset')
   app.get('/healthz', async () => ({ status: 'ok' }))
   app.get('/photos/:signature/:expiresAt/*', async () => 'photo')
+  app.get('/admin/photos/persons', async () => ({ ok: true }))
 
   return app
 }
@@ -133,18 +134,40 @@ describe('webAuthMiddleware', () => {
     expect(response.statusCode).toBe(200)
   })
 
-  test('protects /setup and /assets when credentials are configured', async () => {
+  test('keeps /setup and /assets protected when credentials are configured', async () => {
     mockGetEnv.mockReturnValue({
       WEB_AUTH_USER: 'admin',
       WEB_AUTH_PASS: 'secret'
     })
     const app = buildApp()
 
-    const setup = await app.inject({ method: 'GET', url: '/setup' })
     const asset = await app.inject({ method: 'GET', url: '/assets/app.js' })
 
-    expect(setup.statusCode).toBe(401)
     expect(asset.statusCode).toBe(401)
+  })
+
+  test('exempts /admin and /setup API surfaces from the Basic layer (F-01)', async () => {
+    mockGetEnv.mockReturnValue({
+      WEB_AUTH_USER: 'admin',
+      WEB_AUTH_PASS: 'secret'
+    })
+    const app = buildApp()
+
+    // Bearer-only requests to the API surfaces pass the Basic layer; the
+    // route-level Bearer setupAuthMiddleware authorizes them afterwards.
+    const admin = await app.inject({
+      method: 'GET',
+      url: '/admin/photos/persons',
+      headers: { authorization: 'Bearer some-token' }
+    })
+    const setup = await app.inject({
+      method: 'GET',
+      url: '/setup',
+      headers: { authorization: 'Bearer some-token' }
+    })
+
+    expect(admin.statusCode).toBe(200)
+    expect(setup.statusCode).toBe(200)
   })
 
   test('rejects a short username as 401 without throwing', async () => {

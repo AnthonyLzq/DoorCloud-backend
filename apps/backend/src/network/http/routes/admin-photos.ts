@@ -11,6 +11,7 @@ import type {
 } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { DiskPhotoStorage, UNIDENTIFIED_FOLDER } from 'storage/photos'
+import { validateImage } from 'utils'
 import { z } from 'zod'
 import { setupAuthMiddleware } from '../middleware/setup-auth'
 import { response } from '../response'
@@ -77,6 +78,9 @@ const photoParams = z.object({
     .trim()
     .min(1)
     .regex(/^[^/\\]+$/, 'filename must not contain path separators')
+    .refine(f => f !== '.' && f !== '..', {
+      message: 'filename cannot be "." or ".."'
+    })
 })
 const trayPhotoParams = z.object({
   filename: z
@@ -84,6 +88,9 @@ const trayPhotoParams = z.object({
     .trim()
     .min(1)
     .regex(/^[^/\\]+$/, 'filename must not contain path separators')
+    .refine(f => f !== '.' && f !== '..', {
+      message: 'filename cannot be "." or ".."'
+    })
 })
 
 const AdminPhotos = (server: ZodFastifyInstance): void => {
@@ -135,6 +142,16 @@ const AdminPhotos = (server: ZodFastifyInstance): void => {
       const { name } = request.body
 
       try {
+        // A-01: symmetric owner guard — the owner identity cannot be created
+        // through the API even if the owner folder is absent.
+        if (name === USER_NAME)
+          return response({
+            error: true,
+            message: 'The owner folder cannot be created',
+            reply,
+            status: 403
+          })
+
         if ((await photoStorage.listDirectories()).includes(name))
           return response({
             error: true,
@@ -169,6 +186,16 @@ const AdminPhotos = (server: ZodFastifyInstance): void => {
         return response({
           error: true,
           message: 'The owner folder cannot be renamed',
+          reply,
+          status: 403
+        })
+
+      // A-01: symmetric owner guard — renaming any folder onto the owner
+      // identity is rejected even when the owner folder is absent.
+      if (to === USER_NAME)
+        return response({
+          error: true,
+          message: 'The owner folder name is reserved',
           reply,
           status: 403
         })
@@ -284,15 +311,18 @@ const AdminPhotos = (server: ZodFastifyInstance): void => {
         for await (const part of parts) {
           if (part.type !== 'file') continue
 
-          const format = part.mimetype.split('/')[1]
+          const buffer = await part.toBuffer()
+
+          // U-01: derive the stored extension from verified content
+          const { ext } = validateImage(buffer, part.mimetype)
           const originalName = (part.filename || part.fieldname).trim()
           const baseName =
             originalName.replace(/\.[^./]+$/, '').replace(/[^\w.-]+/g, '-') ||
             'photo'
           const path = await photoStorage.upload(
             name,
-            `${baseName}-${randomUUID()}.${format}`,
-            await part.toBuffer()
+            `${baseName}-${randomUUID()}.${ext}`,
+            buffer
           )
 
           urls.push(photoStorage.getUrl(path))

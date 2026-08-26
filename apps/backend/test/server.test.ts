@@ -181,4 +181,18 @@ describe('HTTP hardening (REQ-6/7) — security headers and rate limit', () => {
     const got429 = burst.some(res => res.statusCode === 429)
     expect(got429).toBe(true)
   })
+
+  it('does not reflect an arbitrary Origin when CORS_ORIGINS is unset (F-03)', async () => {
+    const { Server } = await import('../src/network/server.js')
+    currentServer = Server
+    await Server.start()
+
+    const res = await Server.app.inject({
+      method: 'GET',
+      url: '/healthz',
+      headers: { origin: 'https://evil.com' }
+    })
+
+    expect(res.headers['access-control-allow-origin']).toBeUndefined()
+  })
 })

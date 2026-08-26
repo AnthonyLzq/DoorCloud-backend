@@ -4,10 +4,17 @@ import { safeEqual } from './auth'
 
 const REALM = 'DoorCloud'
 
-// Exempt paths: container liveness and signed photo URLs consumed by
-// OpenWA/WhatsApp. Everything else requires Basic credentials.
+// Exempt paths: container liveness, signed photo URLs consumed by
+// OpenWA/WhatsApp, and the Bearer-governed admin/setup API surfaces. These
+// are authorized by their route-level setupAuthMiddleware (Bearer), which
+// runs after this global preHandler, so exempting them lets Bearer win
+// without the Basic layer rejecting the same authorization header.
+// Everything else requires Basic credentials.
 const isExemptPath = (path: string): boolean =>
-  path.startsWith('/healthz') || path.startsWith('/photos')
+  path.startsWith('/healthz') ||
+  path.startsWith('/photos') ||
+  path.startsWith('/admin') ||
+  path.startsWith('/setup')
 
 const reject = (reply: FastifyReply): void => {
   reply

@@ -68,8 +68,13 @@ class Server {
     })
     this.#photoStorage = photoStorage
 
+    // F-03: when CORS_ORIGINS is unset, do NOT reflect an arbitrary request
+    // Origin (the old `CORS_ORIGINS ?? true` echoed any Origin in dev). A
+    // non-configured origin defaults to a non-reflecting safe policy (deny
+    // cross-origin) because the Preact SPA is same-origin and PHOTOS_BASE_URL
+    // image loads are not CORS fetches. When configured, the allowlist applies.
     await this.#app.register(cors, {
-      origin: CORS_ORIGINS ?? true
+      origin: CORS_ORIGINS ?? false
     })
     await this.#app.register(multipart, {
       limits: {

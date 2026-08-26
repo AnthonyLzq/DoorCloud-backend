@@ -1,6 +1,6 @@
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { extname } from 'node:path'
+import { basename, extname } from 'node:path'
 import { getEnv } from 'config/env'
 import type {
   FastifyBaseLogger,
@@ -88,7 +88,12 @@ const Photos = (server: ZodFastifyInstance): void => {
       throw error
     }
 
-    return reply.type(contentTypeFor(fullPath)).send(createReadStream(fullPath))
+    // U-04: explicit Content-Disposition (defense-in-depth) so browsers treat
+    // the payload as the intended image file rather than guessing content type.
+    return reply
+      .type(contentTypeFor(fullPath))
+      .header('Content-Disposition', `inline; filename="${basename(fullPath)}"`)
+      .send(createReadStream(fullPath))
   })
 }
 
