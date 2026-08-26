@@ -13,6 +13,13 @@ mkdir -p "$MODELS_DIR/insightface" "$MODELS_DIR/mediapipe" "$MODELS_DIR/dlib"
 # truth for the production downloader).
 BUFFALO_S_SHA256="d85a87f503f691807cd8bb97128bdf7a0660326cd9cd02657127fa978bab8b5e"
 
+# CD-12 supply-chain pin: sha256 of the dlib artifacts as served from
+# https://dlib.net/files (HTTPS only). Computed Aug 2026 from the live
+# artifacts; verified BEFORE extraction so a tampered or truncated archive
+# never reaches bunzip2.
+DLIB_RECOGNITION_SHA256="abb1f61041e434465855ce81c2bd546e830d28bcbed8d27ffbe5bb408b11553a"
+DLIB_SHAPE_PREDICTOR_SHA256="7d6637b8f34ddb0c1363e09a4628acb34314019ec3566fd66b80c04dda6980f5"
+
 # Function to extract zip files using Python (fallback if unzip is not available)
 extract_zip() {
   local zip_file="$1"
@@ -91,7 +98,10 @@ fi
 if [ ! -f "$MODELS_DIR/dlib/dlib_face_recognition_resnet_model_v1.dat" ]; then
   echo "Downloading dlib face recognition..."
   curl -L --retry 3 -o "$MODELS_DIR/dlib/dlib_face_recognition_resnet_model_v1.dat.bz2" \
-    "http://dlib.net/files/dlib_face_recognition_resnet_model_v1.dat.bz2"
+    "https://dlib.net/files/dlib_face_recognition_resnet_model_v1.dat.bz2"
+  echo "Verifying dlib recognition sha256 (pinned)..."
+  verify_sha256 "$MODELS_DIR/dlib/dlib_face_recognition_resnet_model_v1.dat.bz2" \
+    "$DLIB_RECOGNITION_SHA256"
   echo "Extracting dlib model..."
   bunzip2 "$MODELS_DIR/dlib/dlib_face_recognition_resnet_model_v1.dat.bz2"
   echo "✓ dlib face recognition downloaded"
@@ -101,8 +111,11 @@ fi
 if [ ! -f "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat" ]; then
   echo "Downloading dlib shape predictor..."
   curl -L --retry 3 -o "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat.bz2" \
-    "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
-  echo "Extracting dlib shape predictor..."
+    "https://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
+  echo "Verifying shape predictor sha256 (pinned)..."
+  verify_sha256 "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat.bz2" \
+    "$DLIB_SHAPE_PREDICTOR_SHA256"
+  echo "Extracting shape predictor..."
   bunzip2 "$MODELS_DIR/dlib/shape_predictor_68_face_landmarks.dat.bz2"
   echo "✓ dlib shape predictor downloaded"
 fi
