@@ -44,6 +44,11 @@ fi
 
 chown mosquitto:mosquitto "$rendered_config" 2>/dev/null || true
 chmod 644 "$rendered_config"
+if [ -n "$tls_cafile" ]; then
+  # Bind-mounted certs keep host ownership; make them readable by the broker
+  # user when the entrypoint runs as root (no-op otherwise).
+  chown mosquitto:mosquitto "$tls_cafile" "$tls_certfile" "$tls_keyfile" 2>/dev/null || true
+fi
 echo "[doorcloud] passwordfile generated for: $backend_user, $device_user"
 
 exec mosquitto -c "$rendered_config"

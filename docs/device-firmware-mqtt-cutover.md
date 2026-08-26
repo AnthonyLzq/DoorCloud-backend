@@ -1,56 +1,65 @@
-# Device Firmware MQTT Cutover (Deferred Follow-up)
+# Device Firmware MQTT Cutover (TLS)
 
-Status: DEFERRED. This document makes the deferral explicit instead of
-silently breaking devices when the MQTT network surface is reduced.
+Status: PARTIALLY DONE (2026-08-26). The broker-side 8883 TLS listener is
+**active** in the local compose stack; the device CLI defaults to `mqtts`.
+Physical firmware must still point at `mqtts://<broker-host>:8883` with the CA
+pinned, and the Coolify production deploy must mount its own certs.
 
-## What changed (Slice 5, SEC-03 / CD-13)
+## Broker side (done)
 
-The production compose stack no longer publishes MQTT (1883) or OpenWA
-(2785) ports to the host; broker traffic stays on the internal compose
-network. `MQTT_PASS` is now required in compose (`${MQTT_PASS:?}`, no
-default fallback), and the generated `infra/mosquitto/passwordfile` is
-gitignored.
+- Provisioned a per-deployment CA + broker server certificate in
+  `infra/mosquitto/certs/` (gitignored, never committed). SAN covers
+  `mosquitto`, `localhost`, `doorcloud.noirsystems.net`, `127.0.0.1` and the
+  LAN IP.
+- `docker-compose.yaml` mosquitto service mounts `infra/mosquitto/certs` at
+  `/mosquitto/certs` (read-only) and sets the `MOSQUITTO_TLS_*` defaults to
+  those container paths; the 8883 listener is published on the host.
+- `password-generator.sh` renders the 8883 listener on startup (fail-closed:
+  no plaintext 8883 fallback) and adjusts cert ownership for the broker user.
+- Verified live: TLS CONNACK 0 with backend and device credentials; host-side
+  `mqtts://localhost:8883` connection with CA pin succeeds, and without the
+  CA the handshake is rejected (self-signed chain).
 
-## Device impact
+## Device side (pending, hardware)
 
-Anything that reached the broker through a published plaintext
-`tcp://<host>:1883` loses host access once the port mapping is gone:
+- Physical firmware endpoint: `mqtts://<broker-host>:8883`, username
+  `MQTT_DEVICE_USER`, password `MQTT_DEVICE_PASS`, CA pinned (same
+  `infra/mosquitto/certs/ca.crt` content).
+- CLI tool default is already TLS (`apps/backend/scripts/photo-send.ts`:
+  `MQTT_PROTOCOL=mqtts`, `MQTT_PORT=8883`, `MQTT_CA` default
+  `../../infra/mosquitto/certs/ca.crt`).
 
-- `apps/backend/scripts/photo-send.ts` (device CLI) defaults to plaintext
-  `localhost:1883` with `MQTT_DEVICE_USER` / `MQTT_DEVICE_PASS`.
-- Physical firmware that connects to `<host>:1883` over the LAN.
+## Generating certificates (per deployment)
 
-The broker itself is unchanged inside the compose network
-(`mosquitto:1883`), and the compose stack still carries the
-`MQTT_DEVICE_USER` / `MQTT_DEVICE_PASS` device account.
+```bash
+mkdir -p infra/mosquitto/certs && cd infra/mosquitto/certs
+openssl genrsa -out ca.key 4096
+openssl req -x509 -new -key ca.key -sha256 -days 3650 -out ca.crt \
+  -subj "/CN=DoorCloud LAN CA"
+openssl genrsa -out server.key 2048
+openssl req -new -key server.key -out server.csr -subj "/CN=doorcloud-broker"
+printf "subjectAltName=DNS:mosquitto,DNS:localhost,DNS:doorcloud.noirsystems.net,IP:127.0.0.1,IP:192.168.176.4\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n" > san.ext
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -out server.crt -days 825 -sha256 -extfile san.ext
+rm -f server.csr san.ext
+```
 
-## Options for devices
+Adjust the SAN list (DNS/IP) to the real broker endpoints before deploying.
 
-1. Internal network: run the device on the same compose network and target
-   `mosquitto:1883` (no host mapping needed).
-2. TLS cutover: connect to the config-ready 8883 listener once certificates
-   are provisioned (below).
+## Production (Coolify) notes
 
-## TLS cutover timing (8883)
-
-The 8883 listener is config-ready but dormant: `password-generator.sh`
-appends it to the rendered broker config when `MOSQUITTO_TLS_CAFILE`,
-`MOSQUITTO_TLS_CERTFILE` and `MOSQUITTO_TLS_KEYFILE` are all set in compose
-(mosquitto 2.x cannot expand env vars in config files, so the entrypoint
-renders them). Until then, 8883 is not listening.
-
-1. Provision a CA and a server certificate for the broker host.
-2. Mount the certs into the mosquitto container (bake into the image or add
-   a volume) and set the three `MOSQUITTO_TLS_*` env vars in compose.
-3. Point devices at `mqtts://<host>:8883` with the CA pinned, switch
-   `MQTT_PROTOCOL` to `mqtts`, and use `MQTT_DEVICE_USER` /
-   `MQTT_DEVICE_PASS`.
-4. Update `apps/backend/scripts/photo-send.ts` defaults to TLS once
-   firmware has cut over.
+- The compose defaults point at `/mosquitto/certs/*` inside the container;
+  Coolify must provide those files (own volume/secret) and/or override
+  `MOSQUITTO_TLS_CAFILE` / `MOSQUITTO_TLS_CERTFILE` / `MOSQUITTO_TLS_KEYFILE`
+  with the container paths. 1883 stays internal-only (CD-13).
+- Passwordfile is regenerated per boot (`password-generator.sh`), keep the
+  Mosquitto password env vars set.
 
 ## Follow-up checklist
 
-- [ ] Provision broker CA + server certificates.
-- [ ] Set `MOSQUITTO_TLS_*` in the deploy environment to activate 8883.
-- [ ] Update device firmware endpoint to `mqtts://<host>:8883` with CA pin.
-- [ ] Update `photo-send.ts` defaults to `mqtts` after firmware cutover.
+- [x] Provision broker CA + server certificates (local stack).
+- [x] Set `MOSQUITTO_TLS_*` (compose defaults) to activate 8883.
+- [ ] Provision certs in the Coolify production environment (same material,
+      own mount) and verify 8883 there.
+- [ ] Update physical firmware endpoint to `mqtts://<host>:8883` with CA pin.
+- [x] Update `photo-send.ts` defaults to `mqtts` (CA pulled from repo certs).
