@@ -16,22 +16,42 @@ mosquitto_passwd -b "$target" "$device_user" "$device_pass"
 chown mosquitto:mosquitto "$target" 2>/dev/null || true
 chmod 600 "$target"
 
-# T5.3: render the final broker config from the baked base plus the 8883 TLS
+# CD-14: render the final broker config from the baked base plus the 8883 TLS
 # listener. mosquitto 2.x cannot expand env vars in config files, so the TLS
-# block is appended from the MOSQUITTO_TLS_* env provided by compose; it
-# stays disabled until all three paths are set (no plaintext 8883 fallback).
-tls_cafile="${MOSQUITTO_TLS_CAFILE:-}"
-tls_certfile="${MOSQUITTO_TLS_CERTFILE:-}"
-tls_keyfile="${MOSQUITTO_TLS_KEYFILE:-}"
+# block is appended from MOSQUITTO_TLS_*_B64 env provided by compose. The
+# certificates travel as base64 content (single-line, secret-friendly) and are
+# materialized into the existing config-private volume by the entrypoint, so
+# no host bind or shared volume is required (Coolify-compatible). The listener
+# stays disabled until all three envs are set (no plaintext 8883 fallback).
+tls_ca_b64="${MOSQUITTO_TLS_CA_B64:-}"
+tls_cert_b64="${MOSQUITTO_TLS_CERT_B64:-}"
+tls_key_b64="${MOSQUITTO_TLS_KEY_B64:-}"
 
 : > "$rendered_config"
 cat "$base_config" >> "$rendered_config"
 
-if [ -n "$tls_cafile" ] || [ -n "$tls_certfile" ] || [ -n "$tls_keyfile" ]; then
-  if [ -z "$tls_cafile" ] || [ -z "$tls_certfile" ] || [ -z "$tls_keyfile" ]; then
-    echo "[doorcloud] MOSQUITTO_TLS_CAFILE, MOSQUITTO_TLS_CERTFILE and MOSQUITTO_TLS_KEYFILE must all be set together" >&2
+tls_dir="/mosquitto/config-private/certs"
+tls_cafile=""
+tls_certfile=""
+tls_keyfile=""
+
+if [ -n "$tls_ca_b64" ] || [ -n "$tls_cert_b64" ] || [ -n "$tls_key_b64" ]; then
+  if [ -z "$tls_ca_b64" ] || [ -z "$tls_cert_b64" ] || [ -z "$tls_key_b64" ]; then
+    echo "[doorcloud] MOSQUITTO_TLS_CA_B64, MOSQUITTO_TLS_CERT_B64 and MOSQUITTO_TLS_KEY_B64 must all be set together" >&2
     exit 1
   fi
+
+  mkdir -p "$tls_dir"
+  tls_cafile="$tls_dir/ca.crt"
+  tls_certfile="$tls_dir/server.crt"
+  tls_keyfile="$tls_dir/server.key"
+  printf '%s' "$tls_ca_b64" | base64 -d > "$tls_cafile"
+  printf '%s' "$tls_cert_b64" | base64 -d > "$tls_certfile"
+  printf '%s' "$tls_key_b64" | base64 -d > "$tls_keyfile"
+  chown mosquitto:mosquitto "$tls_cafile" "$tls_certfile" "$tls_keyfile" 2>/dev/null || true
+  chmod 644 "$tls_cafile" "$tls_certfile" 2>/dev/null || true
+  chmod 600 "$tls_keyfile" 2>/dev/null || true
+
   cat >> "$rendered_config" <<EOF
 
 listener 8883 0.0.0.0

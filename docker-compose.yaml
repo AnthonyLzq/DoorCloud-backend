@@ -122,24 +122,30 @@ services:
     image: doorcloud-mosquitto
     container_name: doorcloud-mosquitto
     restart: unless-stopped
-    # CD-13: no host port mapping. The broker is reachable only on the
-    # internal compose network (mosquitto:1883, CD-7); the MQTT integration
-    # harness opts into a host mapping via docker-compose.integration.yaml,
-    # which shares the MOSQUITTO_PORT source (REQ-3).
+    # CD-13: no host port mapping for the plaintext surface. The broker is
+    # reachable only on the internal compose network (mosquitto:1883, CD-7);
+    # the MQTT integration harness opts into a host mapping via
+    # docker-compose.integration.yaml, which shares the MOSQUITTO_PORT source
+    # (REQ-3). CD-14: the device-facing TLS listener (8883) is published below
+    # and dormant until MOSQUITTO_TLS_*_B64 are set (fail-closed).
     environment:
       # CD-13: no default MQTT password fallback (see doorcloud service).
       MOSQUITTO_BACKEND_PASSWORD: ${MQTT_PASS:?MQTT_PASS is required}
       MOSQUITTO_BACKEND_USER: ${MQTT_USER:-doorcloud-backend}
       MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-doorcloud-device}
       MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-doorcloud-device-local}
-      # T5.3: 8883 TLS listener is config-ready. mosquitto 2.x cannot expand
-      # env vars in config files, so password-generator.sh appends the TLS
-      # listener to the rendered config only when all three paths are set.
-      # Provision certs in the image or a volume first; see
-      # infra/mosquitto/mosquitto.conf + docs/device-firmware-mqtt-cutover.md.
-      MOSQUITTO_TLS_CAFILE: ${MOSQUITTO_TLS_CAFILE:-}
-      MOSQUITTO_TLS_CERTFILE: ${MOSQUITTO_TLS_CERTFILE:-}
-      MOSQUITTO_TLS_KEYFILE: ${MOSQUITTO_TLS_KEYFILE:-}
+      # CD-14: 8883 TLS listener, opt-in. Certificates travel as base64 content
+      # (single-line secrets) and are materialized into the config-private
+      # volume by password-generator.sh, so no repo-relative bind is needed
+      # (Coolify-compatible). All-or-nothing: if only some are set the broker
+      # fails closed. Set per deployment: Coolify app env or local .env.
+      MOSQUITTO_TLS_CA_B64: ${MOSQUITTO_TLS_CA_B64:-}
+      MOSQUITTO_TLS_CERT_B64: ${MOSQUITTO_TLS_CERT_B64:-}
+      MOSQUITTO_TLS_KEY_B64: ${MOSQUITTO_TLS_KEY_B64:-}
+    ports:
+      # CD-14: device-facing TLS surface. Only listens once the TLS envs are
+      # set; until then connections are refused (no plaintext fallback).
+      - '8883:8883'
     volumes:
       # Brok config/ACL/password-generator are baked into the image (Coolify
       # cannot bind repo-relative files from a compose app). Only runtime data
