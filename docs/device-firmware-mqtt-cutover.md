@@ -1,9 +1,11 @@
 # Device Firmware MQTT Cutover (TLS)
 
-Status: DESIGN READY (2026-08-26). Broker-side TLS is implemented as an
-**opt-in, Coolify-compatible** listener (8883). Dormant by default (no
-plaintext fallback). Nothing changes for the current deployment until the
-three `MOSQUITTO_TLS_*_B64` env vars are set.
+Status: PENDING UNTIL DEVICE (2026-08-26). Broker-side TLS is **active inside
+the container** in both stacks (local + Coolify prod, `8883 TLS listener
+enabled`), the `MOSQUITTO_TLS_*_B64` envs are set in Coolify, and the image
+tag is pinned (`doorcloud-mosquitto:cd-14`). The ONLY remaining step before
+a device can connect is exposing port 8883 on the Coolify host (see
+"Expose 8883 in prod" below) — deferred until a real device exists.
 
 ## Why env-content (base64) instead of file paths
 
@@ -30,11 +32,35 @@ export MOSQUITTO_TLS_KEY_B64="$(base64 -w0 infra/mosquitto/certs/server.key)"
 
    - Local: put the three lines in the gitignored `.env` and
      `docker compose up -d --build mosquitto`.
-   - Coolify: set them as app env vars (or database-type secrets) before the
-     next deploy; the 8883 port is already published by the compose file.
+   - Coolify: set them as app env vars (done 2026-08-26); the publisher
+     rebuilds the image via the pinned tag.
 3. Verify: `docker logs doorcloud-mosquitto | grep "8883 TLS listener enabled"`
-   and connect with the CA pinned, e.g.
-   `mosquitto_sub -h <host> -p 8883 --cafile ca.crt -u doorcloud-device -P '<pass>'`.
+   (prod log confirmed 2026-08-26: listener active inside the container).
+
+## Expose 8883 in prod (PENDING - do when a device exists)
+
+Coolify v4 does NOT publish `ports:` of a compose application to the host
+(verified: 1996/1883/8883 all closed on `doorcloud.noirsystems.net`; traffic
+goes through the internal proxy network only). Two options:
+
+1. **Proxy TCP routing (recommended)** — the proven pattern for MQTT in
+   Coolify:
+   - Server (SSH): add a `mqtt` entrypoint `:8883` to the Coolify proxy
+     (static config at `/data/coolify/proxy/...`, ports `8883:8883` on the
+     proxy container) and restart the proxy.
+   - Coolify UI: enable **Connect to Predefined Network** on the app so the
+     mosquitto container joins the proxy network.
+   - Repo: add `traefik.tcp.*` labels (HostSNI `doorcloud.noirsystems.net`,
+     entrypoints `mqtt`, TLS passthrough, loadbalancer port 8883) to the
+     mosquitto service in `docker-compose.yaml`.
+   - Device: `mqtts://doorcloud.noirsystems.net:8883` with the CA pinned (the
+     server cert already carries that SAN).
+2. **Raw Compose Deployment** — applies the compose as-is (publishes 8883 on
+   the host) but requires writing the proxy labels for the web app too;
+   heavier, not recommended.
+
+Until then, the listener stays active inside the container with no external
+exposure (secure by default: nothing open, nothing reachable).
 
 ## Generating certificates (per deployment)
 
