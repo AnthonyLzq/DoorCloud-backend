@@ -119,7 +119,7 @@ services:
   mosquitto:
     build:
       context: ./infra/mosquitto
-    image: doorcloud-mosquitto
+    image: doorcloud-mosquitto:cd-14
     container_name: doorcloud-mosquitto
     restart: unless-stopped
     # CD-13: no host port mapping for the plaintext surface. The broker is
