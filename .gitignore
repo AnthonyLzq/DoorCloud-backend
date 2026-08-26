@@ -186,9 +186,3 @@ apps/web/playwright-report/
 .turbo/
 apps/*/.turbo/
 packages/*/.turbo/
-
-# Strix scan artifacts (runtime data, regenerable; never commit)
-strix_runs/
-
-# MQTT broker TLS certs (provisioned per deployment, never commit)
-infra/mosquitto/certs/

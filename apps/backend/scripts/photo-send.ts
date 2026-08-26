@@ -37,14 +37,9 @@ const mqttOptions = (): mqtt.IClientOptions => {
     MQTT_DEVICE_USER,
     MQTT_HOST,
     MQTT_KEEPALIVE = '60',
-    MQTT_PORT = '8883',
-    MQTT_PROTOCOL = 'mqtts',
-    // CD-14: the broker CA for the TLS listener. Relative to apps/backend
-    // (this script runs from there); a device would pin its own copy.
-    MQTT_CA = '../../infra/mosquitto/certs/ca.crt'
+    MQTT_PORT = '1883',
+    MQTT_PROTOCOL = 'mqtt'
   } = process.env
-
-  const protocol = MQTT_PROTOCOL === 'mqtts' ? 'mqtts' : 'mqtt'
 
   return {
     clean: MQTT_CLEAN !== 'false',
@@ -56,12 +51,9 @@ const mqttOptions = (): mqtt.IClientOptions => {
     // scripts/mosquitto/create-password-file.sh.
     password: MQTT_DEVICE_PASS ?? 'doorcloud-device-local',
     port: Number(MQTT_PORT),
-    protocol,
+    protocol: MQTT_PROTOCOL === 'mqtts' ? 'mqtts' : 'mqtt',
     reconnectPeriod: 0,
-    username: MQTT_DEVICE_USER ?? 'doorcloud-device',
-    // CD-14: pin the broker CA for mqtts (fail closed: a missing CA file
-    // throws at startup, so the CLI never silently downgrades to plaintext).
-    ...(protocol === 'mqtts' ? { ca: readFileSync(MQTT_CA) } : {})
+    username: MQTT_DEVICE_USER ?? 'doorcloud-device'
   }
 }
 
