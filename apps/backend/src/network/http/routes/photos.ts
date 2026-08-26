@@ -36,6 +36,36 @@ const isNotFoundError = (error: unknown): boolean =>
   'code' in error &&
   (error as { code?: unknown }).code === 'ENOENT'
 
+// U-04a: header values reject control chars and non-ASCII; a person folder
+// name may legally contain CR/LF/quotes or accented characters (e.g.
+// "Nicolás\r\nR-Ro-<uuid>.jpg"), which would make setHeader throw
+// ERR_INVALID_CHAR and turn the response into a 500. Keep the plain
+// filename RFC 6266-safe (ASCII fallback) and carry the real name in an
+// RFC 5987 filename* (percent-encoded).
+const headerContentDisposition = (fullPath: string): string => {
+  const name = basename(fullPath)
+  const fallback = Array.from(name)
+    .map(c => {
+      const code = c.charCodeAt(0)
+      if (
+        code < 0x20 ||
+        code === 0x7f ||
+        code > 0x7e ||
+        c === '"' ||
+        c === '\\'
+      )
+        return '_'
+      return c
+    })
+    .join('')
+  const encoded = encodeURIComponent(name).replace(
+    /[!'()*]/g,
+    c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  )
+
+  return `inline; filename="${fallback}"; filename*=UTF-8''${encoded}`
+}
+
 /**
  * Serves signed photo URLs under /photos/:signature/:expiresAt/*.
  *
@@ -90,9 +120,11 @@ const Photos = (server: ZodFastifyInstance): void => {
 
     // U-04: explicit Content-Disposition (defense-in-depth) so browsers treat
     // the payload as the intended image file rather than guessing content type.
+    // U-04a: the filename is sanitized so control/non-ASCII characters in a
+    // person folder name can never inject header values or break the response.
     return reply
       .type(contentTypeFor(fullPath))
-      .header('Content-Disposition', `inline; filename="${basename(fullPath)}"`)
+      .header('Content-Disposition', headerContentDisposition(fullPath))
       .send(createReadStream(fullPath))
   })
 }

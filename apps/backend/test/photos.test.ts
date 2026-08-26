@@ -136,4 +136,38 @@ describe('Signed photo serving (RF-4)', () => {
     expect(response.headers['content-disposition']).toContain('inline')
     expect(response.headers['content-disposition']).toContain('selfie.jpg')
   })
+
+  test('U-04a: CRLF and non-ASCII filenames never break the response', async () => {
+    const app = await buildApp()
+
+    mkdirSync(join(photosDir, 'Ana-42'), { recursive: true })
+    writeFileSync(join(photosDir, 'Ana-42', 'selfie\r\n42.jpg'), 'photo-content')
+    writeFileSync(join(photosDir, 'Ana-42', 'selfie ñ.jpg'), 'photo-content')
+
+    const sign = (path: string, expiresAt = Date.now() + 30_000) =>
+      createHmac('sha256', PHOTO_URL_SECRET)
+        .update(`${expiresAt}:${path}`)
+        .digest('hex')
+    const urlFor = (rawPath: string) => {
+      const expiresAt = Date.now() + 30_000
+      const encoded = rawPath
+        .split('/')
+        .map(encodeURIComponent)
+        .join('/')
+
+      return `/photos/${sign(rawPath, expiresAt)}/${expiresAt}/${encoded}`
+    }
+
+    const crlf = await app.inject({ method: 'GET', url: urlFor('Ana-42/selfie\r\n42.jpg') })
+    expect(crlf.statusCode).toBe(200)
+    expect(crlf.headers['content-disposition']).not.toMatch(/[\r\n]/)
+    expect(crlf.headers['content-disposition']).toContain('filename*=UTF-8')
+    expect(crlf.headers['content-disposition']).toContain('%0D%0A')
+
+    const accent = await app.inject({ method: 'GET', url: urlFor('Ana-42/selfie ñ.jpg') })
+    expect(accent.statusCode).toBe(200)
+    expect(accent.headers['content-disposition']).toContain('filename*=UTF-8')
+    expect(accent.headers['content-disposition']).toContain('%C3%B1')
+    expect(accent.headers['content-disposition']).toContain('filename="selfie _.jpg"')
+  })
 })
