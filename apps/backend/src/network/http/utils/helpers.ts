@@ -12,14 +12,18 @@ const handlerErrorInRoute = (error: unknown) => {
     const errCode = (error as { code?: unknown }).code
 
     // U-02/U-03: multipart/official Fastify body errors map to client errors
-    // instead of 500. A file over the per-route limit is 413; a missing or
-    // malformed multipart content type is 400.
-    if (errCode === 'FST_REQ_FILE_TOO_LARGE') {
-      message = 'File too large'
+    // instead of 500. A file over the per-route limit or more files than the
+    // route allows is 413; a missing/malformed multipart content type or too
+    // many form parts/fields is 400.
+    if (errCode === 'FST_REQ_FILE_TOO_LARGE' || errCode === 'FST_FILES_LIMIT') {
+      message =
+        errCode === 'FST_FILES_LIMIT' ? 'Too many files' : 'File too large'
       code = 413
     } else if (
       errCode === 'FST_INVALID_MULTIPART_CONTENT_TYPE' ||
-      errCode === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
+      errCode === 'FST_ERR_CTP_INVALID_MEDIA_TYPE' ||
+      errCode === 'FST_PARTS_LIMIT' ||
+      errCode === 'FST_FIELDS_LIMIT'
     ) {
       message = 'Invalid or empty multipart body'
       code = 400

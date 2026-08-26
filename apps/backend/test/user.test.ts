@@ -428,10 +428,56 @@ describe('User HTTP routes (RF-3)', () => {
     }
 
     try {
+      handlerErrorInRoute(
+        Object.assign(new Error('too many'), { code: 'FST_FILES_LIMIT' })
+      )
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(413)
+    }
+
+    try {
+      handlerErrorInRoute(
+        Object.assign(new Error('too many'), { code: 'FST_PARTS_LIMIT' })
+      )
+      expect.unreachable()
+    } catch (error) {
+      expect((error as { statusCode: number }).statusCode).toBe(400)
+    }
+
+    try {
       handlerErrorInRoute(new CustomError('unsupported', 415))
       expect.unreachable()
     } catch (error) {
       expect((error as { statusCode: number }).statusCode).toBe(415)
+    }
+  })
+
+  it('maps too many upload files to 413 instead of 500 (U-02a)', async () => {
+    const app = await buildApp()
+    const boundary = '----doorcloud-test'
+    const filePart = (filename: string) =>
+      [
+        `--${boundary}\r\n`,
+        `Content-Disposition: form-data; name="selfie"; filename="${filename}"\r\n`,
+        'Content-Type: image/jpeg\r\n',
+        '\r\n',
+        'photo-bytes',
+        '\r\n'
+      ].join('')
+    const body = filePart('a.jpg') + filePart('b.jpg') + `--${boundary}--\r\n`
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/user/upload',
+        headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+        payload: body
+      })
+
+      expect(res.statusCode).toBe(413)
+    } finally {
+      await app.close()
     }
   })
 })
