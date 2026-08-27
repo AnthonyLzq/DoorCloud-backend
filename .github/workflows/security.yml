@@ -1,0 +1,44 @@
+name: Security - doorcloud
+
+# Supply-chain gate on every push: dependency audit (pnpm) + filesystem
+# vulnerability scan (Trivy, lockfile-aware). Runs BEFORE anything else so a
+# vulnerable push never reaches the deploy pipeline.
+on: [push]
+
+jobs:
+  scan:
+    name: Dependency audit and Trivy scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          hide-progress: true
+          timeout: '10m'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js (pnpm via packageManager field)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod
