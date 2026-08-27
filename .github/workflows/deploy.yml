@@ -1,26 +1,36 @@
 name: Deploy to Coolify
 
-# Redeploys the doorcloud app on every push to master (and manually).
-# Coolify has no GitHub webhook configured for this repo, so the GitHub
-# Actions pipeline is the deploy trigger. COOLIFY_TOKEN secret required.
+# Gated deploy: every push to master first runs the Security - doorcloud
+# workflow (Trivy + pnpm audit); this workflow starts only when that scan
+# completed and fails fast unless it passed. Manual dispatch remains as an
+# override. Coolify has no GitHub webhook configured for this repo, so the
+# GitHub Actions pipeline is the deploy trigger. COOLIFY_TOKEN secret required.
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: ['Security - doorcloud']
+    types: [completed]
     branches: [master]
-    paths-ignore:
-      - 'README.md'
-      - 'AGENTS.md'
-      - 'docs/**'
-      - 'openspec/**'
-      - '.github/workflows/*'
 
 jobs:
   deploy:
     name: Redeploy doorcloud on Coolify
     runs-on: ubuntu-latest
     steps:
+      - name: Gate on security scan
+        if: github.event_name == 'workflow_run'
+        run: |
+          conclusion="${{ github.event.workflow_run.conclusion }}"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::Security scan ${{ github.event.workflow_run.id }} concluded: $conclusion; deploy skipped"
+            exit 1
+          fi
+          echo "Security scan passed; deploying."
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Install Coolify CLI
         run: |

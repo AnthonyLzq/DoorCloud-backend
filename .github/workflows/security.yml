@@ -1,9 +1,20 @@
 name: Security - doorcloud
 
 # Supply-chain gate on every push: dependency audit (pnpm) + filesystem
-# vulnerability scan (Trivy, lockfile-aware). Runs BEFORE anything else so a
-# vulnerable push never reaches the deploy pipeline.
-on: [push]
+# vulnerability scan (Trivy, lockfile-aware). The deploy workflow chains off
+# this run (workflow_run): a push only reaches production after this scan
+# passes. Same paths-ignore as the deploy trigger so docs-only pushes neither
+# scan nor deploy.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'README.md'
+      - 'AGENTS.md'
+      - 'docs/**'
+      - 'openspec/**'
+      - '.github/workflows/*'
 
 jobs:
   scan:
