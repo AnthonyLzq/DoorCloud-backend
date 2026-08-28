@@ -6,7 +6,12 @@ services:
     container_name: doorcloud
     restart: unless-stopped
     ports:
-      - '1996:1996'
+      # CD-15: loopback-only host binding. The web surface is for the local
+      # browser; LAN devices have no HTTP client (the door uses MQTT), and
+      # plain-HTTP Basic auth credentials must not cross the LAN. Remote
+      # access is the Coolify proxy with HTTPS. Coolify ignores this mapping
+      # (it does not publish compose ports to the host).
+      - '127.0.0.1:1996:1996'
     env_file:
       # Remote orchestrators (Coolify) supply the same vars as app-level env;
       # the local .env is optional so a fresh clone deploys without it.
