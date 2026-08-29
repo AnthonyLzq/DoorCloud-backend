@@ -431,6 +431,10 @@ The SPA is served same-origin by the backend and replaces the old
 ships its built `dist`, so a fresh checkout must `pnpm --filter
 @doorcloud/shared build` before building the backend or web consumers.
 
+## Security Analysis
+
+The repository carries a full security review trail: a static hardening change (`openspec/changes/archive/2026-08-14-security-hardening-plan/`), an orchestrated dynamic pentest, a browser UI assessment, and a CI supply-chain gate (Trivy + `pnpm audit` chained before deploys). See [`docs/security-analysis.md`](docs/security-analysis.md) for the thesis-like report (methodology, findings with fix commits, live-probe verification, deployment notes, and references), and [`docs/device-firmware-mqtt-cutover.md`](docs/device-firmware-mqtt-cutover.md) for the MQTT TLS runbook.
+
 ## Benchmark and Demographic Bias Analysis
 
 The repository includes a reproducible benchmark and demographic bias analysis pipeline for the face recognition models. See [`docs/benchmark-analysis.md`](docs/benchmark-analysis.md) for the full thesis-like report (methodology, results, figures, LaTeX tables, and Appendix A with per-model bias tables).
